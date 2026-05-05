@@ -404,6 +404,8 @@ export default function AuditLogPage() {
       (entry) => entry.sessionId === selectedEntry.sessionId && entry.id !== selectedEntry.id
     )
   }, [selectedEntry])
+  const selectedSeverityConfig = selectedEntry ? severityConfig[selectedEntry.severity] : null
+  const SelectedSeverityIcon = selectedSeverityConfig?.icon
 
   const toggleAction = (action: AuditActionType) => {
     setSelectedActions((prev) =>
@@ -716,9 +718,9 @@ export default function AuditLogPage() {
             <>
               <SheetHeader>
                 <SheetTitle className="text-[14px] flex items-center gap-2">
-                  <severityConfig[selectedEntry.severity].icon
-                    className={cn('size-5', severityConfig[selectedEntry.severity].color)}
-                  />
+                  {SelectedSeverityIcon && (
+                    <SelectedSeverityIcon className={cn('size-5', selectedSeverityConfig.color)} />
+                  )}
                   Audit Log Entry
                 </SheetTitle>
               </SheetHeader>
