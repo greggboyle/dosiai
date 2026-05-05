@@ -4,7 +4,13 @@ import { logAuditEvent } from '@/lib/audit/log'
 import type { BillingCycle, WorkspacePlan } from '@/lib/types/dosi'
 import { PLAN_LIMITS } from '@/lib/billing/limits'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '')
+function getStripeClient() {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) {
+    throw new Error('Missing STRIPE_SECRET_KEY')
+  }
+  return new Stripe(key)
+}
 
 const PRICE_ENV_MAP: Record<Exclude<WorkspacePlan, 'trial' | 'enterprise'>, Record<BillingCycle, string>> = {
   starter: {
@@ -31,6 +37,7 @@ function getPriceId(plan: WorkspacePlan, billingCycle: BillingCycle) {
 }
 
 export async function createCheckoutSession(workspaceId: string, plan: WorkspacePlan, billingCycle: BillingCycle) {
+  const stripe = getStripeClient()
   const supabase = createSupabaseAdminClient()
   const { data: workspace } = await supabase.from('workspace').select('*').eq('id', workspaceId).single()
   if (!workspace) throw new Error('Workspace not found')
@@ -52,6 +59,7 @@ export async function createCheckoutSession(workspaceId: string, plan: Workspace
 }
 
 export async function createBillingPortalSession(workspaceId: string) {
+  const stripe = getStripeClient()
   const supabase = createSupabaseAdminClient()
   const { data: workspace } = await supabase.from('workspace').select('*').eq('id', workspaceId).single()
   if (!workspace?.stripe_customer_id) {
@@ -144,6 +152,7 @@ export async function handleWebhook(event: Stripe.Event) {
 }
 
 export function verifyWebhookSignature(payload: string, signature: string) {
+  const stripe = getStripeClient()
   const secret = process.env.STRIPE_WEBHOOK_SECRET
   if (!secret) throw new Error('Missing STRIPE_WEBHOOK_SECRET')
   return stripe.webhooks.constructEvent(payload, signature, secret)
