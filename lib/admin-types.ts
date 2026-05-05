@@ -93,6 +93,7 @@ export type AIPurpose =
   | 'sweep_sell' 
   | 'sweep_channel' 
   | 'sweep_regulatory'
+  | 'sweep_topic'
   | 'scoring'
   | 'embedding'
   | 'brief_drafting'

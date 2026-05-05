@@ -1,0 +1,66 @@
+'use server'
+
+import { getSession } from '@/lib/auth/session'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { inngest } from '@/inngest/client'
+import { checkCostBudget } from '@/lib/ai/cost'
+import type { WorkspacePlan } from '@/lib/types/dosi'
+
+async function requireWorkspaceAdmin(): Promise<{ workspaceId: string; userId: string; plan: WorkspacePlan }> {
+  const session = await getSession()
+  if (!session?.user) throw new Error('Unauthorized')
+
+  const supabase = await createSupabaseServerClient()
+  const { data: member } = await supabase
+    .from('workspace_member')
+    .select('workspace_id, role')
+    .eq('user_id', session.user.id)
+    .eq('status', 'active')
+    .order('joined_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (!member || member.role !== 'admin') {
+    throw new Error('Only workspace admins can run a manual sweep')
+  }
+
+  const { data: workspace } = await supabase
+    .from('workspace')
+    .select('id, plan')
+    .eq('id', member.workspace_id)
+    .single()
+
+  if (!workspace) throw new Error('Workspace not found')
+
+  return {
+    workspaceId: workspace.id,
+    userId: session.user.id,
+    plan: workspace.plan as WorkspacePlan,
+  }
+}
+
+export async function triggerManualSweep(): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const { workspaceId, userId, plan } = await requireWorkspaceAdmin()
+    if (plan === 'trial') {
+      return { ok: false, error: 'Manual sweeps require Starter or higher on this workspace.' }
+    }
+
+    const budget = await checkCostBudget(workspaceId, plan)
+    if (!budget.ok) {
+      return {
+        ok: false,
+        error: 'AI cost ceiling reached. Raise the ceiling or wait for the monthly reset.',
+      }
+    }
+
+    await inngest.send({
+      name: 'sweep/run',
+      data: { workspaceId, trigger: 'manual', triggerUserId: userId },
+    })
+    return { ok: true }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Sweep could not be scheduled'
+    return { ok: false, error: msg }
+  }
+}

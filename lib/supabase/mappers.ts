@@ -19,6 +19,9 @@ export function workspaceFromDb(row: Database['public']['Tables']['workspace']['
     stripeSubscriptionId: row.stripe_subscription_id ?? undefined,
     createdAt: row.created_at,
     lastActiveAt: row.last_active_at,
+    lastSweepAt: row.last_sweep_at ?? undefined,
+    reviewQueueThreshold: row.review_queue_threshold,
+    scoringWeights: (row.scoring_weights as Record<string, number>) ?? undefined,
   }
 }
 
@@ -42,6 +45,9 @@ export function workspaceToDb(
     stripe_subscription_id: workspace.stripeSubscriptionId ?? null,
     created_at: workspace.createdAt,
     last_active_at: workspace.lastActiveAt,
+    last_sweep_at: workspace.lastSweepAt ?? null,
+    review_queue_threshold: workspace.reviewQueueThreshold,
+    scoring_weights: workspace.scoringWeights ?? undefined,
   }
 }
 

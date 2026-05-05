@@ -3,6 +3,7 @@
 import { logAuditEvent } from '@/lib/audit/log'
 import { getOperatorSession } from '@/lib/auth/operator'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { inngest } from '@/inngest/client'
 
 export async function runSweepOnBehalf(workspaceId: string, reason: string) {
   const operatorSession = await getOperatorSession()
@@ -13,8 +14,11 @@ export async function runSweepOnBehalf(workspaceId: string, reason: string) {
   const { data: workspace } = await supabase.from('workspace').select('id,name').eq('id', workspaceId).single()
   if (!workspace) throw new Error('Workspace not found')
 
-  // Phase 1 stub: only logs and audits action.
-  // Phase 2 can add an Inngest event dispatch here to kick off actual sweep orchestration.
+  await inngest.send({
+    name: 'sweep/run',
+    data: { workspaceId, trigger: 'manual' as const, triggerUserId: null },
+  })
+
   await logAuditEvent({
     severity: 'warn',
     category: 'operator',

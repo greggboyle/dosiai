@@ -1,34 +1,31 @@
-# Current Phase: Phase 1 — Foundation
+# Current Phase: Phase 2 — Ingestion Engine
 
 In scope for this phase:
-- Supabase project setup, schema migrations for foundational entities
-- RLS policies on every workspace-scoped table
-- Supabase Auth (email + Google + Microsoft SSO)
-- Workspace, WorkspaceMember, WorkspaceInvite entities and full lifecycle
-- Trial state machine (active → read_only on expiration)
-- Plan tier definitions and enforcement (analyst seat caps, competitor caps, topic caps, battle card caps; AI cost ceiling structure exists but isn't enforced yet — that's Phase 2)
-- Stripe integration: Checkout for upgrades, Customer Portal for billing management, webhooks for plan transitions
-- Operator admin scaffold: separate auth, workspace list, workspace detail, override management, impersonation, audit log viewer
-- Audit log infrastructure
-- Wire existing v0 UI shell (sidebar, top bar, layout) to real auth and workspace context
-- Stub list views for competitors, topics, briefs, battle cards, win/loss (empty states only)
+- Inngest workflows for sweep orchestration and AI vendor calls
+- AI vendor abstraction layer (OpenAI, Anthropic, xAI)
+- AIRoutingConfig and operator UI for managing it
+- PromptTemplate management with draft/active split, versioning, A/B testing
+- IntelligenceItem schema and ingestion pipeline
+- pgvector setup and embedding generation
+- MIS computation (deterministic + LLM-assisted explanation)
+- Confidence as first-class field on items
+- Cross-vendor and cross-sweep deduplication
+- Review Queue filter (items below threshold)
+- Competitor auto-discovery and AI-assisted profile population
+- AI cost tracking with transactional increment and ceiling enforcement
+- Vendor health and cost monitoring (operator admin)
+- Manual and scheduled sweeps
+- Wire feed, dashboard top-of-feed, review queue, and competitor profile to real ingested data
 
-Out of scope for this phase (deferred to Phase 2):
-- Any AI vendor integration
-- Sweep orchestration
-- IntelligenceItem ingestion
-- MIS computation
-- Embeddings and pgvector
-- AIRoutingConfig and PromptTemplate (entity exists in schema but no operator UI yet)
-
-Out of scope for this phase (deferred to Phase 3):
-- Brief authoring
-- Battle card authoring (rep view and author view)
-- Win/loss outcome logging form (the data model exists, but the form is Phase 3)
-- Customer Voice view
+Out of scope (deferred to Phase 3):
+- Brief authoring (AI drafting model is configured, but UI is Phase 3)
+- Battle card authoring and rep view (the recent_activity section needs sweep data, hence Phase 2 prereq, but the rest of the surface is Phase 3)
+- Win/loss outcome logging form
+- Customer Voice dedicated tab
 - Channels view
 - Notifications (email, Slack, Teams, webhook)
-- Real-time subscriptions for live feed updates
-- Trial warning modal sequence (T-7, T-3, T-1) — the trial state machine is in scope; the modal UX is Phase 3
+- Real-time subscriptions for live feed updates as sweeps complete
+- Trial warning modal sequence
+- Polished limit-hit upgrade prompts (Phase 1 stub toasts remain)
 
-Read docs/spec/dosi_ai_design_prompt.md §1, §2, §4, §10, §11, §12, §15, §16 for the full context relevant to this phase.
+Read docs/spec/dosi_ai_design_prompt.md §3, §4, §5, §6, §7, §11, §12 for the full context relevant to this phase.

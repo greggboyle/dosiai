@@ -15,7 +15,15 @@ export type OverrideType =
   | 'battle_card_cap'
   | 'ai_cost_ceiling_cents'
 export type AuditSeverity = 'info' | 'warn' | 'error' | 'critical'
-export type AuditCategory = 'system' | 'auth' | 'billing' | 'membership' | 'override' | 'operator' | 'workspace'
+export type AuditCategory =
+  | 'system'
+  | 'auth'
+  | 'billing'
+  | 'membership'
+  | 'override'
+  | 'operator'
+  | 'workspace'
+  | 'ai_routing'
 export type ImpersonationMode = 'read_only' | 'write'
 
 export interface Workspace {
@@ -35,6 +43,70 @@ export interface Workspace {
   stripeSubscriptionId?: string
   createdAt: string
   lastActiveAt: string
+  lastSweepAt?: string
+  reviewQueueThreshold?: number
+  scoringWeights?: Record<string, number>
+}
+
+/** Canonical AI routing / vendor identifiers (align with DB enums). */
+export type AiVendor = 'openai' | 'anthropic' | 'xai'
+
+export type AiPurpose =
+  | 'sweep_buy'
+  | 'sweep_sell'
+  | 'sweep_channel'
+  | 'sweep_regulatory'
+  | 'sweep_topic'
+  | 'scoring'
+  | 'embedding'
+  | 'brief_drafting'
+  | 'battle_card_interview'
+
+export interface AiRoutingRuleRow {
+  vendor: AiVendor
+  model: string
+  isPrimary: boolean
+  isEnabled: boolean
+}
+
+export type MisBand = 'noise' | 'low' | 'medium' | 'high' | 'critical'
+
+export interface MisScore {
+  value: number
+  band: MisBand
+  components: Record<string, number>
+  explanation: string
+  confidence: 'low' | 'medium' | 'high'
+  confidenceReason?: string
+}
+
+export interface PromptAbTest {
+  isActive: boolean
+  controlVersion: number
+  testVersion: number
+  trafficPercent: number
+  startedAt: string
+}
+
+export interface PromptTemplateRecord {
+  id: string
+  name: string
+  purpose: AiPurpose
+  vendor: AiVendor
+  status: 'active' | 'draft' | 'archived'
+  version: number
+  content: string
+  draftContent?: string
+  draftNote?: string
+  deploymentHistory: JsonDeploymentEntry[]
+  abTest?: PromptAbTest
+}
+
+export interface JsonDeploymentEntry {
+  version: number
+  deployedAt: string
+  deployedBy: string
+  note?: string
 }
 
 export interface WorkspaceMember {
