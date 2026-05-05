@@ -1,31 +1,24 @@
-# Current Phase: Phase 2 — Ingestion Engine
+# Current Phase: Phase 3 — Consumption, Polish, Operator Completion
 
 In scope for this phase:
-- Inngest workflows for sweep orchestration and AI vendor calls
-- AI vendor abstraction layer (OpenAI, Anthropic, xAI)
-- AIRoutingConfig and operator UI for managing it
-- PromptTemplate management with draft/active split, versioning, A/B testing
-- IntelligenceItem schema and ingestion pipeline
-- pgvector setup and embedding generation
-- MIS computation (deterministic + LLM-assisted explanation)
-- Confidence as first-class field on items
-- Cross-vendor and cross-sweep deduplication
-- Review Queue filter (items below threshold)
-- Competitor auto-discovery and AI-assisted profile population
-- AI cost tracking with transactional increment and ceiling enforcement
-- Vendor health and cost monitoring (operator admin)
-- Manual and scheduled sweeps
-- Wire feed, dashboard top-of-feed, review queue, and competitor profile to real ingested data
+- Brief authoring (create, AI-draft, edit, publish, reader, share)
+- Battle card system (interview flow, author view, rep view, signed share links, Slack lookup)
+- Win/loss outcome logging form, three-lens view, bulk CSV import, MIS learning loop integration
+- Customer Voice dedicated view with sentiment analytics
+- Channels view with type filtering and authority scoring
+- Topics CRUD with AI-suggested seeds
+- Trial conversion lifecycle UX: T-7/T-3/T-1 warning modals, polished read-only state, upgrade modal flow with Stripe, contextual limit-hit prompts
+- Notification stack: in-app realtime, email digests, Slack, Teams, webhooks; per-user/per-competitor thresholds
+- Realtime subscriptions for live feed updates as sweeps complete
+- Operator admin completion: prompt A/B testing UI, full impersonation with two-operator approval, embed migration progress UI, billing operations (credits, refunds)
+- Observability: Sentry, structured logging, performance instrumentation
+- Audit log review viewer with severity filters
 
-Out of scope (deferred to Phase 3):
-- Brief authoring (AI drafting model is configured, but UI is Phase 3)
-- Battle card authoring and rep view (the recent_activity section needs sweep data, hence Phase 2 prereq, but the rest of the surface is Phase 3)
-- Win/loss outcome logging form
-- Customer Voice dedicated tab
-- Channels view
-- Notifications (email, Slack, Teams, webhook)
-- Real-time subscriptions for live feed updates as sweeps complete
-- Trial warning modal sequence
-- Polished limit-hit upgrade prompts (Phase 1 stub toasts remain)
+Out of scope for v1 (post-launch):
+- Enterprise tier features (SSO/SCIM, BYOK, custom data residency, BAA)
+- CRM integration
+- Multi-language
+- Native mobile apps
+- Predictive forecasting
 
-Read docs/spec/dosi_ai_design_prompt.md §3, §4, §5, §6, §7, §11, §12 for the full context relevant to this phase.
+Read docs/spec/dosi_ai_design_prompt.md §5.5, §8, §9, §10, §16, §17, §18 — and the trial conversion brief (dosi_ai_v0_trial_conversion_brief.md) — for the full context relevant to this phase.

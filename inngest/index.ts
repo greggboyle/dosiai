@@ -1,3 +1,8 @@
+import { learnFromOutcome } from '@/inngest/functions/learn-from-outcome'
+import { trialWarningCheck } from '@/inngest/functions/trial-warning-check'
+import { refreshBattleCardRecentActivity } from '@/inngest/functions/refresh-battle-card-recent-activity'
+import { synthesizeBattleCardSection } from '@/inngest/functions/synthesize-battle-card-section'
+import { draftBrief } from '@/inngest/functions/draft-brief'
 import { trialExpirationCheck } from '@/inngest/functions/trial-expiration-check'
 import { monthlyCostReset } from '@/inngest/functions/monthly-cost-reset'
 import { populateCompetitorProfile } from '@/inngest/functions/populate-competitor-profile'
@@ -6,6 +11,11 @@ import { runSweep } from '@/inngest/sweeps/run-sweep'
 import { scheduleSweeps } from '@/inngest/sweeps/schedule-sweeps'
 
 export const functions = [
+  learnFromOutcome,
+  trialWarningCheck,
+  synthesizeBattleCardSection,
+  refreshBattleCardRecentActivity,
+  draftBrief,
   trialExpirationCheck,
   monthlyCostReset,
   populateCompetitorProfile,

@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation'
 import { AppShellClient } from '@/components/app-shell-client'
-import type { WorkspaceSubscription } from '@/lib/billing-types'
+import type { PlanId, WorkspaceSubscription } from '@/lib/billing-types'
 import { getTrialDaysRemaining, getTrialStatus, PLAN_CONFIG } from '@/lib/billing-types'
+import { loadTrialWarningBootstrap } from '@/lib/billing/trial-warning-data'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -62,8 +63,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     analystSeatsLimit: PLAN_CONFIG[workspaceRow.plan].limits.analystSeats,
   }
 
+  const trialWarning = await loadTrialWarningBootstrap(
+    workspaceRow.id,
+    workspaceRow.plan as PlanId
+  )
+
   return (
     <AppShellClient
+      trialWarning={trialWarning}
       workspace={{
         id: workspaceRow.id,
         name: workspaceRow.name,

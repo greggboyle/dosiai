@@ -37,6 +37,8 @@ import { FeedList } from '@/components/feed/feed-list'
 import { FeedDetail } from '@/components/feed/feed-detail'
 import type { IntelligenceItem, Category } from '@/lib/types'
 import { useMediaQuery } from '@/hooks/use-media-query'
+import { useSearchParams } from 'next/navigation'
+import { markIntelligenceItemReviewed } from '@/lib/intelligence/actions'
 
 // Helper to create mock dates relative to "now" - using fixed offsets in hours
 function createMockDate(hoursAgo: number): string {
@@ -430,8 +432,19 @@ const categoryFilters: { value: Category; label: string }[] = [
   { value: 'regulatory', label: 'Regulatory' },
 ]
 
-export function FeedClient({ initialItems }: { initialItems?: IntelligenceItem[] }) {
-  const dataSource = initialItems && initialItems.length > 0 ? initialItems : mockFeedItems
+export function FeedClient({
+  initialItems,
+  reviewQueueThreshold = 30,
+}: {
+  initialItems: IntelligenceItem[]
+  reviewQueueThreshold?: number
+}) {
+  const [items, setItems] = React.useState<IntelligenceItem[]>(initialItems)
+  React.useEffect(() => {
+    setItems(initialItems)
+  }, [initialItems])
+
+  const dataSource = items
 
   const allCompetitors = React.useMemo(
     () => [...new Set(dataSource.flatMap((i) => i.relatedCompetitors?.map((c) => c.name) ?? []))],
@@ -447,7 +460,12 @@ export function FeedClient({ initialItems }: { initialItems?: IntelligenceItem[]
   const isDesktop = useMediaQuery('(min-width: 1280px)')
   
   // View tabs
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = React.useState<ViewTab>('all')
+
+  React.useEffect(() => {
+    if (searchParams.get('tab') === 'review') setActiveTab('review')
+  }, [searchParams])
   
   // Filters
   const [selectedCategories, setSelectedCategories] = React.useState<Category[]>([])
@@ -483,7 +501,9 @@ export function FeedClient({ initialItems }: { initialItems?: IntelligenceItem[]
   }, [mounted, dataSource])
   
   const watchingCount = dataSource.filter(i => i.isWatching).length
-  const reviewCount = dataSource.filter(i => i.mis.value >= 70 && !i.isRead).length
+  const reviewCount = dataSource.filter(
+    (i) => i.mis.value < reviewQueueThreshold && !i.reviewedAt
+  ).length
 
   // Filter and sort items
   const filteredItems = React.useMemo(() => {
@@ -509,7 +529,9 @@ export function FeedClient({ initialItems }: { initialItems?: IntelligenceItem[]
         items = items.filter(i => i.isWatching)
         break
       case 'review':
-        items = items.filter(i => i.mis.value >= 70 && !i.isRead)
+        items = items.filter(
+          (i) => i.mis.value < reviewQueueThreshold && !i.reviewedAt
+        )
         break
     }
 
@@ -571,7 +593,18 @@ export function FeedClient({ initialItems }: { initialItems?: IntelligenceItem[]
     showUnreadOnly,
     sortBy,
     mounted,
+    reviewQueueThreshold,
   ])
+
+  const handleMarkReviewed = React.useCallback(
+    async (item: IntelligenceItem) => {
+      await markIntelligenceItemReviewed(item.id)
+      const ts = new Date().toISOString()
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, reviewedAt: ts } : i)))
+      setSelectedItem((cur) => (cur?.id === item.id ? { ...cur, reviewedAt: ts } : cur))
+    },
+    []
+  )
 
   const hasActiveFilters = 
     selectedCategories.length > 0 || 
@@ -838,7 +871,7 @@ export function FeedClient({ initialItems }: { initialItems?: IntelligenceItem[]
       {/* Detail Panel - Desktop */}
       {isDesktop && (
         <div className="hidden xl:flex w-[40%] flex-col bg-card">
-          <FeedDetail item={selectedItem} />
+          <FeedDetail item={selectedItem} onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)} />
         </div>
       )}
 
@@ -846,7 +879,7 @@ export function FeedClient({ initialItems }: { initialItems?: IntelligenceItem[]
       {!isDesktop && (
         <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
           <SheetContent side="right" className="w-full sm:max-w-lg p-0">
-            <FeedDetail item={selectedItem} />
+            <FeedDetail item={selectedItem} onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)} />
           </SheetContent>
         </Sheet>
       )}

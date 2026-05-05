@@ -518,6 +518,9 @@ export interface Topic {
   // Kept in TS type for UI rendering convenience
   linkedCompetitorIds: string[]
   linkedCompetitorNames: string[]
+  /** Same-workspace topic IDs this theme overlaps with (cross-tags). */
+  relatedTopicIds?: string[]
+  relatedTopicNames?: string[]
   createdAt: string
   updatedAt: string
   status: TopicStatus // C5: Replaces isArchived

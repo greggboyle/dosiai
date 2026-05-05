@@ -289,6 +289,7 @@ export interface Database {
           search_seeds: string[] | null
           importance: 'critical' | 'high' | 'medium' | 'low'
           embedding: string | null
+          related_topic_ids: string[]
         }
         Insert: {
           id?: string
@@ -301,6 +302,7 @@ export interface Database {
           search_seeds?: string[] | null
           importance?: 'critical' | 'high' | 'medium' | 'low'
           embedding?: string | null
+          related_topic_ids?: string[]
         }
         Update: Partial<Database['public']['Tables']['topic']['Insert']>
       }
@@ -605,6 +607,337 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['suggested_competitor']['Insert']>
+      }
+      brief: {
+        Row: {
+          id: string
+          workspace_id: string
+          author_id: string
+          title: string
+          summary: string
+          body: string
+          word_count: number
+          audience: 'leadership' | 'sales' | 'product' | 'general'
+          priority: 'critical' | 'high' | 'medium'
+          status: 'draft' | 'published' | 'archived'
+          ai_drafted: boolean
+          human_reviewed: boolean
+          linked_item_ids: string[]
+          linked_topic_ids: string[]
+          linked_competitor_ids: string[]
+          published_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          author_id: string
+          title?: string
+          summary?: string
+          body?: string
+          word_count?: number
+          audience?: 'leadership' | 'sales' | 'product' | 'general'
+          priority?: 'critical' | 'high' | 'medium'
+          status?: 'draft' | 'published' | 'archived'
+          ai_drafted?: boolean
+          human_reviewed?: boolean
+          linked_item_ids?: string[]
+          linked_topic_ids?: string[]
+          linked_competitor_ids?: string[]
+          published_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['brief']['Insert']>
+      }
+      brief_comment: {
+        Row: {
+          id: string
+          brief_id: string
+          author_id: string
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          brief_id: string
+          author_id: string
+          body: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['brief_comment']['Insert']>
+      }
+      battle_card: {
+        Row: {
+          id: string
+          workspace_id: string
+          competitor_id: string
+          segment_tag: string | null
+          status: 'draft' | 'published' | 'archived'
+          version: number
+          owner_id: string | null
+          freshness_score: number | null
+          interview_state: Json
+          published_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          competitor_id: string
+          segment_tag?: string | null
+          status?: 'draft' | 'published' | 'archived'
+          version?: number
+          owner_id?: string | null
+          freshness_score?: number | null
+          interview_state?: Json
+          published_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['battle_card']['Insert']>
+      }
+      battle_card_section: {
+        Row: {
+          id: string
+          battle_card_id: string
+          section_type:
+            | 'tldr'
+            | 'why_we_win'
+            | 'why_they_win'
+            | 'objections'
+            | 'trap_setters'
+            | 'proof_points'
+            | 'pricing'
+            | 'recent_activity'
+            | 'talk_tracks'
+          content: Json
+          display_order: number
+          last_reviewed_at: string | null
+          last_contributor_id: string | null
+          ai_drafted: boolean
+          source_item_ids: string[]
+          feedback_count: number
+          gap_count: number
+        }
+        Insert: {
+          id?: string
+          battle_card_id: string
+          section_type:
+            | 'tldr'
+            | 'why_we_win'
+            | 'why_they_win'
+            | 'objections'
+            | 'trap_setters'
+            | 'proof_points'
+            | 'pricing'
+            | 'recent_activity'
+            | 'talk_tracks'
+          content?: Json
+          display_order?: number
+          last_reviewed_at?: string | null
+          last_contributor_id?: string | null
+          ai_drafted?: boolean
+          source_item_ids?: string[]
+          feedback_count?: number
+          gap_count?: number
+        }
+        Update: Partial<Database['public']['Tables']['battle_card_section']['Insert']>
+      }
+      battle_card_share_link: {
+        Row: {
+          id: string
+          workspace_id: string
+          battle_card_id: string
+          token: string
+          expires_at: string
+          created_by: string | null
+          revoked_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          battle_card_id: string
+          token: string
+          expires_at: string
+          created_by?: string | null
+          revoked_at?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['battle_card_share_link']['Insert']>
+      }
+      workspace_reason_tag: {
+        Row: {
+          id: string
+          workspace_id: string
+          tag: string
+          usage_count: number
+          archived: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          tag: string
+          usage_count?: number
+          archived?: boolean
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['workspace_reason_tag']['Insert']>
+      }
+      win_loss_outcome: {
+        Row: {
+          id: string
+          workspace_id: string
+          deal_name: string
+          competitor_id: string
+          additional_competitor_ids: string[]
+          outcome: 'won' | 'lost' | 'no_decision' | 'disqualified'
+          deal_size_cents: number | null
+          deal_size_band: string | null
+          segment: string | null
+          deal_stage_at_close: string | null
+          close_date: string
+          reason_summary: string
+          reason_tags: string[]
+          battle_card_id: string | null
+          most_helpful_section_type:
+            | 'tldr'
+            | 'why_we_win'
+            | 'why_they_win'
+            | 'objections'
+            | 'trap_setters'
+            | 'proof_points'
+            | 'pricing'
+            | 'recent_activity'
+            | 'talk_tracks'
+            | null
+          missing_section_feedback: string | null
+          notes: string | null
+          source: 'manual' | 'crm_sync'
+          external_id: string | null
+          submitted_by: string
+          submitted_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          deal_name: string
+          competitor_id: string
+          additional_competitor_ids?: string[]
+          outcome: 'won' | 'lost' | 'no_decision' | 'disqualified'
+          deal_size_cents?: number | null
+          deal_size_band?: string | null
+          segment?: string | null
+          deal_stage_at_close?: string | null
+          close_date?: string
+          reason_summary: string
+          reason_tags?: string[]
+          battle_card_id?: string | null
+          most_helpful_section_type?:
+            | 'tldr'
+            | 'why_we_win'
+            | 'why_they_win'
+            | 'objections'
+            | 'trap_setters'
+            | 'proof_points'
+            | 'pricing'
+            | 'recent_activity'
+            | 'talk_tracks'
+            | null
+          missing_section_feedback?: string | null
+          notes?: string | null
+          source?: 'manual' | 'crm_sync'
+          external_id?: string | null
+          submitted_by: string
+          submitted_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['win_loss_outcome']['Insert']>
+      }
+      battle_card_section_gap_note: {
+        Row: {
+          id: string
+          workspace_id: string
+          battle_card_section_id: string
+          win_loss_outcome_id: string | null
+          note: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          battle_card_section_id: string
+          win_loss_outcome_id?: string | null
+          note: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['battle_card_section_gap_note']['Insert']>
+      }
+      channel: {
+        Row: {
+          id: string
+          workspace_id: string
+          name: string
+          type:
+            | 'publication'
+            | 'conference'
+            | 'podcast'
+            | 'webinar'
+            | 'community'
+            | 'analyst_firm'
+            | 'other'
+          url: string | null
+          authority_score: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          name: string
+          type?:
+            | 'publication'
+            | 'conference'
+            | 'podcast'
+            | 'webinar'
+            | 'community'
+            | 'analyst_firm'
+            | 'other'
+          url?: string | null
+          authority_score?: number
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['channel']['Insert']>
+      }
+      channel_appearance: {
+        Row: {
+          item_id: string
+          channel_id: string
+          appearance_at: string
+        }
+        Insert: {
+          item_id: string
+          channel_id: string
+          appearance_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['channel_appearance']['Insert']>
+      }
+      trial_warning_seen: {
+        Row: {
+          workspace_id: string
+          threshold: 't_minus_7' | 't_minus_3' | 't_minus_1'
+          seen_at: string
+          dismissed: boolean
+        }
+        Insert: {
+          workspace_id: string
+          threshold: 't_minus_7' | 't_minus_3' | 't_minus_1'
+          seen_at?: string
+          dismissed?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['trial_warning_seen']['Insert']>
       }
     }
     Views: Record<string, never>

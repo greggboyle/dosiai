@@ -42,9 +42,10 @@ import { getRelativeTime, getCategoryInfo } from '@/lib/types'
 
 interface FeedDetailProps {
   item: IntelligenceItem | null
+  onMarkReviewed?: () => void | Promise<void>
 }
 
-export function FeedDetail({ item }: FeedDetailProps) {
+export function FeedDetail({ item, onMarkReviewed }: FeedDetailProps) {
   const [scoreExpanded, setScoreExpanded] = React.useState(false)
   const [commentText, setCommentText] = React.useState('')
 
@@ -94,9 +95,15 @@ export function FeedDetail({ item }: FeedDetailProps) {
               />
               {item.isBookmarked ? 'Saved' : 'Save'}
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={!!item.reviewedAt}
+              onClick={() => void onMarkReviewed?.()}
+            >
               <XCircle className="size-3.5 mr-1" />
-              Dismiss
+              {item.reviewedAt ? 'Reviewed' : 'Mark reviewed'}
             </Button>
             <Button variant="ghost" size="sm" className="h-8 text-xs">
               <Share2 className="size-3.5 mr-1" />
@@ -149,9 +156,11 @@ export function FeedDetail({ item }: FeedDetailProps) {
             </h2>
 
             {/* Score & Confidence Row */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <MISBadge score={item.mis} size="lg" />
-              
+              <Badge variant="secondary" className="text-xs font-mono">
+                Vendors {item.vendorConsensus.confirmed}/{item.vendorConsensus.total}
+              </Badge>
               <Collapsible open={scoreExpanded} onOpenChange={setScoreExpanded}>
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground">

@@ -12,26 +12,15 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { 
-  type WorkspaceSubscription,
-  PLAN_CONFIG,
-} from '@/lib/billing-types'
+import { type WorkspaceSubscription, type TrialUsageStats } from '@/lib/billing-types'
 
 // =============================================================================
 // TRIAL WARNING MODAL
 // =============================================================================
 // Appears at T-7, T-3, T-1 thresholds
-// Dismissible but tracked - "Remind me later" sets last_seen_warning flag
+// Dismissible but tracked via `trial_warning_seen.dismissed`
 
-type WarningThreshold = 7 | 3 | 1
-
-interface TrialUsageStats {
-  competitorsAdded: number
-  sweepsRun: number
-  itemsReviewed: number
-  briefsAuthored: number
-  battleCardsCreated: number
-}
+export type WarningThreshold = 7 | 3 | 1
 
 type EngagementLevel = 'high' | 'medium' | 'low'
 
@@ -39,6 +28,8 @@ interface TrialWarningModalProps {
   subscription: WorkspaceSubscription
   usageStats: TrialUsageStats
   isOpen: boolean
+  /** When set (realtime / DB row), drives headline instead of inferring only from days remaining */
+  alertThreshold?: WarningThreshold
   onDismiss: (threshold: WarningThreshold) => void
   onUpgrade: () => void
 }
@@ -109,12 +100,13 @@ export function TrialWarningModal({
   subscription,
   usageStats,
   isOpen,
+  alertThreshold,
   onDismiss,
   onUpgrade,
 }: TrialWarningModalProps) {
   const daysRemaining = subscription.trialDaysRemaining ?? 0
-  const threshold = getCurrentThreshold(daysRemaining)
-  
+  const threshold = alertThreshold ?? getCurrentThreshold(daysRemaining)
+
   if (!threshold) {
     return null
   }
