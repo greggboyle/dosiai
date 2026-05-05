@@ -199,7 +199,7 @@ function ImpersonationBanner({ state, onEnd }: { state: ImpersonationState; onEn
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), [])
+  const [supabase, setSupabase] = React.useState<ReturnType<typeof createSupabaseBrowserClient> | null>(null)
   const [searchQuery, setSearchQuery] = React.useState('')
   const [isMobile, setIsMobile] = React.useState(false)
   const [currentOperator, setCurrentOperator] = React.useState<OperatorUser | null>(null)
@@ -214,6 +214,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [])
 
   React.useEffect(() => {
+    setSupabase(createSupabaseBrowserClient())
+  }, [])
+
+  React.useEffect(() => {
+    if (!supabase) return
+
     if (pathname === '/admin/sign-in') {
       setAuthLoading(false)
       return
@@ -287,12 +293,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [pathname, router, supabase])
 
   const handleSignOut = async () => {
+    if (!supabase) return
     await supabase.auth.signOut()
     router.replace('/admin/sign-in')
   }
 
   const handleEndImpersonation = async () => {
-    if (!impersonationState.workspaceId || !currentOperator) return
+    if (!supabase || !impersonationState.workspaceId || !currentOperator) return
     const { data: active } = await supabase
       .from('impersonation_session')
       .select('id')

@@ -10,14 +10,19 @@ import { Label } from '@/components/ui/label'
 
 export default function AdminSignInPage() {
   const router = useRouter()
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), [])
+  const [supabase, setSupabase] = React.useState<ReturnType<typeof createSupabaseBrowserClient> | null>(null)
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
 
+  React.useEffect(() => {
+    setSupabase(createSupabaseBrowserClient())
+  }, [])
+
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!supabase) return
     setSubmitting(true)
     setError(null)
 
