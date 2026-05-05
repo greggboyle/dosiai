@@ -6,6 +6,7 @@ import type { WorkspaceSubscription } from '@/lib/billing-types'
 interface WorkspaceContextValue {
   workspace: { id: string; name: string; status: 'active' | 'read_only' | 'grace_period' | 'cancelled' }
   subscription: WorkspaceSubscription
+  memberRole: 'admin' | 'analyst' | 'viewer'
 }
 
 const WorkspaceContext = React.createContext<WorkspaceContextValue | null>(null)

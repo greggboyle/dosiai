@@ -23,7 +23,7 @@ interface AppShellClientProps {
 
 export function AppShellClient({ children, workspace, member, subscription, trialWarning }: AppShellClientProps) {
   return (
-    <WorkspaceProvider value={{ workspace, subscription }}>
+    <WorkspaceProvider value={{ workspace, subscription, memberRole: member.role }}>
       <TooltipProvider>
         {trialWarning ? (
           <TrialWarningHost
