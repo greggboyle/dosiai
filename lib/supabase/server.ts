@@ -18,7 +18,14 @@ export async function createSupabaseServerClient() {
           return cookieStore.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Cookie writes are forbidden in Server Components; Supabase may still try to refresh the session.
+            // Writes succeed in Route Handlers and Server Actions. Consider middleware if you need refresh in RSC.
+          }
         },
       },
     }
