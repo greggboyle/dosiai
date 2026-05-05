@@ -73,9 +73,14 @@ export function AppSidebar({ workspace, member, subscription }: AppSidebarProps)
   const pathname = usePathname()
   const { state } = useSidebar()
   const collapsed = state === 'collapsed'
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), [])
+  const [supabase, setSupabase] = React.useState<ReturnType<typeof createSupabaseBrowserClient> | null>(null)
+
+  React.useEffect(() => {
+    setSupabase(createSupabaseBrowserClient())
+  }, [])
 
   const signOut = async () => {
+    if (!supabase) return
     await supabase.auth.signOut()
     window.location.href = '/sign-in'
   }

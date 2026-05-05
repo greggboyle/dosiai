@@ -8,13 +8,18 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export default function ForgotPasswordPage() {
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), [])
+  const [supabase, setSupabase] = React.useState<ReturnType<typeof createSupabaseBrowserClient> | null>(null)
   const [email, setEmail] = React.useState('')
   const [message, setMessage] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
 
+  React.useEffect(() => {
+    setSupabase(createSupabaseBrowserClient())
+  }, [])
+
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!supabase) return
     setError(null)
     setMessage(null)
 

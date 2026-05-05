@@ -12,14 +12,19 @@ import { Label } from '@/components/ui/label'
 export default function SignUpPage() {
   const router = useRouter()
   const params = useSearchParams()
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), [])
+  const [supabase, setSupabase] = React.useState<ReturnType<typeof createSupabaseBrowserClient> | null>(null)
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
+  React.useEffect(() => {
+    setSupabase(createSupabaseBrowserClient())
+  }, [])
+
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!supabase) return
     setIsSubmitting(true)
     setError(null)
 

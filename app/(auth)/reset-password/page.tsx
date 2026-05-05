@@ -10,12 +10,17 @@ import { Label } from '@/components/ui/label'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), [])
+  const [supabase, setSupabase] = React.useState<ReturnType<typeof createSupabaseBrowserClient> | null>(null)
   const [password, setPassword] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
 
+  React.useEffect(() => {
+    setSupabase(createSupabaseBrowserClient())
+  }, [])
+
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!supabase) return
     setError(null)
 
     const { error: updateError } = await supabase.auth.updateUser({ password })

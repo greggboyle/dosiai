@@ -11,13 +11,18 @@ import { Label } from '@/components/ui/label'
 
 export default function SignInPage() {
   const router = useRouter()
-  const supabase = React.useMemo(() => createSupabaseBrowserClient(), [])
+  const [supabase, setSupabase] = React.useState<ReturnType<typeof createSupabaseBrowserClient> | null>(null)
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
+  React.useEffect(() => {
+    setSupabase(createSupabaseBrowserClient())
+  }, [])
+
   const signInWithProvider = async (provider: 'google' | 'azure') => {
+    if (!supabase) return
     setError(null)
     const { error: providerError } = await supabase.auth.signInWithOAuth({
       provider,
@@ -28,6 +33,7 @@ export default function SignInPage() {
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!supabase) return
     setIsSubmitting(true)
     setError(null)
 
