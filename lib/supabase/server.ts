@@ -1,8 +1,12 @@
-import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import type { Database } from '@/lib/supabase/types'
 
+/**
+ * Supabase client for Server Components, Route Handlers, and Server Actions.
+ * `next/headers` is loaded dynamically so Turbopack does not treat this module as shared client code.
+ */
 export async function createSupabaseServerClient() {
+  const { cookies } = await import('next/headers')
   const cookieStore = await cookies()
 
   return createServerClient<Database>(
