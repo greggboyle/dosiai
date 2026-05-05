@@ -68,9 +68,12 @@ import {
 } from '@/components/ui/table'
 import { 
   PLAN_CONFIG, 
+  type PlanId,
+  type BillingInterval,
   type WorkspaceSubscription,
   formatPrice,
 } from '@/lib/billing-types'
+import { openBillingPortal, startCheckout } from '@/app/(app)/settings/billing/actions'
 
 // -------------------------------------------------------------------
 // Mock data - realistic seed data for a Team annual workspace
@@ -241,12 +244,35 @@ export default function BillingPage() {
   const [cancelReason, setCancelReason] = React.useState('')
   const [cancelFeedback, setCancelFeedback] = React.useState('')
   const [showUpgradeModal, setShowUpgradeModal] = React.useState(false)
+  const [isBillingRedirecting, setIsBillingRedirecting] = React.useState(false)
+  const [upgradePlan, setUpgradePlan] = React.useState<Exclude<PlanId, 'trial' | 'enterprise'>>('team')
+  const [upgradeCycle, setUpgradeCycle] = React.useState<BillingInterval>('annual')
 
   const handleCancelPlan = () => {
     // In production: API call to cancel
     console.log('[v0] Cancelling plan with reason:', cancelReason, cancelFeedback)
     setShowCancelModal(false)
     setCancelStep('confirm')
+  }
+
+  const handleStartUpgrade = async () => {
+    try {
+      setIsBillingRedirecting(true)
+      const url = await startCheckout(upgradePlan, upgradeCycle)
+      window.location.href = url
+    } finally {
+      setIsBillingRedirecting(false)
+    }
+  }
+
+  const handleOpenPortal = async () => {
+    try {
+      setIsBillingRedirecting(true)
+      const url = await openBillingPortal()
+      window.location.href = url
+    } finally {
+      setIsBillingRedirecting(false)
+    }
   }
 
   return (
@@ -270,7 +296,7 @@ export default function BillingPage() {
                 Current plan: <span className="text-accent">{currentPlan.name}</span>
               </CardTitle>
               <CardDescription className="mt-1">
-                {currentPlan.tagline}
+                {currentPlan.description}
               </CardDescription>
             </div>
           </div>
@@ -350,10 +376,10 @@ export default function BillingPage() {
 
           {/* Action buttons */}
           <div className="flex items-center gap-3 pt-2">
-            <Button onClick={() => setShowUpgradeModal(true)}>
+            <Button onClick={() => setShowUpgradeModal(true)} disabled={isBillingRedirecting}>
               Change plan
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleOpenPortal} disabled={isBillingRedirecting}>
               {subscription.billingInterval === 'annual' ? 'Switch to monthly' : 'Switch to annual'}
             </Button>
             <button 
@@ -551,7 +577,7 @@ export default function BillingPage() {
                     <p className="text-sm text-muted-foreground">Expires 12/2028</p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={handleOpenPortal} disabled={isBillingRedirecting}>
                   Update card
                 </Button>
               </div>
@@ -659,6 +685,59 @@ export default function BillingPage() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change plan</DialogTitle>
+            <DialogDescription>Select a plan and billing cycle, then continue to Stripe Checkout.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="upgrade-plan">Plan</Label>
+              <Select
+                value={upgradePlan}
+                onValueChange={(value) => setUpgradePlan(value as Exclude<PlanId, 'trial' | 'enterprise'>)}
+              >
+                <SelectTrigger id="upgrade-plan">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="starter">Starter</SelectItem>
+                  <SelectItem value="team">Team</SelectItem>
+                  <SelectItem value="business">Business</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="upgrade-cycle">Billing cycle</Label>
+              <Select value={upgradeCycle} onValueChange={(value) => setUpgradeCycle(value as BillingInterval)}>
+                <SelectTrigger id="upgrade-cycle">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="annual">Annual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUpgradeModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                setShowUpgradeModal(false)
+                await handleStartUpgrade()
+              }}
+              disabled={isBillingRedirecting}
+            >
+              Continue to checkout
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

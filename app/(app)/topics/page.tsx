@@ -46,6 +46,9 @@ import {
   Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MutationGuard } from '@/components/mutation-guard'
+import { useWorkspaceContext } from '@/components/workspace-context'
+import { canMutate, mutationBlockedReason } from '@/lib/auth/permissions'
 import type { Topic, TopicImportance } from '@/lib/types'
 import {
   LineChart,
@@ -513,6 +516,8 @@ export default function TopicsPage() {
   const [topics, setTopics] = React.useState(mockTopics)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   const [editingTopic, setEditingTopic] = React.useState<Topic | undefined>()
+  const { workspace } = useWorkspaceContext()
+  const canAddTopic = canMutate({ status: workspace.status }, 'add_topic')
 
   const handleCreate = () => {
     setEditingTopic(undefined)
@@ -565,10 +570,12 @@ export default function TopicsPage() {
             Track specific themes and trends across your competitive landscape
           </p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="size-4 mr-2" />
-          Create Topic
-        </Button>
+        <MutationGuard canMutate={canAddTopic} reason={mutationBlockedReason({ status: workspace.status })}>
+          <Button onClick={handleCreate}>
+            <Plus className="size-4 mr-2" />
+            Create Topic
+          </Button>
+        </MutationGuard>
       </div>
 
       {topics.length === 0 ? (
@@ -580,10 +587,12 @@ export default function TopicsPage() {
           <p className="text-sm text-muted-foreground mt-1 max-w-sm text-center">
             Create topics to track specific themes, technologies, or trends across all competitor activity.
           </p>
-          <Button className="mt-4" onClick={handleCreate}>
-            <Plus className="size-4 mr-2" />
-            Create your first topic
-          </Button>
+          <MutationGuard canMutate={canAddTopic} reason={mutationBlockedReason({ status: workspace.status })}>
+            <Button className="mt-4" onClick={handleCreate}>
+              <Plus className="size-4 mr-2" />
+              Create your first topic
+            </Button>
+          </MutationGuard>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

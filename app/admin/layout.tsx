@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -32,23 +32,17 @@ import {
   X,
   LayoutDashboard,
 } from 'lucide-react'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { endImpersonation } from '@/app/admin/impersonation/actions'
 
 // Operator roles
-type OperatorRole = 'support' | 'ops' | 'engineer' | 'admin' | 'auditor'
+type OperatorRole = 'viewer' | 'analyst' | 'admin' | 'owner'
 
 interface OperatorUser {
   id: string
   name: string
   email: string
   role: OperatorRole
-}
-
-// Mock current operator
-const currentOperator: OperatorUser = {
-  id: 'op-1',
-  name: 'Alex Chen',
-  email: 'alex@dosi.ai',
-  role: 'admin',
 }
 
 // Impersonation state (would come from context in real app)
@@ -60,24 +54,18 @@ interface ImpersonationState {
   operatorName?: string
 }
 
-const mockImpersonation: ImpersonationState = {
-  isActive: false,
-}
-
 const roleLabels: Record<OperatorRole, string> = {
-  support: 'Support',
-  ops: 'Ops',
-  engineer: 'Engineer',
+  viewer: 'Viewer',
+  analyst: 'Analyst',
   admin: 'Admin',
-  auditor: 'Auditor',
+  owner: 'Owner',
 }
 
 const roleColors: Record<OperatorRole, string> = {
-  support: 'bg-blue-100 text-blue-700 border-blue-200',
-  ops: 'bg-amber-100 text-amber-700 border-amber-200',
-  engineer: 'bg-green-100 text-green-700 border-green-200',
+  viewer: 'bg-slate-100 text-slate-700 border-slate-200',
+  analyst: 'bg-blue-100 text-blue-700 border-blue-200',
   admin: 'bg-red-100 text-red-700 border-red-200',
-  auditor: 'bg-slate-100 text-slate-700 border-slate-200',
+  owner: 'bg-amber-100 text-amber-700 border-amber-200',
 }
 
 interface NavItem {
@@ -110,8 +98,8 @@ const navigation: NavSection[] = [
   {
     title: 'Platform',
     items: [
-      { label: 'AI Routing', href: '/admin/ai-routing', icon: Route, roles: ['engineer', 'admin'] },
-      { label: 'Prompts', href: '/admin/prompts', icon: FileCode, roles: ['engineer', 'admin'] },
+      { label: 'AI Routing', href: '/admin/ai-routing', icon: Route, roles: ['admin', 'owner'] },
+      { label: 'Prompts', href: '/admin/prompts', icon: FileCode, roles: ['admin', 'owner'] },
       { label: 'Vendor Health', href: '/admin/vendor-health', icon: Activity },
       { label: 'System Health', href: '/admin/system-health', icon: Heart },
     ],
@@ -121,13 +109,13 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Impersonation Sessions', href: '/admin/impersonation', icon: UserCheck },
       { label: 'Audit Log', href: '/admin/audit-log', icon: ScrollText },
-      { label: 'Operator Users', href: '/admin/operators', icon: Users, roles: ['admin'] },
+      { label: 'Operator Users', href: '/admin/operators', icon: Users, roles: ['admin', 'owner'] },
     ],
   },
   {
     title: 'Billing',
     items: [
-      { label: 'Credits & Overrides', href: '/admin/billing', icon: CreditCard, roles: ['ops', 'admin'] },
+      { label: 'Credits & Overrides', href: '/admin/billing', icon: CreditCard, roles: ['admin', 'owner'] },
     ],
   },
 ]
@@ -178,7 +166,7 @@ function AdminSidebar({ operatorRole }: { operatorRole: OperatorRole }) {
   )
 }
 
-function ImpersonationBanner({ state }: { state: ImpersonationState }) {
+function ImpersonationBanner({ state, onEnd }: { state: ImpersonationState; onEnd: () => Promise<void> }) {
   if (!state.isActive) return null
 
   const duration = state.startedAt
@@ -197,6 +185,9 @@ function ImpersonationBanner({ state }: { state: ImpersonationState }) {
         variant="ghost"
         size="sm"
         className="h-7 text-white hover:bg-purple-700 hover:text-white"
+        onClick={() => {
+          void onEnd()
+        }}
       >
         <X className="size-3 mr-1" />
         End impersonation
@@ -206,8 +197,14 @@ function ImpersonationBanner({ state }: { state: ImpersonationState }) {
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const supabase = React.useMemo(() => createSupabaseBrowserClient(), [])
   const [searchQuery, setSearchQuery] = React.useState('')
   const [isMobile, setIsMobile] = React.useState(false)
+  const [currentOperator, setCurrentOperator] = React.useState<OperatorUser | null>(null)
+  const [authLoading, setAuthLoading] = React.useState(true)
+  const [impersonationState, setImpersonationState] = React.useState<ImpersonationState>({ isActive: false })
 
   React.useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024)
@@ -215,6 +212,112 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  React.useEffect(() => {
+    if (pathname === '/admin/sign-in') {
+      setAuthLoading(false)
+      return
+    }
+
+    let mounted = true
+    async function loadOperator() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!session?.user?.email) {
+        if (mounted) {
+          setCurrentOperator(null)
+          setAuthLoading(false)
+          router.replace('/admin/sign-in')
+        }
+        return
+      }
+
+      const { data: operator } = await supabase
+        .from('operator_user')
+        .select('*')
+        .eq('email', session.user.email.toLowerCase())
+        .eq('status', 'active')
+        .maybeSingle()
+
+      if (!mounted) return
+      if (!operator) {
+        setCurrentOperator(null)
+        setAuthLoading(false)
+        router.replace('/admin/sign-in')
+        return
+      }
+
+      setCurrentOperator({
+        id: operator.id,
+        name: operator.name,
+        email: operator.email,
+        role: operator.role,
+      })
+
+      const { data: activeImpersonation } = await supabase
+        .from('impersonation_session')
+        .select('id,workspace_id,started_at,workspace:workspace_id(name)')
+        .eq('operator_id', operator.id)
+        .is('ended_at', null)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (activeImpersonation) {
+        setImpersonationState({
+          isActive: true,
+          workspaceId: activeImpersonation.workspace_id,
+          workspaceName: (activeImpersonation.workspace as unknown as { name?: string })?.name,
+          startedAt: activeImpersonation.started_at,
+          operatorName: operator.name,
+        })
+      } else {
+        setImpersonationState({ isActive: false })
+      }
+
+      setAuthLoading(false)
+    }
+
+    loadOperator()
+    return () => {
+      mounted = false
+    }
+  }, [pathname, router, supabase])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.replace('/admin/sign-in')
+  }
+
+  const handleEndImpersonation = async () => {
+    if (!impersonationState.workspaceId || !currentOperator) return
+    const { data: active } = await supabase
+      .from('impersonation_session')
+      .select('id')
+      .eq('operator_id', currentOperator.id)
+      .is('ended_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!active) return
+    await endImpersonation(active.id)
+    setImpersonationState({ isActive: false })
+    router.refresh()
+  }
+
+  if (pathname === '/admin/sign-in') {
+    return <>{children}</>
+  }
+
+  if (authLoading || !currentOperator) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-sm text-slate-500">Loading operator session...</div>
+      </div>
+    )
+  }
 
   if (isMobile) {
     return (
@@ -232,7 +335,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex min-h-screen flex-col bg-white">
       {/* Impersonation Banner */}
-      <ImpersonationBanner state={mockImpersonation} />
+      <ImpersonationBanner state={impersonationState} onEnd={handleEndImpersonation} />
 
       {/* Top Bar */}
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-700 bg-slate-800 px-4">
@@ -274,7 +377,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <div className="text-xs text-slate-500">{currentOperator.email}</div>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600">
+              <DropdownMenuItem className="text-red-600" onClick={handleSignOut}>
                 <LogOut className="mr-2 size-4" />
                 Sign out
               </DropdownMenuItem>

@@ -61,6 +61,8 @@ import {
 } from 'lucide-react'
 import type { AdminWorkspace, WorkspaceStatus, PlanTier, WorkspaceSweepStatus } from '@/lib/admin-types'
 import { format } from 'date-fns'
+import { startImpersonation } from '@/app/admin/impersonation/actions'
+import { runSweepOnBehalf } from '@/app/admin/workspaces/actions'
 
 // Exact seed data from spec - 10 workspaces
 const mockWorkspaces: AdminWorkspace[] = [
@@ -375,6 +377,7 @@ export default function AdminWorkspacesSearchPage() {
   const [dateTo, setDateTo] = React.useState<Date | undefined>(undefined)
   const [sortBy, setSortBy] = React.useState<string>('lastActiveAt')
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc')
+  const [actionMessage, setActionMessage] = React.useState<string | null>(null)
 
   // Auto-focus search on mount
   React.useEffect(() => {
@@ -492,6 +495,28 @@ export default function AdminWorkspacesSearchPage() {
     }
   }
 
+  const handleImpersonate = async (workspaceId: string, workspaceName: string) => {
+    const reason = window.prompt(`Reason for impersonating ${workspaceName}:`)
+    if (!reason) return
+    try {
+      await startImpersonation(workspaceId, 'read_only', reason)
+      setActionMessage(`Started read-only impersonation for ${workspaceName}.`)
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : 'Failed to start impersonation.')
+    }
+  }
+
+  const handleRunSweepOnBehalf = async (workspaceId: string, workspaceName: string) => {
+    const reason = window.prompt(`Reason for triggering a sweep for ${workspaceName}:`)
+    if (!reason) return
+    try {
+      await runSweepOnBehalf(workspaceId, reason)
+      setActionMessage(`Sweep request recorded for ${workspaceName}.`)
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : 'Failed to trigger sweep.')
+    }
+  }
+
   return (
     <div className="space-y-3">
       {/* Large Search Input */}
@@ -604,6 +629,11 @@ export default function AdminWorkspacesSearchPage() {
       </div>
 
       {/* Dense Table */}
+      {actionMessage && (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          {actionMessage}
+        </div>
+      )}
       <div className="rounded-lg border border-slate-200 overflow-x-auto">
         <Table>
           <TableHeader>
@@ -743,11 +773,11 @@ export default function AdminWorkspacesSearchPage() {
                                 View detail
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleImpersonate(workspace.id, workspace.name)}>
                               <UserCheck className="mr-2 size-4" />
                               Impersonate
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleRunSweepOnBehalf(workspace.id, workspace.name)}>
                               <RefreshCw className="mr-2 size-4" />
                               Run sweep on behalf of
                             </DropdownMenuItem>
@@ -769,8 +799,10 @@ export default function AdminWorkspacesSearchPage() {
                     <ContextMenuItem asChild>
                       <Link href={`/admin/workspaces/${workspace.id}`}>View detail</Link>
                     </ContextMenuItem>
-                    <ContextMenuItem>Impersonate</ContextMenuItem>
-                    <ContextMenuItem>Run sweep on behalf of</ContextMenuItem>
+                    <ContextMenuItem onClick={() => handleImpersonate(workspace.id, workspace.name)}>Impersonate</ContextMenuItem>
+                    <ContextMenuItem onClick={() => handleRunSweepOnBehalf(workspace.id, workspace.name)}>
+                      Run sweep on behalf of
+                    </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem>View audit log</ContextMenuItem>
                     <ContextMenuItem>Manage overrides</ContextMenuItem>

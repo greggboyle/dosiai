@@ -20,6 +20,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react'
+import { createWorkspace, saveCompetitors, saveTopics, saveWorkspaceProfile } from '@/app/onboarding/actions'
 
 // Step definitions
 const STEPS = [
@@ -71,6 +72,13 @@ export default function OnboardingPage() {
   const router = useRouter()
   const [currentStepIndex, setCurrentStepIndex] = React.useState(0)
   const [showSweepProgress, setShowSweepProgress] = React.useState(false)
+  const [workspaceId, setWorkspaceId] = React.useState<string | null>(null)
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = React.useState(false)
+  const [isSavingStep, setIsSavingStep] = React.useState(false)
+  const [profileSaved, setProfileSaved] = React.useState(false)
+  const [competitorsSaved, setCompetitorsSaved] = React.useState(false)
+  const [topicsSaved, setTopicsSaved] = React.useState(false)
+  const [onboardingError, setOnboardingError] = React.useState<string | null>(null)
   
   // Form state
   const [workspaceName, setWorkspaceName] = React.useState('')
@@ -196,7 +204,76 @@ export default function OnboardingPage() {
     }
   }
   
-  const goNext = () => {
+  const goNext = async () => {
+    if (currentStep.id === 'welcome' && !workspaceId) {
+      try {
+        setIsCreatingWorkspace(true)
+        setOnboardingError(null)
+        const result = await createWorkspace({
+          name: workspaceName.trim(),
+          companyDescription: companySummary.trim() || undefined,
+        })
+        setWorkspaceId(result.workspaceId)
+      } catch {
+        setOnboardingError('We could not create your workspace. Please try again.')
+        return
+      } finally {
+        setIsCreatingWorkspace(false)
+      }
+    }
+    if (currentStep.id === 'company' && workspaceId && !profileSaved) {
+      try {
+        setIsSavingStep(true)
+        setOnboardingError(null)
+        await saveWorkspaceProfile({
+          workspaceId,
+          companyName: companyName.trim(),
+          companyWebsite: companyWebsite.trim(),
+          companySummary: companySummary.trim(),
+          companyICP: companyICP.trim(),
+          industry,
+        })
+        setProfileSaved(true)
+      } catch {
+        setOnboardingError('We could not save your company profile. Please try again.')
+        return
+      } finally {
+        setIsSavingStep(false)
+      }
+    }
+    if (currentStep.id === 'competitors' && workspaceId && !competitorsSaved) {
+      try {
+        setIsSavingStep(true)
+        setOnboardingError(null)
+        await saveCompetitors({
+          workspaceId,
+          competitors: competitors.map((c) => ({ name: c.name, website: c.website })),
+        })
+        setCompetitorsSaved(true)
+      } catch {
+        setOnboardingError('We could not save competitors. Please try again.')
+        return
+      } finally {
+        setIsSavingStep(false)
+      }
+    }
+    if (currentStep.id === 'topics' && workspaceId && !topicsSaved && !skipTopics) {
+      try {
+        setIsSavingStep(true)
+        setOnboardingError(null)
+        await saveTopics({
+          workspaceId,
+          topics: topics.map((t) => ({ name: t.name, description: t.description })),
+        })
+        setTopicsSaved(true)
+      } catch {
+        setOnboardingError('We could not save topics. Please try again.')
+        return
+      } finally {
+        setIsSavingStep(false)
+      }
+    }
+
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1)
     }
@@ -748,15 +825,17 @@ export default function OnboardingPage() {
             
             {/* Launch button */}
             <Button 
-              onClick={launchSweep} 
+              onClick={launchSweep}
               size="lg"
               className="w-full mt-6"
+              disabled
+              title="Sweeps available once Phase 2 ships"
             >
               Run my first sweep
             </Button>
             
             <p className="text-xs text-muted-foreground text-center">
-              Your first sweep takes about 5 minutes. We&apos;ll email you when it&apos;s ready.
+              Sweeps available once Phase 2 ships.
             </p>
           </div>
         )}
@@ -774,9 +853,9 @@ export default function OnboardingPage() {
             </Button>
             <Button
               onClick={goNext}
-              disabled={!canGoNext()}
+              disabled={!canGoNext() || isCreatingWorkspace || isSavingStep}
             >
-              Continue
+              {isCreatingWorkspace ? 'Creating workspace...' : isSavingStep ? 'Saving...' : 'Continue'}
               <ChevronRight className="size-4 ml-2" />
             </Button>
           </div>
@@ -794,6 +873,9 @@ export default function OnboardingPage() {
           </div>
         )}
       </div>
+      {onboardingError && (
+        <p className="mt-4 text-sm text-destructive">{onboardingError}</p>
+      )}
     </div>
   )
 }

@@ -24,6 +24,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { MISBadge } from '@/components/mis-badge'
+import { MutationGuard } from '@/components/mutation-guard'
+import { useWorkspaceContext } from '@/components/workspace-context'
+import { canMutate, mutationBlockedReason } from '@/lib/auth/permissions'
 import type { Competitor, MISScore } from '@/lib/types'
 
 // Mock data - realistic logistics competitors (C2: updated tier enum and status)
@@ -123,6 +126,8 @@ const tierColors: Record<string, string> = {
 
 export default function CompetitorsPage() {
   const [searchQuery, setSearchQuery] = React.useState('')
+  const { workspace } = useWorkspaceContext()
+  const canAddCompetitor = canMutate({ status: workspace.status }, 'add_competitor')
 
   const filteredCompetitors = competitors.filter((competitor) =>
     competitor.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -138,10 +143,12 @@ export default function CompetitorsPage() {
             Track and analyze your competitive landscape
           </p>
         </div>
-        <Button>
-          <Plus className="size-4 mr-2" />
-          Add Competitor
-        </Button>
+        <MutationGuard canMutate={canAddCompetitor} reason={mutationBlockedReason({ status: workspace.status })}>
+          <Button>
+            <Plus className="size-4 mr-2" />
+            Add Competitor
+          </Button>
+        </MutationGuard>
       </div>
 
       {/* Search */}
