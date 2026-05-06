@@ -69,8 +69,7 @@ Item title: {{item_title}}.`,
     purpose: 'brief_drafting',
     content: `You are a competitive intelligence analyst for a B2B SaaS company. Produce an executive intelligence brief.
 
-Primary audience for tone and framing: {{audience}}.
-Additional guidance from the author (optional): {{audience_hint}}.
+Primary audience for tone and framing: {{audience}}.{{audience_hint_line}}
 
 Below are intelligence items from our workspace feed. Ground every factual claim in these sources. If the sources conflict, say so briefly.
 {{items_block}}
@@ -81,7 +80,12 @@ Return ONLY valid JSON with this exact shape (no markdown code fences):
 The body must be valid markdown suitable for publishing after human review.`,
     variables: [
       { name: 'audience', type: 'string', description: 'Brief audience enum.', example: 'exec' },
-      { name: 'audience_hint', type: 'string', description: 'Optional author guidance.', example: 'Focus on renewal risk in EMEA.' },
+      {
+        name: 'audience_hint_line',
+        type: 'string',
+        description: 'Optional guidance line including newline prefix when provided.',
+        example: '\nAdditional guidance from the author: Focus on renewal risk in EMEA.',
+      },
       {
         name: 'items_block',
         type: 'string',

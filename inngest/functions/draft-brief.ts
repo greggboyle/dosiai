@@ -4,8 +4,9 @@ import { checkCostBudget, recordVendorCall } from '@/lib/ai/cost'
 import { estimateCallCostCents } from '@/lib/ai/pricing'
 import { getRoutingFor } from '@/lib/ai/router'
 import { getVendorClient } from '@/lib/ai/factory'
+import { getActivePromptTemplateFor, renderPromptTemplate } from '@/lib/ai/prompt-template'
 import { briefDraftResponseSchema } from '@/lib/brief/schema'
-import { buildBriefDraftPrompt } from '@/lib/brief/draft-prompt'
+import { BRIEF_DRAFT_PROMPT_TEMPLATE, buildBriefDraftPromptVariables } from '@/lib/brief/draft-prompt'
 import { countWords } from '@/lib/brief/queries'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 
@@ -55,7 +56,8 @@ export const draftBrief = inngest.createFunction(
 
       const routing = await getRoutingFor('brief_drafting')
       const vendorClient = getVendorClient(routing.vendor, routing.model)
-      const prompt = buildBriefDraftPrompt({
+      const template = await getActivePromptTemplateFor('brief_drafting', routing.vendor)
+      const promptVars = buildBriefDraftPromptVariables({
         audience: brief.audience,
         audienceHint,
         items: items.map((it) => ({
@@ -64,6 +66,7 @@ export const draftBrief = inngest.createFunction(
           content: it.content ?? '',
         })),
       })
+      const prompt = renderPromptTemplate(template?.content ?? BRIEF_DRAFT_PROMPT_TEMPLATE, promptVars)
 
       const started = Date.now()
       const result = await vendorClient.complete({
@@ -92,6 +95,8 @@ export const draftBrief = inngest.createFunction(
         purpose: 'brief_drafting',
         vendor: routing.vendor,
         model: routing.model,
+        promptTemplateId: template?.id ?? null,
+        promptTemplateVersion: template?.version ?? null,
         requestTokens: result.usage.inputTokens,
         responseTokens: result.usage.outputTokens,
         costCents,

@@ -293,7 +293,7 @@ export async function seedPromptTemplatesFromCode() {
 
   const [routingRes, promptRes] = await Promise.all([
     admin.from('ai_routing_config').select('purpose,rules'),
-    admin.from('prompt_template').select('id,purpose,vendor'),
+    admin.from('prompt_template').select('id,purpose,vendor,version,content,draft_content'),
   ])
   if (routingRes.error) throw routingRes.error
   if (promptRes.error) throw promptRes.error
@@ -337,6 +337,30 @@ export async function seedPromptTemplatesFromCode() {
   if (missingRows.length > 0) {
     const { error } = await admin.from('prompt_template').insert(missingRows)
     if (error) throw error
+  }
+
+  // Keep seeded brief_drafting templates aligned with runtime fallback prompt.
+  const briefDefault = getEmbeddedPromptDefault('brief_drafting')
+  if (briefDefault) {
+    const staleBriefTemplates = (promptRes.data ?? []).filter(
+      (row) =>
+        row.purpose === 'brief_drafting' &&
+        row.version === 1 &&
+        !row.draft_content &&
+        row.content !== briefDefault.content
+    )
+    for (const row of staleBriefTemplates) {
+      const { error } = await admin
+        .from('prompt_template')
+        .update({
+          content: briefDefault.content,
+          variables: briefDefault.variables,
+          updated_at: now,
+          updated_by_operator_id: operator.id,
+        })
+        .eq('id', row.id)
+      if (error) throw error
+    }
   }
 
   return { created: missingRows.length }
