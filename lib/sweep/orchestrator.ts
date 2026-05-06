@@ -42,7 +42,7 @@ ${competitorLines}
 Active topics:
 ${topicLines}
 
-Each item must include: title, summary, confidence (low|medium|high), confidenceReason, category (buy-side|sell-side|channel|regulatory), sourceUrls (array of {name,url,domain}), optional fiveWH, optional eventAt ISO string, optional sourceType, optional relatedCompetitorNames (string[]), optional entitiesMentioned ([{name}]).
+Each item must include: title, summary, confidence (low|medium|high), confidenceReason, category as exactly one of the strings \"buy-side\", \"sell-side\", \"channel\", or \"regulatory\" (no other labels), sourceUrls (array of {name,url,domain}), optional fiveWH, optional eventAt ISO string, optional sourceType, optional relatedCompetitorNames (string[]), optional entitiesMentioned ([{name}]).
 Produce 1-3 realistic items if data is thin; focus on verifiable claims.`
 }
 

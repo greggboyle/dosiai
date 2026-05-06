@@ -1,5 +1,57 @@
 import { z } from 'zod'
 
+export const SWEEP_CATEGORY_VALUES = ['buy-side', 'sell-side', 'channel', 'regulatory'] as const
+
+export type SweepCategoryValue = (typeof SWEEP_CATEGORY_VALUES)[number]
+
+/** Maps vendor JSON to one of four feed categories — models often emit synonyms or hyphenated misc labels. */
+export function normalizeSweepCategory(raw: unknown, fallback: SweepCategoryValue = 'buy-side'): SweepCategoryValue {
+  if (raw == null || raw === '') return fallback
+
+  const s = String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+
+  if ((SWEEP_CATEGORY_VALUES as readonly string[]).includes(s)) {
+    return s as SweepCategoryValue
+  }
+
+  const aliases: Record<string, SweepCategoryValue> = {
+    buy: 'buy-side',
+    sell: 'sell-side',
+    channel: 'channel',
+    regulatory: 'regulatory',
+    'buy_side': 'buy-side',
+    'sell_side': 'sell-side',
+    'competitive-intelligence': 'buy-side',
+    'competitive_intelligence': 'buy-side',
+    intelligence: 'buy-side',
+    'market-intelligence': 'buy-side',
+    industry: 'channel',
+    partner: 'channel',
+    alliances: 'channel',
+    ecosystem: 'channel',
+    compliance: 'regulatory',
+    legal: 'regulatory',
+    policy: 'regulatory',
+  }
+
+  const compact = s.replace(/_/g, '-')
+  if (aliases[compact]) return aliases[compact]
+
+  if (/regul|complian|policy|legal/.test(compact)) return 'regulatory'
+  if (/channel|partner|reseller|distribution|ecosystem/.test(compact)) return 'channel'
+  if (/sell|vendor-selection|evaluation|rfp|pricing/.test(compact)) return 'sell-side'
+  if (/buy|procurement|competitive|intel|market|strategy/.test(compact)) return 'buy-side'
+
+  return fallback
+}
+
+export const sweepCategorySchema = z
+  .union([z.enum(SWEEP_CATEGORY_VALUES), z.string(), z.number()])
+  .transform((v) => normalizeSweepCategory(v, 'buy-side'))
+
 export const sourceRefSchema = z.object({
   name: z.string(),
   url: z.string(),
@@ -21,7 +73,7 @@ export const parsedSweepItemSchema = z.object({
   summary: z.string(),
   content: z.string().optional().default(''),
   fullSummary: z.string().optional(),
-  category: z.enum(['buy-side', 'sell-side', 'channel', 'regulatory']),
+  category: sweepCategorySchema,
   subcategory: z.string().optional(),
   fiveWH: fiveWhSchema.optional(),
   sourceUrls: z.array(sourceRefSchema).default([]),
