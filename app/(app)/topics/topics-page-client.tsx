@@ -493,6 +493,10 @@ export function TopicsPageClient({ initialTopics }: { initialTopics: Topic[] }) 
   const { workspace } = useWorkspaceContext()
   const canAddTopic = canMutate({ status: workspace.status }, 'add_topic')
 
+  React.useEffect(() => {
+    setTopics(initialTopics)
+  }, [initialTopics])
+
   const handleCreate = () => {
     setEditingTopic(undefined)
     setIsModalOpen(true)
