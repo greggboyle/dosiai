@@ -25,6 +25,7 @@ export default async function BriefEditPage({ params }: { params: Promise<{ id: 
 
   const row = await getBriefById(id)
   if (!row || row.workspace_id !== member.workspace_id) notFound()
+  if (row.status === 'archived') notFound()
 
   const { data: workspace } = await supabase.from('workspace').select('status').eq('id', member.workspace_id).single()
 

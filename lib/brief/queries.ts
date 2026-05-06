@@ -41,6 +41,7 @@ export async function listBriefsForWorkspace(workspaceId: string): Promise<Brief
     .from('brief')
     .select('*')
     .eq('workspace_id', workspaceId)
+    .neq('status', 'archived')
     .order('updated_at', { ascending: false })
 
   if (error) throw error

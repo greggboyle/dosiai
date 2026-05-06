@@ -110,7 +110,7 @@ export async function saveBrief(input: {
   if (!isOwner && !isAdmin) throw new Error('Forbidden')
 
   let humanReviewed = existing.human_reviewed
-  if (existing.ai_drafted && !existing.human_reviewed && input.body.trim() !== (existing.body ?? '').trim()) {
+  if (existing.ai_drafted && !existing.human_reviewed) {
     humanReviewed = true
   }
 
@@ -201,4 +201,27 @@ export async function enqueueBriefDraft(input: {
   })
 
   revalidatePath(`/briefs/${input.briefId}/edit`)
+}
+
+export async function archiveBrief(briefId: string): Promise<void> {
+  const ctx = await requireAuthorWorkspace()
+  if (ctx.status === 'read_only') throw new Error('Workspace is read-only')
+
+  const supabase = await createSupabaseServerClient()
+  const { data: existing, error: fetchErr } = await supabase
+    .from('brief')
+    .select('author_id, workspace_id')
+    .eq('id', briefId)
+    .single()
+
+  if (fetchErr || !existing) throw new Error('Brief not found')
+  if (existing.workspace_id !== ctx.workspaceId) throw new Error('Forbidden')
+  if (existing.author_id !== ctx.userId && ctx.role !== 'admin') throw new Error('Forbidden')
+
+  const { error } = await supabase.from('brief').update({ status: 'archived' }).eq('id', briefId)
+  if (error) throw error
+
+  revalidatePath('/briefs')
+  revalidatePath('/')
+  revalidatePath(`/briefs/${briefId}`)
 }

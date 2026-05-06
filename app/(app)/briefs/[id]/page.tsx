@@ -25,6 +25,7 @@ export default async function BriefReaderPage({ params }: { params: Promise<{ id
 
   const row = await getBriefById(id)
   if (!row || row.workspace_id !== member.workspace_id) notFound()
+  if (row.status === 'archived') notFound()
 
   const isViewer = member.role === 'viewer'
   if (isViewer && row.status !== 'published') notFound()

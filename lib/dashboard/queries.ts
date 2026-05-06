@@ -145,6 +145,7 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
       .from('brief')
       .select('id,title,audience,priority,published_at,updated_at,status')
       .eq('workspace_id', workspaceId)
+      .neq('status', 'archived')
       .order('updated_at', { ascending: false })
       .limit(5),
     supabase
