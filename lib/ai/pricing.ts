@@ -4,6 +4,7 @@
  */
 const TABLE: Record<string, { inPerM: number; outPerM: number }> = {
   'gpt-4o': { inPerM: 2.5, outPerM: 10 },
+  'gpt-4.1-mini': { inPerM: 0.4, outPerM: 1.6 },
   'gpt-4o-mini': { inPerM: 0.15, outPerM: 0.6 },
   'gpt-4-turbo': { inPerM: 10, outPerM: 30 },
   'text-embedding-3-small': { inPerM: 0.02, outPerM: 0 },

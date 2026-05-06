@@ -129,6 +129,19 @@ function enforceCategory(
   return map[fallbackCat]
 }
 
+function normalizeSearchSeeds(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter((v) => v.length > 0)
+  }
+  if (typeof raw === 'string') {
+    const t = raw.trim()
+    return t ? [t] : []
+  }
+  return []
+}
+
 async function runTopicsPass(
   workspaceId: string,
   plan: WorkspacePlan,
@@ -147,11 +160,12 @@ async function runTopicsPass(
   if (!primaryRule) return { items: [], vendorCallIds: [] }
 
   for (const topic of topics) {
+    const seedText = topic.seeds.length > 0 ? topic.seeds.join(', ') : '(none)'
     const prompt = buildDefaultPrompt(
       purpose,
       companySummary,
       competitorLines,
-      `Topic: ${topic.name}\n${topic.description ?? ''}\nSeeds: ${topic.seeds.join(', ')}`
+      `Topic: ${topic.name}\n${topic.description ?? ''}\nSeeds: ${seedText}`
     )
     const client = getVendorClient(primaryRule.vendor, primaryRule.model)
     const started = Date.now()
@@ -302,7 +316,7 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
         id: t.id,
         name: t.name,
         description: t.description,
-        seeds: t.search_seeds ?? [],
+        seeds: normalizeSearchSeeds(t.search_seeds),
       })),
       companySummary,
       competitorLines

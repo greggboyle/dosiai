@@ -69,7 +69,7 @@ const vendorInfo: Record<AIVendor, { name: string; color: string; logo: string }
 
 // Model options per vendor
 const modelOptions: Record<AIVendor, string[]> = {
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'text-embedding-3-small', 'text-embedding-3-large'],
+  openai: ['gpt-4o', 'gpt-4.1-mini', 'gpt-4o-mini', 'gpt-4-turbo', 'text-embedding-3-small', 'text-embedding-3-large'],
   anthropic: ['claude-opus-4-7', 'claude-sonnet-4-5', 'claude-haiku-3-5'],
   xai: ['grok-4', 'grok-3-mini'],
 }
@@ -408,6 +408,47 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
         rules: c.rules.map(r => r.id === ruleId ? { ...r, isEnabled: !r.isEnabled } : r)
       }
     }))
+  }
+
+  const handleAddVendor = () => {
+    if (!addVendorOpen || !newModel || !changeReason.trim()) return
+
+    setPurposeConfigs((prev) =>
+      prev.map((c) => {
+        if (c.purpose !== addVendorOpen) return c
+
+        const exists = c.rules.some((r) => r.vendor === newVendor && r.model === newModel)
+        if (exists) return c
+
+        const nowIso = new Date().toISOString()
+        const newRule: AIRoutingRule = {
+          id: `${addVendorOpen}-${newVendor}-${newModel}-${crypto.randomUUID().slice(0, 8)}`,
+          vendor: newVendor,
+          model: newModel,
+          purpose: addVendorOpen,
+          isPrimary: c.rules.length === 0,
+          isEnabled: true,
+          costPer1MTokens: 0,
+          avgLatencyMs: 0,
+          citationRate: 0,
+          factualGroundingScore: 0,
+          notes: changeReason.trim(),
+          lastChangedAt: nowIso,
+          lastChangedBy: 'operator',
+        }
+
+        return {
+          ...c,
+          mode: c.rules.length > 0 ? 'multi-vendor' : c.mode,
+          rules: [...c.rules, newRule],
+        }
+      })
+    )
+
+    toast.success('Vendor added. Click "Save to database" to persist this change.')
+    setAddVendorOpen(null)
+    setChangeReason('')
+    setNewModel('')
   }
 
   return (
@@ -839,7 +880,7 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
           </div>
           <SheetFooter>
             <Button variant="outline" onClick={() => setAddVendorOpen(null)}>Cancel</Button>
-            <Button disabled={!newModel || !changeReason.trim()}>Add vendor</Button>
+            <Button onClick={handleAddVendor} disabled={!newModel || !changeReason.trim()}>Add vendor</Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
