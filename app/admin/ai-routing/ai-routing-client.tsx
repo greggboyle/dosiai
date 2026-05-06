@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -88,267 +89,19 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
   battle_card_interview: { name: 'battle_card_interview', description: 'Battle card interview-driven build' },
 }
 
-// Seed data - exact configuration from spec
-const seedPurposeConfigs: AIPurposeConfig[] = [
-  {
-    purpose: 'sweep_buy',
-    name: 'sweep_buy',
-    description: 'Buy-side intelligence sweeps',
-    mode: 'single-vendor',
-    rules: [
-      {
-        id: 'sweep-buy-openai',
-        vendor: 'openai',
-        model: 'gpt-4o',
-        purpose: 'sweep_buy',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 2.50,
-        avgLatencyMs: 1847,
-        citationRate: 87,
-        factualGroundingScore: 91,
-        notes: 'moved off gpt-4-turbo, citation quality up',
-        lastChangedAt: '2026-04-21T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-    ],
-  },
-  {
-    purpose: 'sweep_sell',
-    name: 'sweep_sell',
-    description: 'Sell-side intelligence sweeps',
-    mode: 'single-vendor',
-    rules: [
-      {
-        id: 'sweep-sell-openai',
-        vendor: 'openai',
-        model: 'gpt-4o',
-        purpose: 'sweep_sell',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 2.50,
-        avgLatencyMs: 1847,
-        citationRate: 87,
-        factualGroundingScore: 91,
-        notes: '',
-        lastChangedAt: '2026-04-21T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-    ],
-  },
-  {
-    purpose: 'sweep_channel',
-    name: 'sweep_channel',
-    description: 'Channel intelligence sweeps',
-    mode: 'single-vendor',
-    rules: [
-      {
-        id: 'sweep-channel-xai',
-        vendor: 'xai',
-        model: 'grok-4',
-        purpose: 'sweep_channel',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 1.80,
-        avgLatencyMs: 2103,
-        citationRate: 79,
-        factualGroundingScore: 84,
-        notes: 'grok web search behavior best for channel content',
-        lastChangedAt: '2026-04-04T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-    ],
-  },
-  {
-    purpose: 'sweep_regulatory',
-    name: 'sweep_regulatory',
-    description: 'Regulatory intelligence sweeps',
-    mode: 'multi-vendor',
-    rules: [
-      {
-        id: 'sweep-reg-anthropic',
-        vendor: 'anthropic',
-        model: 'claude-opus-4-7',
-        purpose: 'sweep_regulatory',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 3.00,
-        avgLatencyMs: 2891,
-        citationRate: 94,
-        factualGroundingScore: 96,
-        notes: '',
-        lastChangedAt: '2026-04-28T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-      {
-        id: 'sweep-reg-xai',
-        vendor: 'xai',
-        model: 'grok-4',
-        purpose: 'sweep_regulatory',
-        isPrimary: false,
-        isEnabled: true,
-        costPer1MTokens: 1.80,
-        avgLatencyMs: 2103,
-        citationRate: 81,
-        factualGroundingScore: 83,
-        notes: 'triangulation with Claude for regulatory accuracy',
-        lastChangedAt: '2026-04-28T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-    ],
-  },
-  {
-    purpose: 'sweep_self',
-    name: 'sweep_self',
-    description: 'Own-company intelligence sweeps',
-    mode: 'single-vendor',
-    rules: [
-      {
-        id: 'sweep-self-openai',
-        vendor: 'openai',
-        model: 'gpt-4o',
-        purpose: 'sweep_self',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 2.50,
-        avgLatencyMs: 1847,
-        citationRate: 87,
-        factualGroundingScore: 91,
-        notes: 'defaults aligned with sweep_buy',
-        lastChangedAt: '2026-05-06T00:00:00Z',
-        lastChangedBy: 'system',
-      },
-    ],
-  },
-  {
-    purpose: 'sweep_topic',
-    name: 'sweep_topic',
-    description: 'Topic-focused intelligence pass',
-    mode: 'single-vendor',
-    rules: [
-      {
-        id: 'sweep-topic-openai',
-        vendor: 'openai',
-        model: 'gpt-4o',
-        purpose: 'sweep_topic',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 2.5,
-        avgLatencyMs: 1847,
-        citationRate: 87,
-        factualGroundingScore: 91,
-        notes: '',
-        lastChangedAt: '2026-05-01T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-    ],
-  },
-  {
-    purpose: 'scoring',
-    name: 'scoring',
-    description: 'MIS scoring (LLM-assisted explanation generation)',
-    mode: 'single-vendor',
-    rules: [
-      {
-        id: 'scoring-anthropic',
-        vendor: 'anthropic',
-        model: 'claude-opus-4-7',
-        purpose: 'scoring',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 3.00,
-        avgLatencyMs: 2891,
-        citationRate: 94,
-        factualGroundingScore: 96,
-        notes: '',
-        lastChangedAt: '2026-04-14T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-    ],
-  },
-  {
-    purpose: 'embedding',
-    name: 'embedding',
-    description: 'Embedding model (proximity, dedup, competitor matching)',
-    mode: 'single-vendor',
-    rules: [
-      {
-        id: 'embedding-openai',
-        vendor: 'openai',
-        model: 'text-embedding-3-small',
-        purpose: 'embedding',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 0.02,
-        avgLatencyMs: 124,
-        citationRate: 0, // N/A for embeddings
-        factualGroundingScore: 0, // N/A for embeddings
-        notes: 'platform-wide migration completed 2026-01-04',
-        lastChangedAt: '2026-01-04T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-    ],
-  },
-  {
-    purpose: 'brief_drafting',
-    name: 'brief_drafting',
-    description: 'AI-drafted brief generation',
-    mode: 'single-vendor',
-    rules: [
-      {
-        id: 'brief-anthropic',
-        vendor: 'anthropic',
-        model: 'claude-opus-4-7',
-        purpose: 'brief_drafting',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 3.00,
-        avgLatencyMs: 2891,
-        citationRate: 94,
-        factualGroundingScore: 96,
-        notes: '',
-        lastChangedAt: '2026-04-14T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-    ],
-  },
-  {
-    purpose: 'battle_card_interview',
-    name: 'battle_card_interview',
-    description: 'Battle card interview-driven build',
-    mode: 'single-vendor',
-    rules: [
-      {
-        id: 'bc-anthropic',
-        vendor: 'anthropic',
-        model: 'claude-opus-4-7',
-        purpose: 'battle_card_interview',
-        isPrimary: true,
-        isEnabled: true,
-        costPer1MTokens: 3.00,
-        avgLatencyMs: 2891,
-        citationRate: 94,
-        factualGroundingScore: 96,
-        notes: '',
-        lastChangedAt: '2026-04-21T00:00:00Z',
-        lastChangedBy: 'jkim',
-      },
-    ],
-  },
-]
-
-// Audit log entries for the routing config
-const auditLogEntries = [
-  { timestamp: '2026-04-28 14:30', operator: 'jkim', action: 'rule_updated', details: 'sweep_regulatory: Added xAI grok-4 as secondary vendor for triangulation' },
-  { timestamp: '2026-04-21 10:15', operator: 'jkim', action: 'rule_updated', details: 'sweep_buy: Switched from gpt-4-turbo to gpt-4o — citation quality improved' },
-  { timestamp: '2026-04-21 10:15', operator: 'jkim', action: 'rule_updated', details: 'battle_card_interview: Set claude-opus-4-7 as primary' },
-  { timestamp: '2026-04-14 09:00', operator: 'jkim', action: 'rule_updated', details: 'scoring: Set claude-opus-4-7 as primary' },
-  { timestamp: '2026-04-04 11:30', operator: 'jkim', action: 'rule_updated', details: 'sweep_channel: Switched to xAI grok-4 — better web search for channels' },
-]
+const basePurposeConfigs: AIPurposeConfig[] = (Object.entries(purposeInfo) as Array<
+  [AIPurpose, { name: string; description: string }]
+>).map(([purpose, info]) => ({
+  purpose,
+  name: info.name,
+  description: info.description,
+  mode: 'single-vendor',
+  rules: [],
+}))
 
 function formatDaysAgo(dateStr: string): string {
   const date = new Date(dateStr)
-  const now = new Date('2026-05-05T12:00:00Z') // Fixed reference for consistency
+  const now = new Date()
   const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
   if (diffDays === 0) return 'today'
   if (diffDays === 1) return '1 day ago'
@@ -357,11 +110,18 @@ function formatDaysAgo(dateStr: string): string {
 
 interface AiRoutingClientProps {
   initialConfigs: AiRoutingDbRow[]
+  initialAuditRows: Array<{
+    timestamp: string
+    operator_role: string
+    action: string
+    reason: string | null
+    target_name: string
+  }>
 }
 
-export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
+export function AiRoutingClient({ initialConfigs, initialAuditRows }: AiRoutingClientProps) {
   const [purposeConfigs, setPurposeConfigs] = React.useState<AIPurposeConfig[]>(() =>
-    mergeDbIntoConfigs(seedPurposeConfigs, initialConfigs)
+    mergeDbIntoConfigs(basePurposeConfigs, initialConfigs)
   )
   const [savingDb, setSavingDb] = React.useState(false)
 
@@ -383,13 +143,37 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
       setSavingDb(false)
     }
   }
-  const [expandedPurposes, setExpandedPurposes] = React.useState<Set<AIPurpose>>(new Set(seedPurposeConfigs.map(c => c.purpose)))
+  const [expandedPurposes, setExpandedPurposes] = React.useState<Set<AIPurpose>>(new Set(basePurposeConfigs.map(c => c.purpose)))
   const [editingRule, setEditingRule] = React.useState<{ purpose: AIPurpose; rule: AIRoutingRule } | null>(null)
+  const [editDraft, setEditDraft] = React.useState<{
+    costPer1MTokens: string
+    avgLatencyMs: string
+    citationRate: string
+    factualGroundingScore: string
+    notes: string
+  }>({
+    costPer1MTokens: '',
+    avgLatencyMs: '',
+    citationRate: '',
+    factualGroundingScore: '',
+    notes: '',
+  })
   const [changeReason, setChangeReason] = React.useState('')
   const [addVendorOpen, setAddVendorOpen] = React.useState<AIPurpose | null>(null)
   const [newVendor, setNewVendor] = React.useState<AIVendor>('openai')
   const [newModel, setNewModel] = React.useState('')
   const [refreshing, setRefreshing] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!editingRule) return
+    setEditDraft({
+      costPer1MTokens: String(editingRule.rule.costPer1MTokens),
+      avgLatencyMs: String(editingRule.rule.avgLatencyMs),
+      citationRate: String(editingRule.rule.citationRate),
+      factualGroundingScore: String(editingRule.rule.factualGroundingScore),
+      notes: editingRule.rule.notes,
+    })
+  }, [editingRule])
 
   const togglePurpose = (purpose: AIPurpose) => {
     setExpandedPurposes(prev => {
@@ -685,9 +469,11 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
                       <Plus className="mr-1.5 size-3.5" />
                       Add vendor to this purpose
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-[11px] text-muted-foreground">
+                    <Button variant="ghost" size="sm" className="h-7 text-[11px] text-muted-foreground" asChild>
+                      <Link href="/admin/audit-log?category=ai_routing">
                       <History className="mr-1.5 size-3.5" />
                       View audit log
+                      </Link>
                     </Button>
                   </div>
 
@@ -695,18 +481,18 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
                   <div className="px-4 py-3 bg-muted/30 border-t border-border">
                     <div className="text-[11px] font-medium text-muted-foreground mb-2">Recent changes</div>
                     <div className="space-y-1">
-                      {auditLogEntries
-                        .filter(e => e.details.toLowerCase().includes(config.purpose.replace('_', ' ')) || e.details.toLowerCase().includes(config.name))
+                      {initialAuditRows
+                        .filter((e) => (e.target_name ?? '').toLowerCase().includes(config.purpose))
                         .slice(0, 3)
                         .map((entry, i) => (
                           <div key={i} className="text-[11px] text-muted-foreground flex items-center gap-2">
-                            <span className="font-mono text-[10px] text-muted-foreground/70">{entry.timestamp}</span>
-                            <span>{entry.operator}</span>
+                            <span className="font-mono text-[10px] text-muted-foreground/70">{new Date(entry.timestamp).toLocaleString()}</span>
+                            <span>{entry.operator_role}</span>
                             <span className="text-muted-foreground/50">—</span>
-                            <span className="truncate">{entry.details.split(': ')[1] || entry.details}</span>
+                            <span className="truncate">{entry.reason || entry.action}</span>
                           </div>
                         ))}
-                      {auditLogEntries.filter(e => e.details.toLowerCase().includes(config.purpose.replace('_', ' ')) || e.details.toLowerCase().includes(config.name)).length === 0 && (
+                      {initialAuditRows.filter((e) => (e.target_name ?? '').toLowerCase().includes(config.purpose)).length === 0 && (
                         <div className="text-[11px] text-muted-foreground/50">No recent changes</div>
                       )}
                     </div>
@@ -722,9 +508,11 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
       <div className="rounded-lg border border-border bg-card">
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h2 className="text-[14px] font-medium text-foreground">Recent Routing Changes</h2>
-          <Button variant="ghost" size="sm" className="h-7 text-[11px]">
+          <Button variant="ghost" size="sm" className="h-7 text-[11px]" asChild>
+            <Link href="/admin/audit-log?category=ai_routing">
             <ExternalLink className="mr-1.5 size-3.5" />
             Full audit log
+            </Link>
           </Button>
         </div>
         <Table>
@@ -737,14 +525,14 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {auditLogEntries.map((entry, i) => (
+            {initialAuditRows.map((entry, i) => (
               <TableRow key={i}>
-                <TableCell className="py-2 text-[11px] font-mono text-muted-foreground">{entry.timestamp}</TableCell>
-                <TableCell className="py-2 text-[11px] text-foreground">{entry.operator}</TableCell>
+                <TableCell className="py-2 text-[11px] font-mono text-muted-foreground">{new Date(entry.timestamp).toLocaleString()}</TableCell>
+                <TableCell className="py-2 text-[11px] text-foreground">{entry.operator_role}</TableCell>
                 <TableCell className="py-2">
                   <Badge variant="outline" className="text-[10px] font-mono">{entry.action}</Badge>
                 </TableCell>
-                <TableCell className="py-2 text-[11px] text-muted-foreground">{entry.details}</TableCell>
+                <TableCell className="py-2 text-[11px] text-muted-foreground">{entry.reason || entry.target_name}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -775,7 +563,8 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
                   <Input 
                     type="number" 
                     step="0.01"
-                    defaultValue={editingRule.rule.costPer1MTokens} 
+                    value={editDraft.costPer1MTokens}
+                    onChange={(e) => setEditDraft((prev) => ({ ...prev, costPer1MTokens: e.target.value }))}
                     className="mt-1 h-8 text-[12px] font-mono"
                   />
                 </div>
@@ -783,7 +572,8 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
                   <Label className="text-[11px]">Avg latency (ms)</Label>
                   <Input 
                     type="number" 
-                    defaultValue={editingRule.rule.avgLatencyMs} 
+                    value={editDraft.avgLatencyMs}
+                    onChange={(e) => setEditDraft((prev) => ({ ...prev, avgLatencyMs: e.target.value }))}
                     className="mt-1 h-8 text-[12px] font-mono"
                   />
                 </div>
@@ -797,7 +587,8 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
                       type="number" 
                       min="0" 
                       max="100"
-                      defaultValue={editingRule.rule.citationRate} 
+                      value={editDraft.citationRate}
+                      onChange={(e) => setEditDraft((prev) => ({ ...prev, citationRate: e.target.value }))}
                       className="mt-1 h-8 text-[12px] font-mono"
                     />
                   </div>
@@ -807,7 +598,8 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
                       type="number" 
                       min="0" 
                       max="100"
-                      defaultValue={editingRule.rule.factualGroundingScore} 
+                      value={editDraft.factualGroundingScore}
+                      onChange={(e) => setEditDraft((prev) => ({ ...prev, factualGroundingScore: e.target.value }))}
                       className="mt-1 h-8 text-[12px] font-mono"
                     />
                   </div>
@@ -817,7 +609,8 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
               <div>
                 <Label className="text-[11px]">Notes</Label>
                 <Input 
-                  defaultValue={editingRule.rule.notes} 
+                  value={editDraft.notes}
+                  onChange={(e) => setEditDraft((prev) => ({ ...prev, notes: e.target.value }))}
                   placeholder="e.g., switched from gpt-4-turbo on 2026-04-15 — better citations"
                   className="mt-1 h-8 text-[12px]"
                 />
@@ -838,8 +631,50 @@ export function AiRoutingClient({ initialConfigs }: AiRoutingClientProps) {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setEditingRule(null)}>Cancel</Button>
-            <Button size="sm" disabled={!changeReason.trim()}>Save changes</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditingRule(null)
+                setChangeReason('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={!changeReason.trim()}
+              onClick={() => {
+                if (!editingRule) return
+                setPurposeConfigs((prev) =>
+                  prev.map((cfg) => {
+                    if (cfg.purpose !== editingRule.purpose) return cfg
+                    return {
+                      ...cfg,
+                      rules: cfg.rules.map((r) =>
+                        r.id === editingRule.rule.id
+                          ? {
+                              ...r,
+                              costPer1MTokens: Number(editDraft.costPer1MTokens || 0),
+                              avgLatencyMs: Number(editDraft.avgLatencyMs || 0),
+                              citationRate: Number(editDraft.citationRate || 0),
+                              factualGroundingScore: Number(editDraft.factualGroundingScore || 0),
+                              notes: editDraft.notes,
+                              lastChangedAt: new Date().toISOString(),
+                              lastChangedBy: 'operator',
+                            }
+                          : r
+                      ),
+                    }
+                  })
+                )
+                toast.success('Rule updated in-memory. Click "Save to database" to persist.')
+                setEditingRule(null)
+                setChangeReason('')
+              }}
+            >
+              Save changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

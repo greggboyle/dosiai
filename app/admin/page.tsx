@@ -25,263 +25,6 @@ import {
 } from 'lucide-react'
 import { getAdminDashboardData, type AdminDashboardData } from '@/app/admin/actions/platform'
 
-// Types for operator dashboard
-interface PlatformHealth {
-  activeWorkspacesToday: number
-  sweepsCompleted24h: number
-  sweepsSuccessRate: number
-  sweepsFailed24h: number
-  avgSweepLatencyMs: number
-  avgSweepLatencyTrend: number // positive = slower, negative = faster
-  activeImpersonations: number
-}
-
-interface AttentionItem {
-  id: string
-  severity: 'critical' | 'warning'
-  workspaceName: string | null // null = platform-wide
-  workspaceId: string | null
-  summary: string
-  age: string
-  actionLabel?: string
-  actionHref?: string
-}
-
-interface VendorHealth {
-  vendor: string
-  status: 'healthy' | 'degraded' | 'down'
-  latencyMs: number
-  successRate: number
-  callsLastHour: number
-  projectedDailyCost: number
-}
-
-interface RecentActivity {
-  id: string
-  type: 'signup' | 'upgrade' | 'downgrade' | 'cancellation' | 'ticket'
-  workspaceName: string
-  workspaceId: string
-  details: string
-  timestamp: string
-}
-
-interface ImpersonationSession {
-  id: string
-  workspaceName: string
-  workspaceId: string
-  operatorName: string
-  operatorEmail: string
-  durationMinutes: number
-}
-
-interface QueueDepthPoint {
-  time: string
-  depth: number
-}
-
-// Mock data with realistic seed values from spec
-const fallbackPlatformHealth: PlatformHealth = {
-  activeWorkspacesToday: 247,
-  sweepsCompleted24h: 3892,
-  sweepsSuccessRate: 98.7,
-  sweepsFailed24h: 51,
-  avgSweepLatencyMs: 252000, // 4m 12s
-  avgSweepLatencyTrend: -8, // 8% faster than yesterday
-  activeImpersonations: 1,
-}
-
-const fallbackAttentionItems: AttentionItem[] = [
-  {
-    id: 'att-1',
-    severity: 'critical',
-    workspaceName: 'ChainCo Logistics',
-    workspaceId: 'ws-chainco',
-    summary: 'Sweep failing for 36 hours, error: xAI rate limit exceeded',
-    age: '36h',
-    actionLabel: 'View sweep logs',
-    actionHref: '/admin/workspaces/ws-chainco',
-  },
-  {
-    id: 'att-2',
-    severity: 'warning',
-    workspaceName: null,
-    workspaceId: null,
-    summary: 'OpenAI cost projection over budget by 14% this month',
-    age: '2h',
-    actionLabel: 'View AI routing',
-    actionHref: '/admin/ai-routing',
-  },
-  {
-    id: 'att-3',
-    severity: 'warning',
-    workspaceName: 'Megacorp Logistics',
-    workspaceId: 'ws-megacorp',
-    summary: '3 customer-reported issues in 7 days',
-    age: '4d',
-    actionLabel: 'View workspace',
-    actionHref: '/admin/workspaces/ws-megacorp',
-  },
-  {
-    id: 'att-4',
-    severity: 'critical',
-    workspaceName: null,
-    workspaceId: null,
-    summary: 'Pending two-operator approval — Engineering wants to deploy prompt template v17 (initiated by jkim, requires second approval)',
-    age: '45m',
-    actionLabel: 'Review & approve',
-    actionHref: '/admin/prompts',
-  },
-]
-
-const fallbackVendorHealthData: VendorHealth[] = [
-  {
-    vendor: 'OpenAI',
-    status: 'healthy',
-    latencyMs: 1847,
-    successRate: 99.4,
-    callsLastHour: 4521,
-    projectedDailyCost: 847,
-  },
-  {
-    vendor: 'Anthropic',
-    status: 'healthy',
-    latencyMs: 2103,
-    successRate: 99.8,
-    callsLastHour: 2890,
-    projectedDailyCost: 523,
-  },
-  {
-    vendor: 'xAI',
-    status: 'degraded',
-    latencyMs: 4891,
-    successRate: 94.2,
-    callsLastHour: 1245,
-    projectedDailyCost: 312,
-  },
-]
-
-const fallbackRecentActivity: RecentActivity[] = [
-  {
-    id: 'act-1',
-    type: 'signup',
-    workspaceName: 'TransitFlow Inc',
-    workspaceId: 'ws-transitflow',
-    details: 'New signup, Growth plan trial',
-    timestamp: '2h ago',
-  },
-  {
-    id: 'act-2',
-    type: 'upgrade',
-    workspaceName: 'FleetMaster Pro',
-    workspaceId: 'ws-fleetmaster',
-    details: 'Free → Premium upgrade',
-    timestamp: '3h ago',
-  },
-  {
-    id: 'act-3',
-    type: 'signup',
-    workspaceName: 'Harbor Logistics',
-    workspaceId: 'ws-harbor',
-    details: 'New signup, Enterprise inquiry',
-    timestamp: '4h ago',
-  },
-  {
-    id: 'act-4',
-    type: 'upgrade',
-    workspaceName: 'QuickShip Systems',
-    workspaceId: 'ws-quickship',
-    details: 'Free → Premium upgrade',
-    timestamp: '6h ago',
-  },
-  {
-    id: 'act-5',
-    type: 'cancellation',
-    workspaceName: 'Acme Corp',
-    workspaceId: 'ws-acme',
-    details: 'Cancelled, free tier',
-    timestamp: '8h ago',
-  },
-  {
-    id: 'act-6',
-    type: 'signup',
-    workspaceName: 'PortConnect AI',
-    workspaceId: 'ws-portconnect',
-    details: 'New signup, Growth plan trial',
-    timestamp: '10h ago',
-  },
-  {
-    id: 'act-7',
-    type: 'signup',
-    workspaceName: 'CargoIQ Solutions',
-    workspaceId: 'ws-cargoiq',
-    details: 'New signup, Starter plan',
-    timestamp: '12h ago',
-  },
-]
-
-const fallbackActiveImpersonations: ImpersonationSession[] = [
-  {
-    id: 'imp-1',
-    workspaceName: 'ChainCo Logistics',
-    workspaceId: 'ws-chainco',
-    operatorName: 'Jordan Martinez',
-    operatorEmail: 'jordan@dosi.ai',
-    durationMinutes: 8,
-  },
-]
-
-// Sweep queue depth data (24 hours, hourly) - static values for SSR consistency
-const fallbackQueueDepthData: QueueDepthPoint[] = [
-  { time: '00:00', depth: 4 },
-  { time: '01:00', depth: 3 },
-  { time: '02:00', depth: 2 },
-  { time: '03:00', depth: 2 },
-  { time: '04:00', depth: 3 },
-  { time: '05:00', depth: 5 },
-  { time: '06:00', depth: 7 },
-  { time: '07:00', depth: 10 },
-  { time: '08:00', depth: 18 },
-  { time: '09:00', depth: 22 },
-  { time: '10:00', depth: 25 },
-  { time: '11:00', depth: 28 },
-  { time: '12:00', depth: 20 },
-  { time: '13:00', depth: 24 },
-  { time: '14:00', depth: 26 },
-  { time: '15:00', depth: 22 },
-  { time: '16:00', depth: 19 },
-  { time: '17:00', depth: 15 },
-  { time: '18:00', depth: 12 },
-  { time: '19:00', depth: 9 },
-  { time: '20:00', depth: 7 },
-  { time: '21:00', depth: 5 },
-  { time: '22:00', depth: 4 },
-  { time: '23:00', depth: 3 },
-]
-
-// Current queue stats
-const fallbackQueueStats = {
-  currentDepth: 12,
-  avgWaitTimeMinutes: 2.4,
-  longestWaitMinutes: 8,
-}
-
-// System errors
-const fallbackSystemErrors = {
-  countLast24h: 147,
-  trend: -12, // 12% fewer than previous 24h
-}
-
-const fallbackSystemErrorSeries = [
-  { time: '00:00', errors: 4 }, { time: '01:00', errors: 3 }, { time: '02:00', errors: 2 },
-  { time: '03:00', errors: 5 }, { time: '04:00', errors: 8 }, { time: '05:00', errors: 6 },
-  { time: '06:00', errors: 7 }, { time: '07:00', errors: 9 }, { time: '08:00', errors: 12 },
-  { time: '09:00', errors: 15 }, { time: '10:00', errors: 11 }, { time: '11:00', errors: 8 },
-  { time: '12:00', errors: 6 }, { time: '13:00', errors: 7 }, { time: '14:00', errors: 9 },
-  { time: '15:00', errors: 5 }, { time: '16:00', errors: 4 }, { time: '17:00', errors: 6 },
-  { time: '18:00', errors: 3 }, { time: '19:00', errors: 4 }, { time: '20:00', errors: 5 },
-  { time: '21:00', errors: 3 }, { time: '22:00', errors: 2 }, { time: '23:00', errors: 4 },
-]
-
 // Helper functions
 function formatLatency(ms: number): string {
   if (ms < 1000) return `${ms}ms`
@@ -309,30 +52,42 @@ function StatusDot({ status }: { status: 'healthy' | 'degraded' | 'down' | 'acti
 
 export default function AdminDashboardPage() {
   const [dashboard, setDashboard] = React.useState<AdminDashboardData | null>(null)
+  const [loadError, setLoadError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     let mounted = true
     void getAdminDashboardData()
       .then((data) => {
-        if (mounted) setDashboard(data)
+        if (mounted) {
+          setDashboard(data)
+          setLoadError(null)
+        }
       })
       .catch(() => {
-        if (mounted) setDashboard(null)
+        if (mounted) setLoadError('Unable to load admin dashboard data.')
       })
     return () => {
       mounted = false
     }
   }, [])
 
-  const platformHealth = dashboard?.platformHealth ?? fallbackPlatformHealth
-  const attentionItems = dashboard?.attentionItems ?? fallbackAttentionItems
-  const vendorHealthData = dashboard?.vendorHealth ?? fallbackVendorHealthData
-  const recentActivity = dashboard?.recentActivity ?? fallbackRecentActivity
-  const activeImpersonations = dashboard?.activeImpersonations ?? fallbackActiveImpersonations
-  const queueDepthData = dashboard?.queueDepthData ?? fallbackQueueDepthData
-  const systemErrorSeries = dashboard?.systemErrorSeries ?? fallbackSystemErrorSeries
-  const queueStats = dashboard?.queueStats ?? fallbackQueueStats
-  const systemErrors = dashboard?.systemErrors ?? fallbackSystemErrors
+  if (!dashboard && !loadError) {
+    return <div className="text-sm text-slate-500">Loading dashboard...</div>
+  }
+
+  if (!dashboard) {
+    return <div className="text-sm text-red-600">{loadError}</div>
+  }
+
+  const platformHealth = dashboard.platformHealth
+  const attentionItems = dashboard.attentionItems
+  const vendorHealthData = dashboard.vendorHealth
+  const recentActivity = dashboard.recentActivity
+  const activeImpersonations = dashboard.activeImpersonations
+  const queueDepthData = dashboard.queueDepthData
+  const systemErrorSeries = dashboard.systemErrorSeries
+  const queueStats = dashboard.queueStats
+  const systemErrors = dashboard.systemErrors
 
   return (
     <div className="space-y-4">
@@ -593,8 +348,8 @@ export default function AdminDashboardPage() {
                         {session.operatorName} · {session.durationMinutes} min
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" className="h-7 text-xs shrink-0">
-                      End session
+                    <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" asChild>
+                      <Link href="/admin/impersonation">Manage</Link>
                     </Button>
                   </div>
                 ))}

@@ -17,7 +17,6 @@ import {
   AlertTriangle,
   XCircle,
   RefreshCw,
-  ExternalLink,
 } from 'lucide-react'
 import {
   LineChart,
@@ -30,6 +29,7 @@ import {
   Area,
 } from 'recharts'
 import type { VendorHealthMetric, AIVendor } from '@/lib/admin-types'
+import { useRouter } from 'next/navigation'
 
 const PLATFORM_VENDORS: AIVendor[] = ['openai', 'anthropic', 'xai']
 
@@ -48,23 +48,6 @@ function normalizeVendorMetrics(initial: VendorHealthMetric[]): VendorHealthMetr
       lastCheckedAt: now,
     }
   )
-}
-
-// Generate mock latency time series
-const generateLatencyData = (vendor: AIVendor, baseLatency: number) => {
-  return Array.from({ length: 24 }, (_, i) => ({
-    hour: `${String(i).padStart(2, '0')}:00`,
-    p50: baseLatency + Math.floor(Math.random() * 200) - 100,
-    p99: baseLatency * 2.5 + Math.floor(Math.random() * 500) - 250,
-  }))
-}
-
-// Generate mock error rate time series
-const generateErrorData = (baseRate: number) => {
-  return Array.from({ length: 24 }, (_, i) => ({
-    hour: `${String(i).padStart(2, '0')}:00`,
-    rate: Math.max(0, baseRate + (Math.random() * 0.5) - 0.25),
-  }))
 }
 
 const vendorLabels: Record<AIVendor, string> = {
@@ -87,16 +70,24 @@ const statusColors: Record<VendorHealthMetric['status'], string> = {
 
 interface VendorHealthClientProps {
   initialMetrics: VendorHealthMetric[]
+  seriesByVendor: Record<
+    AIVendor,
+    {
+      latency: Array<{ hour: string; p50: number; p99: number }>
+      error: Array<{ hour: string; rate: number }>
+    }
+  >
 }
 
-export function VendorHealthClient({ initialMetrics }: VendorHealthClientProps) {
+export function VendorHealthClient({ initialMetrics, seriesByVendor }: VendorHealthClientProps) {
+  const router = useRouter()
   const vendorMetrics = React.useMemo(() => normalizeVendorMetrics(initialMetrics), [initialMetrics])
   const [selectedVendor, setSelectedVendor] = React.useState<AIVendor>('openai')
-  const [lastRefresh, setLastRefresh] = React.useState(new Date())
+  const [lastRefresh, setLastRefresh] = React.useState(new Date(initialMetrics[0]?.lastCheckedAt ?? Date.now()))
 
   const selectedHealth = vendorMetrics.find((v) => v.vendor === selectedVendor)
-  const latencyData = generateLatencyData(selectedVendor, selectedHealth?.latencyP50Ms || 1000)
-  const errorData = generateErrorData(selectedHealth?.errorRateLast24h || 0.1)
+  const latencyData = seriesByVendor[selectedVendor]?.latency ?? []
+  const errorData = seriesByVendor[selectedVendor]?.error ?? []
 
   return (
     <div className="space-y-6">
@@ -112,7 +103,14 @@ export function VendorHealthClient({ initialMetrics }: VendorHealthClientProps) 
           <span className="text-[12px] text-slate-500">
             Last updated: {lastRefresh.toLocaleTimeString()}
           </span>
-          <Button variant="outline" size="sm" onClick={() => setLastRefresh(new Date())}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setLastRefresh(new Date())
+              router.refresh()
+            }}
+          >
             <RefreshCw className="mr-2 size-4" />
             Refresh
           </Button>
@@ -172,7 +170,7 @@ export function VendorHealthClient({ initialMetrics }: VendorHealthClientProps) 
             <h2 className="text-[14px] font-medium text-slate-900">
               {vendorLabels[selectedVendor]} - Last 24 Hours
             </h2>
-            <span className="text-[11px] text-slate-400">Charts illustrate aggregate latency/error shape from current metrics.</span>
+            <span className="text-[11px] text-slate-400">Hourly rollups from `vendor_call` (last 24h).</span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
