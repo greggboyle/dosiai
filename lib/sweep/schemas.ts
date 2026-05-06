@@ -68,6 +68,26 @@ export const fiveWhSchema = z.object({
   how: z.string().optional(),
 })
 
+/** Vendors sometimes return fiveWH as a plain string or JSON string instead of an object. */
+function preprocessFiveWh(raw: unknown): unknown {
+  if (raw == null || raw === '') return undefined
+  if (typeof raw === 'string') {
+    const t = raw.trim()
+    if (!t) return undefined
+    try {
+      const o: unknown = JSON.parse(t)
+      if (o !== null && typeof o === 'object' && !Array.isArray(o)) return o
+    } catch {
+      /* treat as prose */
+    }
+    return { what: t }
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw
+  return undefined
+}
+
+export const fiveWhFieldSchema = z.preprocess(preprocessFiveWh, fiveWhSchema.optional())
+
 export const parsedSweepItemSchema = z.object({
   title: z.string(),
   summary: z.string(),
@@ -75,7 +95,7 @@ export const parsedSweepItemSchema = z.object({
   fullSummary: z.string().optional(),
   category: sweepCategorySchema,
   subcategory: z.string().optional(),
-  fiveWH: fiveWhSchema.optional(),
+  fiveWH: fiveWhFieldSchema.optional(),
   sourceUrls: z.array(sourceRefSchema).default([]),
   confidence: z.enum(['low', 'medium', 'high']),
   confidenceReason: z.string(),
