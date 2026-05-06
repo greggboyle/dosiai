@@ -3,8 +3,8 @@
 import { getSession } from '@/lib/auth/session'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { inngest } from '@/inngest/client'
 import { checkCostBudget } from '@/lib/ai/cost'
+import { dispatchSweepRun } from '@/lib/sweep/dispatch-run'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 
 export type TriggerManualSweepOptions = {
@@ -81,9 +81,10 @@ export async function triggerManualSweep(
       }
     }
 
-    await inngest.send({
-      name: 'sweep/run',
-      data: { workspaceId, trigger: 'manual', triggerUserId: userId },
+    await dispatchSweepRun({
+      workspaceId,
+      trigger: 'manual',
+      triggerUserId: userId,
     })
     return { ok: true }
   } catch (e) {

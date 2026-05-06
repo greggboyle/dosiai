@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-
-/** Same-origin relative paths only — avoids open redirects via `?next=`. */
-function safeRelativeNext(raw: string | null): string | null {
-  if (!raw) return null
-  if (!raw.startsWith('/') || raw.startsWith('//')) return null
-  return raw
-}
+import { safeRelativePath } from '@/lib/url/safe-relative-path'
 
 /**
  * GET /logout — ends the Supabase session (clears auth cookies) and redirects.
@@ -17,6 +11,6 @@ export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient()
   await supabase.auth.signOut()
 
-  const nextPath = safeRelativeNext(requestUrl.searchParams.get('next')) ?? '/sign-in'
+  const nextPath = safeRelativePath(requestUrl.searchParams.get('next'), '/sign-in')
   return NextResponse.redirect(new URL(nextPath, requestUrl.origin))
 }

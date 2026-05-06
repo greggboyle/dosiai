@@ -26,7 +26,9 @@ export default function SignInPage() {
     setError(null)
     const { error: providerError } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/')}`,
+      },
     })
     if (providerError) setError(providerError.message)
   }
@@ -45,7 +47,7 @@ export default function SignInPage() {
       return
     }
 
-    router.push('/onboarding')
+    router.push('/')
     router.refresh()
   }
 

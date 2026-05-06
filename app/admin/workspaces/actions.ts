@@ -3,7 +3,7 @@
 import { logAuditEvent } from '@/lib/audit/log'
 import { getOperatorSession } from '@/lib/auth/operator'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { inngest } from '@/inngest/client'
+import { dispatchSweepRun } from '@/lib/sweep/dispatch-run'
 
 export async function runSweepOnBehalf(workspaceId: string, reason: string) {
   const operatorSession = await getOperatorSession()
@@ -14,9 +14,10 @@ export async function runSweepOnBehalf(workspaceId: string, reason: string) {
   const { data: workspace } = await supabase.from('workspace').select('id,name').eq('id', workspaceId).single()
   if (!workspace) throw new Error('Workspace not found')
 
-  await inngest.send({
-    name: 'sweep/run',
-    data: { workspaceId, trigger: 'manual' as const, triggerUserId: null },
+  await dispatchSweepRun({
+    workspaceId,
+    trigger: 'manual',
+    triggerUserId: null,
   })
 
   await logAuditEvent({
