@@ -60,6 +60,13 @@ export async function updateCompanyProfile(formData: FormData) {
     })
 
     if (error) throw error
+
+    const autoBriefsAutoApprove = formData.get('autoBriefsAutoApprove') === 'on'
+    const { error: wsError } = await supabase
+      .from('workspace')
+      .update({ auto_briefs_auto_approve: autoBriefsAutoApprove })
+      .eq('id', workspace.id)
+    if (wsError) throw wsError
   })
 
   revalidatePath('/settings/company-profile')

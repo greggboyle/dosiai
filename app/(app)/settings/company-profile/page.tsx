@@ -38,6 +38,11 @@ export default async function CompanyProfilePage() {
     .select('*')
     .eq('workspace_id', membership.workspace_id)
     .maybeSingle()
+  const { data: workspace } = await supabase
+    .from('workspace')
+    .select('auto_briefs_auto_approve')
+    .eq('id', membership.workspace_id)
+    .maybeSingle()
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -151,6 +156,28 @@ export default async function CompanyProfilePage() {
           <div className="space-y-2">
             <Label htmlFor="otherSocial">Other social</Label>
             <Input id="otherSocial" name="otherSocial" defaultValue={socialValue(profile?.social_handles, 'other')} />
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-md border p-3">
+          <div>
+            <Label htmlFor="autoBriefsAutoApprove">Automated brief approval mode</Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Every sweep generates an automated leadership brief. Scheduled nightly sweeps auto-publish
+              when this is enabled; otherwise they remain drafts.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="autoBriefsAutoApprove"
+              name="autoBriefsAutoApprove"
+              defaultChecked={Boolean(workspace?.auto_briefs_auto_approve ?? true)}
+              className="size-4"
+            />
+            <Label htmlFor="autoBriefsAutoApprove" className="text-sm font-normal">
+              Automatically approve scheduled-sweep briefs
+            </Label>
           </div>
         </div>
 

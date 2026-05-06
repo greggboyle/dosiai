@@ -14,11 +14,12 @@ export const draftBrief = inngest.createFunction(
   { id: 'draft-brief', retries: 2 },
   { event: 'brief/draft-requested' },
   async ({ event, step }) => {
-    const { briefId, workspaceId, itemIds, audienceHint } = event.data as {
+    const { briefId, workspaceId, itemIds, audienceHint, autoPublish } = event.data as {
       briefId: string
       workspaceId: string
       itemIds: string[]
       audienceHint?: string
+      autoPublish?: boolean
     }
 
     return step.run('generate-brief-draft', async () => {
@@ -118,6 +119,12 @@ export const draftBrief = inngest.createFunction(
           ai_drafted: true,
           human_reviewed: false,
           linked_item_ids: itemIds,
+          ...(autoPublish
+            ? {
+                status: 'published' as const,
+                published_at: new Date().toISOString(),
+              }
+            : {}),
         })
         .eq('id', briefId)
 

@@ -80,6 +80,7 @@ create table if not exists public.workspace (
   grace_period_ends_at timestamptz,
   ai_cost_mtd_cents integer not null default 0,
   ai_cost_ceiling_cents integer not null default 4000,
+  auto_briefs_auto_approve boolean not null default true,
   stripe_customer_id text,
   stripe_subscription_id text,
   created_at timestamptz not null default now(),
@@ -1448,7 +1449,8 @@ end $$;
 alter table public.workspace
   add column if not exists last_sweep_at timestamptz,
   add column if not exists review_queue_threshold integer not null default 30,
-  add column if not exists scoring_weights jsonb not null default '{}'::jsonb;
+  add column if not exists scoring_weights jsonb not null default '{}'::jsonb,
+  add column if not exists auto_briefs_auto_approve boolean not null default true;
 
 -- workspace_profile: embeddings + segments
 alter table public.workspace_profile

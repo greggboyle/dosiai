@@ -9,6 +9,7 @@ import { computeMis, embedText, loadProfileVectors, type SweepContext } from '@/
 import { determineVisibility } from '@/lib/feed/visibility'
 import { cosineSimilarity } from '@/lib/vector/cosine'
 import { formatVectorLiteral } from '@/lib/intelligence/map-row'
+import { createAutomatedBriefForSweep } from '@/lib/brief/auto'
 import type { AiPurposeDb } from '@/lib/supabase/types'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 
@@ -598,6 +599,21 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       .from('workspace')
       .update({ last_sweep_at: new Date().toISOString() })
       .eq('id', input.workspaceId)
+
+    try {
+      await createAutomatedBriefForSweep({
+        workspaceId: input.workspaceId,
+        sweepId,
+        trigger: input.trigger,
+        autoApproveScheduled: (ws.auto_briefs_auto_approve ?? true) as boolean,
+      })
+    } catch (briefErr) {
+      console.error('[sweep] automated brief generation failed', {
+        workspaceId: input.workspaceId,
+        sweepId,
+        error: briefErr instanceof Error ? briefErr.message : String(briefErr),
+      })
+    }
 
     return { sweepId, itemsIngested: itemsNew }
   } catch (e) {

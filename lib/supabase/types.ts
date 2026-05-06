@@ -40,6 +40,7 @@ export interface Database {
           last_sweep_at: string | null
           review_queue_threshold: number
           scoring_weights: Json
+          auto_briefs_auto_approve: boolean
         }
         Insert: {
           id?: string
@@ -61,6 +62,7 @@ export interface Database {
           last_sweep_at?: string | null
           review_queue_threshold?: number
           scoring_weights?: Json
+          auto_briefs_auto_approve?: boolean
         }
         Update: Partial<Database['public']['Tables']['workspace']['Insert']>
       }
