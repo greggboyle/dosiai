@@ -41,7 +41,7 @@ import { ReadOnlyDashboardModule } from '@/components/billing/read-only-state'
 import type { TrialUsageStats } from '@/lib/billing-types'
 import { useWorkspaceContext } from '@/components/workspace-context'
 import { formatRelativeLabel, type DashboardSnapshot } from '@/lib/dashboard/queries'
-import { triggerManualSweep } from '@/app/(app)/dashboard/actions'
+import { getLatestSweepStatus, triggerManualSweep } from '@/app/(app)/dashboard/actions'
 
 
 // =============================================================================
@@ -85,7 +85,40 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
   const { subscription, memberRole } = useWorkspaceContext()
   const [refreshing, setRefreshing] = React.useState(false)
   const [sweepRunning, setSweepRunning] = React.useState(false)
+  const [sweepStatus, setSweepStatus] = React.useState<string | null>(snapshot.sweep?.status ?? null)
+  const [isPollingSweep, setIsPollingSweep] = React.useState<boolean>(
+    snapshot.sweep?.status === 'running' || snapshot.sweep?.status === 'queued'
+  )
   const [sweepError, setSweepError] = React.useState<string | null>(null)
+
+  const isSweepInProgress = sweepRunning || sweepStatus === 'running' || sweepStatus === 'queued'
+
+  React.useEffect(() => {
+    setSweepStatus(snapshot.sweep?.status ?? null)
+    setIsPollingSweep(snapshot.sweep?.status === 'running' || snapshot.sweep?.status === 'queued')
+  }, [snapshot.sweep?.status])
+
+  React.useEffect(() => {
+    if (!isPollingSweep) return
+
+    const interval = window.setInterval(() => {
+      void (async () => {
+        const result = await getLatestSweepStatus()
+        if (!result.ok) return
+
+        const nextStatus = result.sweep?.status ?? null
+        setSweepStatus(nextStatus)
+
+        const stillRunning = nextStatus === 'running' || nextStatus === 'queued'
+        if (!stillRunning) {
+          setIsPollingSweep(false)
+          router.refresh()
+        }
+      })()
+    }, 5000)
+
+    return () => window.clearInterval(interval)
+  }, [isPollingSweep, router])
 
   const canRunSweepManually = memberRole === 'admin' && subscription.status !== 'read_only'
 
@@ -265,11 +298,11 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
                   <div
                     className={cn(
                       'size-2 rounded-full',
-                      snapshot.sweep?.status === 'completed'
+                      isSweepInProgress
+                        ? 'bg-amber-500 animate-pulse'
+                        : sweepStatus === 'completed'
                         ? 'bg-positive'
-                        : snapshot.sweep?.status === 'running'
-                          ? 'bg-amber-500 animate-pulse'
-                          : 'bg-muted-foreground'
+                        : 'bg-muted-foreground'
                     )}
                   />
                   <span className="text-sm text-muted-foreground">Last sweep started</span>
@@ -316,17 +349,18 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
                         setSweepError(result.error)
                         return
                       }
-                      router.refresh()
+                      setSweepStatus('queued')
+                      setIsPollingSweep(true)
                     } finally {
                       setSweepRunning(false)
                     }
                   })()
                 }}
               >
-                {sweepRunning ? (
+                {isSweepInProgress ? (
                   <>
                     <RefreshCw className="size-3 mr-2 animate-spin" />
-                    Scheduling…
+                    Sweep in progress…
                   </>
                 ) : (
                   <>
@@ -338,6 +372,9 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
               {sweepError ? (
                 <p className="text-xs text-destructive mt-2">{sweepError}</p>
               ) : null}
+              <p className="text-[10px] text-muted-foreground mt-2">
+                Sweeps usually complete in about 3 minutes.
+              </p>
             </div>
           </DashboardModule>
         </div>

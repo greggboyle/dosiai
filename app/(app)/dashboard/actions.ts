@@ -92,3 +92,58 @@ export async function triggerManualSweep(
     return { ok: false, error: msg }
   }
 }
+
+export async function getLatestSweepStatus(): Promise<{
+  ok: true
+  sweep: { status: string | null; startedAt: string | null; completedAt: string | null } | null
+} | {
+  ok: false
+  error: string
+}> {
+  try {
+    const session = await getSession()
+    if (!session?.user) {
+      return { ok: false, error: 'Unauthorized' }
+    }
+
+    const supabase = await createSupabaseServerClient()
+    const { data: member } = await supabase
+      .from('workspace_member')
+      .select('workspace_id')
+      .eq('user_id', session.user.id)
+      .eq('status', 'active')
+      .order('joined_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (!member) {
+      return { ok: false, error: 'Workspace membership required' }
+    }
+
+    const { data: latestSweep, error } = await supabase
+      .from('sweep')
+      .select('status,started_at,completed_at')
+      .eq('workspace_id', member.workspace_id)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) {
+      return { ok: false, error: error.message }
+    }
+
+    return {
+      ok: true,
+      sweep: latestSweep
+        ? {
+            status: latestSweep.status,
+            startedAt: latestSweep.started_at,
+            completedAt: latestSweep.completed_at,
+          }
+        : null,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Could not load sweep status'
+    return { ok: false, error: msg }
+  }
+}
