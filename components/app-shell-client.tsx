@@ -11,6 +11,7 @@ import { ReadOnlyBanner } from '@/components/billing/read-only-state'
 import { CostCeilingBanner } from '@/components/billing/cost-ceiling-banner'
 import { WorkspaceProvider } from '@/components/workspace-context'
 import type { TrialUsageStats, WorkspaceSubscription } from '@/lib/billing-types'
+import type { SidebarNavBadgeCounts } from '@/lib/dashboard/queries'
 import type { TrialThreshold } from '@/lib/billing/trial-warning-data'
 
 interface AppShellClientProps {
@@ -19,9 +20,17 @@ interface AppShellClientProps {
   member: { name: string; email: string; role: 'admin' | 'analyst' | 'viewer' }
   subscription: WorkspaceSubscription
   trialWarning: { usage: TrialUsageStats; pending: TrialThreshold[] } | null
+  sidebarNavBadgeCounts: SidebarNavBadgeCounts
 }
 
-export function AppShellClient({ children, workspace, member, subscription, trialWarning }: AppShellClientProps) {
+export function AppShellClient({
+  children,
+  workspace,
+  member,
+  subscription,
+  trialWarning,
+  sidebarNavBadgeCounts,
+}: AppShellClientProps) {
   return (
     <WorkspaceProvider value={{ workspace, subscription, memberRole: member.role }}>
       <TooltipProvider>
@@ -35,7 +44,12 @@ export function AppShellClient({ children, workspace, member, subscription, tria
           />
         ) : null}
         <SidebarProvider>
-          <AppSidebar workspace={workspace} member={member} subscription={subscription} />
+          <AppSidebar
+            workspace={workspace}
+            member={member}
+            subscription={subscription}
+            navBadgeCounts={sidebarNavBadgeCounts}
+          />
           <SidebarInset>
             <CostCeilingBanner subscription={subscription} />
             {subscription.status === 'read_only' ? <ReadOnlyBanner subscription={subscription} /> : <TrialBanner subscription={subscription} />}

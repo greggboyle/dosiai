@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { getAdminAuthState } from '@/app/admin/actions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,12 +37,7 @@ export default function AdminSignInPage() {
       return
     }
 
-    const { data: operator } = await supabase
-      .from('operator_user')
-      .select('id')
-      .eq('email', email.toLowerCase())
-      .eq('status', 'active')
-      .maybeSingle()
+    const { operator } = await getAdminAuthState()
 
     if (!operator) {
       await supabase.auth.signOut()

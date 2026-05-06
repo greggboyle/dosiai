@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { endImpersonation } from '@/app/admin/impersonation/actions'
+import { getAdminAuthState } from '@/app/admin/actions'
 
 // Operator roles
 type OperatorRole = 'viewer' | 'analyst' | 'admin' | 'owner'
@@ -240,12 +241,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return
       }
 
-      const { data: operator } = await supabase
-        .from('operator_user')
-        .select('*')
-        .eq('email', session.user.email.toLowerCase())
-        .eq('status', 'active')
-        .maybeSingle()
+      const state = await getAdminAuthState()
+      const operator = state.operator
 
       if (!mounted) return
       if (!operator) {
@@ -262,21 +259,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         role: operator.role,
       })
 
-      const { data: activeImpersonation } = await supabase
-        .from('impersonation_session')
-        .select('id,workspace_id,started_at,workspace:workspace_id(name)')
-        .eq('operator_id', operator.id)
-        .is('ended_at', null)
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (activeImpersonation) {
+      if (state.impersonation) {
         setImpersonationState({
           isActive: true,
-          workspaceId: activeImpersonation.workspace_id,
-          workspaceName: (activeImpersonation.workspace as unknown as { name?: string })?.name,
-          startedAt: activeImpersonation.started_at,
+          workspaceId: state.impersonation.workspaceId,
+          workspaceName: state.impersonation.workspaceName,
+          startedAt: state.impersonation.startedAt,
           operatorName: operator.name,
         })
       } else {

@@ -3,6 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
   Newspaper,
@@ -22,6 +23,7 @@ import {
 import { cn } from '@/lib/utils'
 import { TrialPill, SidebarTrialCard } from '@/components/billing/trial-banner'
 import type { WorkspaceSubscription } from '@/lib/billing-types'
+import type { SidebarNavBadgeCounts } from '@/lib/dashboard/queries'
 import {
   Sidebar,
   SidebarContent,
@@ -49,16 +51,33 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 // Simplified navigation for Tier 1 & 2 personas (mid-market PMMs)
 // Core items are always visible, advanced items hidden in "More" for Tier 3
-const coreNavItems = [
+type NavItemConfig = {
+  label: string
+  href: string
+  icon: LucideIcon
+  badge?: (counts: SidebarNavBadgeCounts) => number | undefined
+}
+
+const coreNavItems: NavItemConfig[] = [
   { label: 'Home', href: '/', icon: LayoutDashboard },
-  { label: 'Feed', href: '/feed', icon: Newspaper, badge: 12 },
+  {
+    label: 'Feed',
+    href: '/feed',
+    icon: Newspaper,
+    badge: (c) => (c.feedReviewQueue > 0 ? c.feedReviewQueue : undefined),
+  },
   { label: 'Competitors', href: '/competitors', icon: Building2 },
   { label: 'Battle Cards', href: '/battle-cards', icon: Swords },
 ]
 
-const moreNavItems = [
+const moreNavItems: NavItemConfig[] = [
   { label: 'Topics', href: '/topics', icon: Hash },
-  { label: 'Briefs', href: '/briefs', icon: FileText, badge: 2 },
+  {
+    label: 'Briefs',
+    href: '/briefs',
+    icon: FileText,
+    badge: (c) => (c.briefCount > 0 ? c.briefCount : undefined),
+  },
   { label: 'Win/Loss', href: '/win-loss', icon: TrendingUp },
   { label: 'Reviews', href: '/customer-voice', icon: MessageSquare },
 ]
@@ -67,9 +86,10 @@ interface AppSidebarProps {
   workspace: { id: string; name: string; logo?: string }
   member: { name: string; email: string; role: 'admin' | 'analyst' | 'viewer' }
   subscription: WorkspaceSubscription
+  navBadgeCounts: SidebarNavBadgeCounts
 }
 
-export function AppSidebar({ workspace, member, subscription }: AppSidebarProps) {
+export function AppSidebar({ workspace, member, subscription, navBadgeCounts }: AppSidebarProps) {
   const pathname = usePathname()
   const { state } = useSidebar()
   const collapsed = state === 'collapsed'
@@ -139,23 +159,24 @@ export function AppSidebar({ workspace, member, subscription }: AppSidebarProps)
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {coreNavItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.href}
-                    tooltip={item.label}
-                  >
-                    <Link href={item.href}>
-                      <item.icon className="size-4" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                  {item.badge && (
-                    <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
-                  )}
-                </SidebarMenuItem>
-              ))}
+              {coreNavItems.map((item) => {
+                const badge = item.badge?.(navBadgeCounts)
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.href}
+                      tooltip={item.label}
+                    >
+                      <Link href={item.href}>
+                        <item.icon className="size-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    {badge != null && badge > 0 ? <SidebarMenuBadge>{badge}</SidebarMenuBadge> : null}
+                  </SidebarMenuItem>
+                )
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -165,23 +186,24 @@ export function AppSidebar({ workspace, member, subscription }: AppSidebarProps)
           <SidebarGroupLabel className="text-xs">More</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {moreNavItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.href}
-                    tooltip={item.label}
-                  >
-                    <Link href={item.href}>
-                      <item.icon className="size-4" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                  {item.badge && (
-                    <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
-                  )}
-                </SidebarMenuItem>
-              ))}
+              {moreNavItems.map((item) => {
+                const badge = item.badge?.(navBadgeCounts)
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.href}
+                      tooltip={item.label}
+                    >
+                      <Link href={item.href}>
+                        <item.icon className="size-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    {badge != null && badge > 0 ? <SidebarMenuBadge>{badge}</SidebarMenuBadge> : null}
+                  </SidebarMenuItem>
+                )
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

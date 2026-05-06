@@ -3,6 +3,7 @@ import { AppShellClient } from '@/components/app-shell-client'
 import type { PlanId, WorkspaceSubscription } from '@/lib/billing-types'
 import { getTrialDaysRemaining, getTrialStatus, PLAN_CONFIG } from '@/lib/billing-types'
 import { loadTrialWarningBootstrap } from '@/lib/billing/trial-warning-data'
+import { loadSidebarNavBadgeCounts } from '@/lib/dashboard/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -68,9 +69,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     workspaceRow.plan as PlanId
   )
 
+  const sidebarNavBadgeCounts = await loadSidebarNavBadgeCounts(workspaceRow.id)
+
   return (
     <AppShellClient
       trialWarning={trialWarning}
+      sidebarNavBadgeCounts={sidebarNavBadgeCounts}
       workspace={{
         id: workspaceRow.id,
         name: workspaceRow.name,

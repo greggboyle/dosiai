@@ -11,6 +11,41 @@ export type DashboardFeedRow = {
   timestampLabel: string
 }
 
+export type SidebarNavBadgeCounts = {
+  /** Feed items in review queue (same logic as dashboard `reviewQueueCount`). */
+  feedReviewQueue: number
+  /** Total briefs in the workspace. */
+  briefCount: number
+}
+
+export async function loadSidebarNavBadgeCounts(workspaceId: string): Promise<SidebarNavBadgeCounts> {
+  const supabase = await createSupabaseServerClient()
+
+  const { data: ws } = await supabase
+    .from('workspace')
+    .select('review_queue_threshold')
+    .eq('id', workspaceId)
+    .single()
+
+  const threshold = ws?.review_queue_threshold ?? 30
+
+  const [reviewQueueRes, briefCountRes] = await Promise.all([
+    supabase
+      .from('intelligence_item')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('visibility', 'feed')
+      .lt('mi_score', threshold)
+      .is('reviewed_at', null),
+    supabase.from('brief').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
+  ])
+
+  return {
+    feedReviewQueue: reviewQueueRes.count ?? 0,
+    briefCount: briefCountRes.count ?? 0,
+  }
+}
+
 export type DashboardSnapshot = {
   feed: DashboardFeedRow[]
   competitorHeatmap: Array<{ id: string; name: string; initial: string; count: number }>
