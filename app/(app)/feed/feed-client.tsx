@@ -40,6 +40,7 @@ import type { IntelligenceItem, Category } from '@/lib/types'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { markIntelligenceItemReviewed } from '@/lib/intelligence/actions'
+import { fetchFeedItemsForFilters } from './actions'
 
 // Helper to create mock dates relative to "now" - using fixed offsets in hours
 function createMockDate(hoursAgo: number): string {
@@ -471,17 +472,6 @@ export function FeedClient({
     )
   }, [initialItems, initialSelectedItem])
 
-  const dataSource = items
-
-  const allCompetitors = React.useMemo(
-    () => [...new Set(dataSource.flatMap((i) => i.relatedCompetitors?.map((c) => c.name) ?? []))],
-    [dataSource]
-  )
-  const allTopics = React.useMemo(
-    () => [...new Set(dataSource.flatMap((i) => i.relatedTopics?.map((t) => t.name) ?? []))],
-    [dataSource]
-  )
-
   const [selectedItem, setSelectedItem] = React.useState<IntelligenceItem | null>(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
   const isDesktop = useMediaQuery('(min-width: 1280px)')
@@ -515,10 +505,72 @@ export function FeedClient({
   const [minScore, setMinScore] = React.useState<number>(0)
   const [showCustomerVoiceOnly, setShowCustomerVoiceOnly] = React.useState(false)
   const [showUnreadOnly, setShowUnreadOnly] = React.useState(false)
+  const [serverFilteredItems, setServerFilteredItems] = React.useState<IntelligenceItem[] | null>(null)
+  const [isFilterQueryLoading, setIsFilterQueryLoading] = React.useState(false)
   
   // Sort
   const [sortBy, setSortBy] = React.useState<SortOption>('recent')
   
+  const hasServerSideFilters =
+    selectedCategories.length > 0 ||
+    selectedCompetitors.length > 0 ||
+    selectedTopics.length > 0 ||
+    minScore > 0 ||
+    showCustomerVoiceOnly
+
+  React.useEffect(() => {
+    let cancelled = false
+    if (!hasServerSideFilters) {
+      setServerFilteredItems(null)
+      setIsFilterQueryLoading(false)
+      return
+    }
+
+    setIsFilterQueryLoading(true)
+    void fetchFeedItemsForFilters({
+      subject,
+      categories: selectedCategories,
+      competitorNames: selectedCompetitors,
+      topicNames: selectedTopics,
+      minScore,
+      customerVoiceOnly: showCustomerVoiceOnly,
+    })
+      .then((rows) => {
+        if (cancelled) return
+        setServerFilteredItems(rows)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setServerFilteredItems([])
+      })
+      .finally(() => {
+        if (cancelled) return
+        setIsFilterQueryLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    hasServerSideFilters,
+    subject,
+    selectedCategories,
+    selectedCompetitors,
+    selectedTopics,
+    minScore,
+    showCustomerVoiceOnly,
+  ])
+
+  const dataSource = serverFilteredItems ?? items
+  const allCompetitors = React.useMemo(
+    () => [...new Set(dataSource.flatMap((i) => i.relatedCompetitors?.map((c) => c.name) ?? []))],
+    [dataSource]
+  )
+  const allTopics = React.useMemo(
+    () => [...new Set(dataSource.flatMap((i) => i.relatedTopics?.map((t) => t.name) ?? []))],
+    [dataSource]
+  )
+
   // Use client-only state to avoid hydration mismatches with date calculations
   const [mounted, setMounted] = React.useState(false)
   React.useEffect(() => {
@@ -681,7 +733,10 @@ export function FeedClient({
             <div>
               <h1 className="text-xl font-semibold tracking-tight">Dossier Feed</h1>
               <p className="text-sm text-muted-foreground">
-                {totalItems} intelligence item{totalItems !== 1 ? 's' : ''} total
+                {hasServerSideFilters
+                  ? `${dataSource.length} matching item${dataSource.length !== 1 ? 's' : ''}`
+                  : `${totalItems} intelligence item${totalItems !== 1 ? 's' : ''} total`}
+                {isFilterQueryLoading ? ' · applying filters…' : ''}
               </p>
             </div>
             <DropdownMenu>
@@ -936,14 +991,16 @@ export function FeedClient({
         />
         <div className="flex items-center justify-between border-t border-border px-6 py-3">
           <div className="text-xs text-muted-foreground">
-            Page {currentPage} of {totalPages} · {pageSize} per page
+            {hasServerSideFilters
+              ? `${dataSource.length} filtered item${dataSource.length !== 1 ? 's' : ''}`
+              : `Page ${currentPage} of ${totalPages} · ${pageSize} per page`}
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               className="h-8 text-xs"
-              disabled={currentPage <= 1}
+              disabled={hasServerSideFilters || currentPage <= 1}
               onClick={() => {
                 const params = new URLSearchParams(searchParams.toString())
                 const next = Math.max(1, currentPage - 1)
@@ -958,7 +1015,7 @@ export function FeedClient({
               variant="outline"
               size="sm"
               className="h-8 text-xs"
-              disabled={currentPage >= totalPages}
+              disabled={hasServerSideFilters || currentPage >= totalPages}
               onClick={() => {
                 const params = new URLSearchParams(searchParams.toString())
                 const next = Math.min(totalPages, currentPage + 1)

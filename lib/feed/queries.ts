@@ -4,6 +4,54 @@ import type { IntelligenceItem } from '@/lib/types'
 
 export type FeedSubject = 'competitors' | 'our-company'
 
+export type FeedServerFilters = {
+  subject?: FeedSubject
+  categories?: Array<'buy-side' | 'sell-side' | 'channel' | 'regulatory'>
+  competitorNames?: string[]
+  topicNames?: string[]
+  minScore?: number
+  customerVoiceOnly?: boolean
+}
+
+async function mapFeedRows(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  rows: Array<{ related_competitors: string[] | null; related_topics: string[] | null } & Record<string, unknown>>
+): Promise<IntelligenceItem[]> {
+  if (!rows.length) return []
+
+  const compIds = new Set<string>()
+  const topicIds = new Set<string>()
+  for (const r of rows) {
+    for (const id of r.related_competitors ?? []) compIds.add(id)
+    for (const id of r.related_topics ?? []) topicIds.add(id)
+  }
+
+  const [{ data: comps }, { data: tops }] = await Promise.all([
+    compIds.size
+      ? supabase.from('competitor').select('id,name').in('id', [...compIds])
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    topicIds.size
+      ? supabase.from('topic').select('id,name').in('id', [...topicIds])
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ])
+
+  const compById = Object.fromEntries((comps ?? []).map((c) => [c.id, c]))
+  const topById = Object.fromEntries((tops ?? []).map((t) => [t.id, t]))
+
+  return rows.map((row) => {
+    const item = intelligenceItemFromDb(row as never)
+    item.relatedCompetitors = ((row.related_competitors as string[] | null) ?? []).map((id) => ({
+      id,
+      name: compById[id]?.name ?? 'Competitor',
+    }))
+    item.relatedTopics = ((row.related_topics as string[] | null) ?? []).map((id) => ({
+      id,
+      name: topById[id]?.name ?? 'Topic',
+    }))
+    return item
+  })
+}
+
 export async function getWorkspaceIdForUser(): Promise<string | null> {
   const supabase = await createSupabaseServerClient()
   const {
@@ -38,39 +86,7 @@ export async function listFeedItems(
   const { data: rows, error } = await query.order('ingested_at', { ascending: false }).limit(limit)
 
   if (error) throw error
-  if (!rows?.length) return []
-
-  const compIds = new Set<string>()
-  const topicIds = new Set<string>()
-  for (const r of rows) {
-    for (const id of r.related_competitors ?? []) compIds.add(id)
-    for (const id of r.related_topics ?? []) topicIds.add(id)
-  }
-
-  const [{ data: comps }, { data: tops }] = await Promise.all([
-    compIds.size
-      ? supabase.from('competitor').select('id,name').in('id', [...compIds])
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    topicIds.size
-      ? supabase.from('topic').select('id,name').in('id', [...topicIds])
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-  ])
-
-  const compById = Object.fromEntries((comps ?? []).map((c) => [c.id, c]))
-  const topById = Object.fromEntries((tops ?? []).map((t) => [t.id, t]))
-
-  return rows.map((row) => {
-    const item = intelligenceItemFromDb(row)
-    item.relatedCompetitors = (row.related_competitors ?? []).map((id) => ({
-      id,
-      name: compById[id]?.name ?? 'Competitor',
-    }))
-    item.relatedTopics = (row.related_topics ?? []).map((id) => ({
-      id,
-      name: topById[id]?.name ?? 'Topic',
-    }))
-    return item
-  })
+  return mapFeedRows(supabase, (rows ?? []) as never)
 }
 
 export async function listFeedItemsPage(
@@ -107,37 +123,7 @@ export async function listFeedItemsPage(
     }
   }
 
-  const compIds = new Set<string>()
-  const topicIds = new Set<string>()
-  for (const r of rows) {
-    for (const id of r.related_competitors ?? []) compIds.add(id)
-    for (const id of r.related_topics ?? []) topicIds.add(id)
-  }
-
-  const [{ data: comps }, { data: tops }] = await Promise.all([
-    compIds.size
-      ? supabase.from('competitor').select('id,name').in('id', [...compIds])
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    topicIds.size
-      ? supabase.from('topic').select('id,name').in('id', [...topicIds])
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-  ])
-
-  const compById = Object.fromEntries((comps ?? []).map((c) => [c.id, c]))
-  const topById = Object.fromEntries((tops ?? []).map((t) => [t.id, t]))
-
-  const items = rows.map((row) => {
-    const item = intelligenceItemFromDb(row)
-    item.relatedCompetitors = (row.related_competitors ?? []).map((id) => ({
-      id,
-      name: compById[id]?.name ?? 'Competitor',
-    }))
-    item.relatedTopics = (row.related_topics ?? []).map((id) => ({
-      id,
-      name: topById[id]?.name ?? 'Topic',
-    }))
-    return item
-  })
+  const items = await mapFeedRows(supabase, rows as never)
 
   const total = count ?? 0
   return {
@@ -147,6 +133,57 @@ export async function listFeedItemsPage(
     pageSize,
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
   }
+}
+
+export async function listFeedItemsFiltered(
+  workspaceId: string,
+  filters: FeedServerFilters
+): Promise<IntelligenceItem[]> {
+  const supabase = await createSupabaseServerClient()
+  const subject = filters.subject ?? 'competitors'
+  const minScore = Math.max(0, filters.minScore ?? 0)
+  const categories = (filters.categories ?? []).filter(Boolean)
+  const competitorNames = [...new Set((filters.competitorNames ?? []).map((v) => v.trim()).filter(Boolean))]
+  const topicNames = [...new Set((filters.topicNames ?? []).map((v) => v.trim()).filter(Boolean))]
+
+  let query = supabase
+    .from('intelligence_item')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('visibility', 'feed')
+
+  query = subject === 'our-company' ? query.eq('is_about_self', true) : query.eq('is_about_self', false)
+  if (categories.length > 0) query = query.in('category', categories as string[])
+  if (minScore > 0) query = query.gte('mi_score', minScore)
+  if (filters.customerVoiceOnly) query = query.not('review_metadata', 'is', null)
+
+  if (competitorNames.length > 0) {
+    const { data: compRows, error: compErr } = await supabase
+      .from('competitor')
+      .select('id,name')
+      .eq('workspace_id', workspaceId)
+      .in('name', competitorNames)
+    if (compErr) throw compErr
+    const competitorIds = (compRows ?? []).map((r) => r.id)
+    if (competitorIds.length === 0) return []
+    query = query.overlaps('related_competitors', competitorIds)
+  }
+
+  if (topicNames.length > 0) {
+    const { data: topicRows, error: topicErr } = await supabase
+      .from('topic')
+      .select('id,name')
+      .eq('workspace_id', workspaceId)
+      .in('name', topicNames)
+    if (topicErr) throw topicErr
+    const topicIds = (topicRows ?? []).map((r) => r.id)
+    if (topicIds.length === 0) return []
+    query = query.overlaps('related_topics', topicIds)
+  }
+
+  const { data: rows, error } = await query.order('ingested_at', { ascending: false }).limit(2000)
+  if (error) throw error
+  return mapFeedRows(supabase, (rows ?? []) as never)
 }
 
 /** Recent feed-visible items mentioning a competitor (for battle card interview context). */
@@ -171,39 +208,7 @@ export async function listIntelItemsForCompetitor(
     .limit(limit)
 
   if (error) throw error
-  if (!rows?.length) return []
-
-  const compIds = new Set<string>()
-  const topicIds = new Set<string>()
-  for (const r of rows) {
-    for (const id of r.related_competitors ?? []) compIds.add(id)
-    for (const id of r.related_topics ?? []) topicIds.add(id)
-  }
-
-  const [{ data: comps }, { data: tops }] = await Promise.all([
-    compIds.size
-      ? supabase.from('competitor').select('id,name').in('id', [...compIds])
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    topicIds.size
-      ? supabase.from('topic').select('id,name').in('id', [...topicIds])
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-  ])
-
-  const compById = Object.fromEntries((comps ?? []).map((c) => [c.id, c]))
-  const topById = Object.fromEntries((tops ?? []).map((t) => [t.id, t]))
-
-  return rows.map((row) => {
-    const item = intelligenceItemFromDb(row)
-    item.relatedCompetitors = (row.related_competitors ?? []).map((id) => ({
-      id,
-      name: compById[id]?.name ?? 'Competitor',
-    }))
-    item.relatedTopics = (row.related_topics ?? []).map((id) => ({
-      id,
-      name: topById[id]?.name ?? 'Topic',
-    }))
-    return item
-  })
+  return mapFeedRows(supabase, (rows ?? []) as never)
 }
 
 export async function getFeedItemsByIds(workspaceId: string, ids: string[]): Promise<IntelligenceItem[]> {
@@ -216,37 +221,5 @@ export async function getFeedItemsByIds(workspaceId: string, ids: string[]): Pro
     .in('id', ids)
 
   if (error) throw error
-  if (!rows?.length) return []
-
-  const compIds = new Set<string>()
-  const topicIds = new Set<string>()
-  for (const r of rows) {
-    for (const id of r.related_competitors ?? []) compIds.add(id)
-    for (const id of r.related_topics ?? []) topicIds.add(id)
-  }
-
-  const [{ data: comps }, { data: tops }] = await Promise.all([
-    compIds.size
-      ? supabase.from('competitor').select('id,name').in('id', [...compIds])
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    topicIds.size
-      ? supabase.from('topic').select('id,name').in('id', [...topicIds])
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-  ])
-
-  const compById = Object.fromEntries((comps ?? []).map((c) => [c.id, c]))
-  const topById = Object.fromEntries((tops ?? []).map((t) => [t.id, t]))
-
-  return rows.map((row) => {
-    const item = intelligenceItemFromDb(row)
-    item.relatedCompetitors = (row.related_competitors ?? []).map((id) => ({
-      id,
-      name: compById[id]?.name ?? 'Competitor',
-    }))
-    item.relatedTopics = (row.related_topics ?? []).map((id) => ({
-      id,
-      name: topById[id]?.name ?? 'Topic',
-    }))
-    return item
-  })
+  return mapFeedRows(supabase, (rows ?? []) as never)
 }
