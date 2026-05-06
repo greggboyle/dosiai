@@ -58,6 +58,7 @@ export type AiPurpose =
   | 'sweep_regulatory'
   | 'sweep_self'
   | 'sweep_topic'
+  | 'competitor_profile_refresh'
   | 'scoring'
   | 'embedding'
   | 'brief_drafting'

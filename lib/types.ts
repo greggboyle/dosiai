@@ -235,6 +235,7 @@ export interface Competitor {
   strengths?: string[]
   weaknesses?: string[]
   lastProfileRefresh?: string
+  lastProfileRefreshAt?: string
   sentimentSummary?: SentimentSummary
   winLossSummary?: WinLossSummary
   recentReviews?: ReviewExcerpt[]

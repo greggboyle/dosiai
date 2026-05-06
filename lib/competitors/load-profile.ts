@@ -5,6 +5,7 @@ import type { Competitor, CompetitorLeader, CompetitorProduct, IntelligenceItem,
 import { getMISBand } from '@/lib/types'
 import type { Database } from '@/lib/supabase/types'
 import type { WinLossRow } from '@/lib/win-loss/queries'
+import type { WorkspacePlan } from '@/lib/types/dosi'
 
 type CompRow = Database['public']['Tables']['competitor']['Row']
 
@@ -73,6 +74,7 @@ function mapPricingModel(s: string | null): Competitor['pricingModel'] {
 }
 
 export type CompetitorProfilePayload = {
+  workspacePlan: WorkspacePlan
   competitor: Competitor
   activityItems: IntelligenceItem[]
   voiceItems: IntelligenceItem[]
@@ -115,6 +117,7 @@ export async function loadCompetitorProfile(
       .limit(12),
     listWinLossOutcomes(workspaceId),
   ])
+  const { data: ws } = await supabase.from('workspace').select('plan').eq('id', workspaceId).maybeSingle()
 
   const activityItems = intelItems
   const voiceCandidates = intelItems.filter((i) => i.category === 'buy-side')
@@ -155,6 +158,7 @@ export async function loadCompetitorProfile(
     strengths: row.strengths ?? undefined,
     weaknesses: row.weaknesses ?? undefined,
     lastProfileRefresh: formatRelativeLabel(row.last_profile_refresh),
+    lastProfileRefreshAt: row.last_profile_refresh ?? undefined,
     discoveryConfidence: row.discovery_confidence ?? undefined,
     aiDraftedFields: row.ai_drafted_fields ?? undefined,
     lastSignificantChangeAt: row.last_significant_change_at ?? undefined,
@@ -179,6 +183,7 @@ export async function loadCompetitorProfile(
   const winLossRows = allWin.filter((w) => w.competitor_id === competitorId)
 
   return {
+    workspacePlan: (ws?.plan ?? 'starter') as WorkspacePlan,
     competitor,
     activityItems,
     voiceItems: voiceCandidates,

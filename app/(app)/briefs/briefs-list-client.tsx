@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Plus, Search, FileText, MoreHorizontal, Clock, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { Brief } from '@/lib/types'
+import { archiveBrief } from '@/lib/brief/actions'
+import { toast } from 'sonner'
 
 const audienceLabels: Record<Brief['audience'], string> = {
   leadership: 'Leadership',
@@ -46,8 +49,10 @@ export interface BriefsListClientProps {
 }
 
 export function BriefsListClient({ briefs, canAuthor, currentUserId }: BriefsListClientProps) {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = React.useState('')
   const [activeTab, setActiveTab] = React.useState<'all' | Brief['audience']>('all')
+  const [deletingId, setDeletingId] = React.useState<string | null>(null)
 
   const filteredBriefs = briefs.filter((brief) => {
     const matchesSearch =
@@ -124,7 +129,28 @@ export function BriefsListClient({ briefs, canAuthor, currentUserId }: BriefsLis
                         <Link href={`/briefs/${brief.id}/edit`}>Edit</Link>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        disabled={deletingId === brief.id}
+                        onClick={() => {
+                          const ok = window.confirm(
+                            'Delete this brief? This will archive it and hide it from all views.'
+                          )
+                          if (!ok) return
+                          setDeletingId(brief.id)
+                          void archiveBrief(brief.id)
+                            .then(() => {
+                              toast.success('Brief deleted')
+                              router.refresh()
+                            })
+                            .catch((e) => {
+                              toast.error(e instanceof Error ? e.message : 'Delete failed')
+                            })
+                            .finally(() => setDeletingId(null))
+                        }}
+                      >
+                        Delete
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

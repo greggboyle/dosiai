@@ -20,7 +20,7 @@ export default async function FeedPage({
   const itemParam = Array.isArray(params.item) ? params.item[0] : params.item
   const parsedPage = Number.parseInt(pageParam ?? '1', 10)
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
-  const pageSize = 25
+  const pageSize = 10
 
   const workspaceId = await getWorkspaceIdForUser()
   const paged = workspaceId

@@ -56,6 +56,10 @@ import type { Competitor, IntelligenceItem, Category } from '@/lib/types'
 import { getCategoryInfo } from '@/lib/types'
 import type { CompetitorBattleCardRow, CompetitorBriefRow } from '@/lib/competitors/load-profile'
 import type { WinLossRow } from '@/lib/win-loss/queries'
+import type { WorkspacePlan } from '@/lib/types/dosi'
+import { getCompetitorProfileRefreshPolicy } from '@/lib/competitors/profile-refresh'
+import { requestCompetitorProfileRefresh } from '@/lib/competitors/actions'
+import { toast } from 'sonner'
 
 const tierLabels: Record<string, string> = {
   primary_direct: 'Primary Direct',
@@ -74,6 +78,7 @@ const tierColors: Record<string, string> = {
 }
 
 export interface CompetitorProfileClientProps {
+  workspacePlan: WorkspacePlan
   competitor: Competitor
   activityItems: IntelligenceItem[]
   voiceItems: IntelligenceItem[]
@@ -133,6 +138,7 @@ function SentimentBar({ positive, mixed, negative }: { positive: number; mixed: 
 }
 
 export function CompetitorProfileClient({
+  workspacePlan,
   competitor,
   activityItems,
   voiceItems,
@@ -141,10 +147,29 @@ export function CompetitorProfileClient({
   winLossRows,
 }: CompetitorProfileClientProps) {
   const [activeTab, setActiveTab] = React.useState('overview')
+  const [refreshingProfile, setRefreshingProfile] = React.useState(false)
   const [confirmedFields, setConfirmedFields] = React.useState<Set<string>>(new Set())
   const [activityFilter, setActivityFilter] = React.useState<Category | 'all'>('all')
   const [voiceSentimentFilter, setVoiceSentimentFilter] = React.useState<'all' | 'positive' | 'mixed' | 'negative'>('all')
   const [notesContent, setNotesContent] = React.useState('## Analyst Notes\n\n- Key observation: Their Series D gives them significant runway\n- Watch for: European expansion announcement expected Q3\n- Action item: Update battle card with new pricing intelligence')
+  const refreshPolicy = React.useMemo(
+    () =>
+      getCompetitorProfileRefreshPolicy({
+        plan: workspacePlan,
+        lastProfileRefreshAt: competitor.lastProfileRefreshAt ?? null,
+      }),
+    [workspacePlan, competitor.lastProfileRefreshAt]
+  )
+  const refreshStatusText = React.useMemo(() => {
+    if (refreshPolicy.allowed) {
+      if (workspacePlan === 'enterprise') return 'Refresh available anytime on Enterprise.'
+      return 'Refresh available now.'
+    }
+    if (refreshPolicy.nextAllowedAt) {
+      return `Refresh available again: ${new Date(refreshPolicy.nextAllowedAt).toLocaleString()}.`
+    }
+    return refreshPolicy.reason ?? 'Refresh unavailable.'
+  }, [refreshPolicy, workspacePlan])
   
   const confirmField = (field: string) => {
     setConfirmedFields(prev => new Set([...prev, field]))
@@ -224,6 +249,19 @@ export function CompetitorProfileClient({
     }))
   }, [voiceItems])
 
+  const handleRefreshProfile = async () => {
+    try {
+      setRefreshingProfile(true)
+      await requestCompetitorProfileRefresh(competitor.id)
+      toast.success('Profile refresh queued. AI updates will appear shortly.')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to queue profile refresh.'
+      toast.error(msg)
+    } finally {
+      setRefreshingProfile(false)
+    }
+  }
+
   return (
     <div className="min-h-screen">
       {/* Sticky Header */}
@@ -254,12 +292,21 @@ export function CompetitorProfileClient({
             </div>
             
             <div className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground">
-                Last refresh: {competitor.lastProfileRefresh}
-              </span>
-              <Button variant="outline" size="sm">
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-xs text-muted-foreground">
+                  Last refresh: {competitor.lastProfileRefresh}
+                </span>
+                <span className="text-[11px] text-muted-foreground">{refreshStatusText}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleRefreshProfile()}
+                disabled={!refreshPolicy.allowed || refreshingProfile}
+                title={!refreshPolicy.allowed ? refreshPolicy.reason : undefined}
+              >
                 <RefreshCw className="size-4 mr-2" />
-                Refresh Profile
+                {refreshingProfile ? 'Refreshing…' : 'Refresh Profile'}
               </Button>
             </div>
           </div>

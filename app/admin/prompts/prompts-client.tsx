@@ -83,6 +83,7 @@ const purposeLabels: Record<AIPurpose, string> = {
   sweep_regulatory: 'Sweep: Regulatory',
   sweep_self: 'Sweep: Own Company',
   sweep_topic: 'Sweep: Topic',
+  competitor_profile_refresh: 'Competitor Profile Refresh',
   scoring: 'MIS Scoring',
   embedding: 'Embedding',
   brief_drafting: 'Brief Drafting',

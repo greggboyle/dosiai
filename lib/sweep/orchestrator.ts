@@ -12,6 +12,8 @@ import { formatVectorLiteral } from '@/lib/intelligence/map-row'
 import { createAutomatedBriefForSweep } from '@/lib/brief/auto'
 import type { AiPurposeDb } from '@/lib/supabase/types'
 import type { WorkspacePlan } from '@/lib/types/dosi'
+import { inngest } from '@/inngest/client'
+import { shouldAutoRefreshTrialOnFirstSweep } from '@/lib/competitors/profile-refresh'
 
 export interface OrchestrateSweepInput {
   workspaceId: string
@@ -354,6 +356,7 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
   if (wsErr || !ws) throw new Error('Workspace not found')
 
   const plan = ws.plan as WorkspacePlan
+  const priorLastSweepAt = ws.last_sweep_at
   const budget = await checkCostBudget(input.workspaceId, plan)
   if (!budget.ok) {
     throw new SweepRejectedError(budget.reason, 'AI cost ceiling exceeded for this workspace')
@@ -365,7 +368,11 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
     .eq('workspace_id', input.workspaceId)
     .maybeSingle()
 
-  const { data: competitors } = await supabase.from('competitor').select('id,name,tier').eq('workspace_id', input.workspaceId)
+  const { data: competitors } = await supabase
+    .from('competitor')
+    .select('id,name,tier')
+    .eq('workspace_id', input.workspaceId)
+    .eq('status', 'active')
   const { data: topicRows } = await supabase
     .from('topic')
     .select('id,name,description,search_seeds,importance,embedding')
@@ -599,6 +606,20 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       .from('workspace')
       .update({ last_sweep_at: new Date().toISOString() })
       .eq('id', input.workspaceId)
+
+    if (shouldAutoRefreshTrialOnFirstSweep(plan, priorLastSweepAt ?? null) && (competitors ?? []).length > 0) {
+      const events = competitors.map((c) => ({
+        name: 'competitor/populate-profile' as const,
+        data: {
+          workspaceId: input.workspaceId,
+          competitorId: c.id,
+          requestedByUserId: input.triggerUserId,
+          source: 'trial_first_sweep' as const,
+          bypassLimits: true,
+        },
+      }))
+      await inngest.send(events)
+    }
 
     try {
       await createAutomatedBriefForSweep({

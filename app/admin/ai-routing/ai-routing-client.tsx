@@ -83,6 +83,10 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
   sweep_regulatory: { name: 'sweep_regulatory', description: 'Regulatory intelligence sweeps' },
   sweep_self: { name: 'sweep_self', description: 'Own-company intelligence sweeps' },
   sweep_topic: { name: 'sweep_topic', description: 'Topic-focused sweep pass' },
+  competitor_profile_refresh: {
+    name: 'competitor_profile_refresh',
+    description: 'Competitor profile refresh (summary, products, leadership)',
+  },
   scoring: { name: 'scoring', description: 'MIS scoring (LLM-assisted explanation generation)' },
   embedding: { name: 'embedding', description: 'Embedding model (proximity, dedup, competitor matching)' },
   brief_drafting: { name: 'brief_drafting', description: 'AI-drafted brief generation' },
