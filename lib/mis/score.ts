@@ -237,6 +237,6 @@ export async function loadProfileVectors(
   return {
     company: parseVec(profile.embedding),
     differentiators: parseVec(profile.differentiators_embedding),
-    segment_relevance: profile.segment_relevance ?? [],
+    segmentRelevance: profile.segment_relevance ?? [],
   }
 }
