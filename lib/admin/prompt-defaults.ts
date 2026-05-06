@@ -1,4 +1,5 @@
 import type { AIPurpose, AIVendor, PromptVariable } from '@/lib/admin-types'
+import { SWEEP_SELF_PROMPT_TEMPLATE } from '@/lib/sweep/self-prompt-template'
 
 export type EmbeddedPromptDefault = {
   purpose: AIPurpose
@@ -19,6 +20,8 @@ Active topics:
 
 Each item must include: title, summary, confidence (low|medium|high), confidenceReason, category as exactly one of the strings "buy-side", "sell-side", "channel", or "regulatory" (no other labels), sourceUrls (array of {name,url,domain}), optional fiveWH as an object {"who","what","when","where","why","how"} strings or omit entirely (never a bare string), optional eventAt ISO string, optional sourceType, optional relatedCompetitorNames (string[]), optional entitiesMentioned ([{name}]).
 Produce 1-3 realistic items if data is thin; focus on verifiable claims.`
+
+export { SWEEP_SHARED_PROMPT as SWEEP_SHARED_PROMPT_TEMPLATE }
 
 const SWEEP_VARIABLES: PromptVariable[] = [
   { name: 'purpose', type: 'string', description: 'Sweep purpose key.', example: 'sweep_buy' },
@@ -42,12 +45,35 @@ const SWEEP_VARIABLES: PromptVariable[] = [
   },
 ]
 
+const SWEEP_SELF_VARIABLES: PromptVariable[] = [
+  { name: 'legal_name', type: 'string', description: 'Workspace legal company name.', example: 'Dosimetry Insights Inc.' },
+  { name: 'primary_url', type: 'string', description: 'Official company website URL.', example: 'https://example.com' },
+  {
+    name: 'product_names',
+    type: 'string',
+    description: 'Comma-separated product names from workspace profile.',
+    example: 'Product A, Product B',
+  },
+  {
+    name: 'brand_aliases',
+    type: 'string',
+    description: 'Comma-separated alternate brand names.',
+    example: 'ExampleCo, Example',
+  },
+  {
+    name: 'social_handles_json',
+    type: 'string',
+    description: 'JSON object of known social handles (stringified).',
+    example: '{"twitter":"exampleco"}',
+  },
+]
+
 const EMBEDDED_PROMPTS: EmbeddedPromptDefault[] = [
   { purpose: 'sweep_buy', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
   { purpose: 'sweep_sell', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
   { purpose: 'sweep_channel', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
   { purpose: 'sweep_regulatory', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
-  { purpose: 'sweep_self', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
+  { purpose: 'sweep_self', content: SWEEP_SELF_PROMPT_TEMPLATE, variables: SWEEP_SELF_VARIABLES },
   { purpose: 'sweep_topic', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
   {
     purpose: 'scoring',

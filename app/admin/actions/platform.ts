@@ -363,6 +363,30 @@ export async function seedPromptTemplatesFromCode() {
     }
   }
 
+  // Own-company sweep: older seeds used the shared sweep template (wrong placeholders).
+  const selfDefault = getEmbeddedPromptDefault('sweep_self')
+  if (selfDefault) {
+    const staleSelfTemplates = (promptRes.data ?? []).filter(
+      (row) =>
+        row.purpose === 'sweep_self' &&
+        row.version === 1 &&
+        !row.draft_content &&
+        row.content !== selfDefault.content
+    )
+    for (const row of staleSelfTemplates) {
+      const { error } = await admin
+        .from('prompt_template')
+        .update({
+          content: selfDefault.content,
+          variables: selfDefault.variables,
+          updated_at: now,
+          updated_by_operator_id: operator.id,
+        })
+        .eq('id', row.id)
+      if (error) throw error
+    }
+  }
+
   return { created: missingRows.length }
 }
 

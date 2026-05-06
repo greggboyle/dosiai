@@ -10,10 +10,13 @@ import { determineVisibility } from '@/lib/feed/visibility'
 import { cosineSimilarity } from '@/lib/vector/cosine'
 import { formatVectorLiteral } from '@/lib/intelligence/map-row'
 import { createAutomatedBriefForSweep } from '@/lib/brief/auto'
-import type { AiPurposeDb } from '@/lib/supabase/types'
+import type { AiPurposeDb, AiVendorDb } from '@/lib/supabase/types'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 import { inngest } from '@/inngest/client'
 import { shouldAutoRefreshTrialOnFirstSweep } from '@/lib/competitors/profile-refresh'
+import { getActivePromptTemplateFor, renderPromptTemplate } from '@/lib/ai/prompt-template'
+import { SWEEP_SHARED_PROMPT_TEMPLATE } from '@/lib/admin/prompt-defaults'
+import { SWEEP_SELF_PROMPT_TEMPLATE } from '@/lib/sweep/self-prompt-template'
 
 export interface OrchestrateSweepInput {
   workspaceId: string
@@ -28,73 +31,25 @@ function categoryToPurpose(cat: 'buy' | 'sell' | 'channel' | 'regulatory'): AiPu
   return 'sweep_regulatory'
 }
 
-function buildDefaultPrompt(
-  purpose: AiPurposeDb,
-  companySummary: string,
-  competitorLines: string,
-  topicLines: string
-): string {
-  return `You are an intelligence analyst. Return STRICT JSON matching {"items":[...]} with fields defined by the schema.
-Purpose: ${purpose}.
-Company context:
-${companySummary}
-
-Tracked competitors:
-${competitorLines}
-
-Active topics:
-${topicLines}
-
-Each item must include: title, summary, confidence (low|medium|high), confidenceReason, category as exactly one of the strings \"buy-side\", \"sell-side\", \"channel\", or \"regulatory\" (no other labels), sourceUrls (array of {name,url,domain}), optional fiveWH as an object {\"who\",\"what\",\"when\",\"where\",\"why\",\"how\"} strings or omit entirely (never a bare string), optional eventAt ISO string, optional sourceType, optional relatedCompetitorNames (string[]), optional entitiesMentioned ([{name}]).
-Produce 1-3 realistic items if data is thin; focus on verifiable claims.`
-}
-
 type RawSweepItem = ParsedSweepItem & { isAboutSelf?: boolean }
 
-function buildSelfSweepPrompt(params: {
-  legalName: string
-  primaryUrl: string
-  productNames: string[]
-  brandAliases: string[]
-  socialHandles: Record<string, unknown>
-}): string {
-  return `You are a media monitoring analyst for ONE company only.
-
-Scope (critical):
-- Return items ONLY where this company is a clear subject (named, or unambiguous via official domain/handle/products above).
-- Exclude generic industry or competitor news unless this company appears explicitly with substantive coverage (not passing mention).
-- Do not pivot to competitors—if the story is chiefly about another vendor, omit it.
-- Keep relatedCompetitorNames empty unless another party is materially part of the same story involving this company.
-
-Recency:
-- Prefer evidence from the last 7 days first.
-- If nothing credible appears in 7 days, extend to the last 30 days and lower confidence unless the story is still clearly timely; state recency gaps in confidenceReason.
-- Older than 30 days: do not return unless authoritative and materially important; always use low confidence and explain staleness.
-
-Return valid JSON only. The word json appears in instructions so response_format=json_object may be used.
-
-Return exactly a JSON object: {"items":[...]} with each item shaped per the downstream schema:
-
-- title, summary, confidence (low|medium|high), confidenceReason
-- sourceUrls (array of {name,url,domain} — cite pages that mention this company where possible)
-- sourceType
-- category (exactly one of: buy-side, sell-side, channel, regulatory — pick whichever best fits the angle of THAT item)
-- subcategory (optional)
-- eventAt (ISO string when publication or event date can be anchored; omit only if unclear and explain)
-- entitiesMentioned (optional [{name,...}])
-- relatedCompetitorNames (omit or empty unless materially relevant)
-- reviewMetadata only for review/community sources:
-  {platform, rating, sentiment (positive/negative/mixed/neutral), reviewerRole, excerpt}
-
-Company identifiers (match using any coherent combination):
-Legal name: ${params.legalName}
-Primary URL: ${params.primaryUrl}
-Products: ${params.productNames.join(', ') || '(none)'}
-Brand aliases / variants: ${params.brandAliases.join(', ') || '(none)'}
-Social handles: ${JSON.stringify(params.socialHandles)}
-
-Produce 1-3 grounded items when coverage is thin. Refuse to fabricate. If no qualifying item exists, return {"items":[]}.
-Skip listicles/roundups unless this company receives substantive standalone treatment with verifiable citation.`
+async function renderSweepAiPrompt(opts: {
+  purpose: AiPurposeDb
+  vendor: AiVendorDb
+  fallbackTemplate: string
+  variables: Record<string, string>
+}): Promise<{
+  prompt: string
+  promptTemplateId: string | null
+  promptTemplateVersion: number | null
+}> {
+  const row = await getActivePromptTemplateFor(opts.purpose, opts.vendor)
+  const raw = row?.content?.trim() ? row.content : opts.fallbackTemplate
+  return {
+    prompt: renderPromptTemplate(raw, opts.variables),
+    promptTemplateId: row?.id ?? null,
+    promptTemplateVersion: row?.version ?? null,
+  }
 }
 
 async function runCategoryPrompt(
@@ -108,12 +63,22 @@ async function runCategoryPrompt(
 ): Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[] }> {
   const purpose = categoryToPurpose(cat)
   const routing = await getRoutingFor(purpose)
-  const prompt = buildDefaultPrompt(purpose, companySummary, competitorLines, topicLines)
 
   const vendorCallIds: string[] = []
   const merged: ParsedSweepItem[] = []
 
   for (const rule of routing.activeRules) {
+    const { prompt, promptTemplateId, promptTemplateVersion } = await renderSweepAiPrompt({
+      purpose,
+      vendor: rule.vendor as AiVendorDb,
+      fallbackTemplate: SWEEP_SHARED_PROMPT_TEMPLATE,
+      variables: {
+        purpose,
+        company_summary: companySummary,
+        competitor_lines: competitorLines,
+        topic_lines: topicLines,
+      },
+    })
     const client = getVendorClient(rule.vendor, rule.model)
     const started = Date.now()
     try {
@@ -136,6 +101,8 @@ async function runCategoryPrompt(
         citationCount: 0,
         responsePayload: res.rawResponse,
         sweepId,
+        promptTemplateId,
+        promptTemplateVersion,
       })
       if (vc?.id) vendorCallIds.push(vc.id)
 
@@ -210,14 +177,21 @@ async function runTopicsPass(
   const primaryRule = routing.activeRules[0]
   if (!primaryRule) return { items: [], vendorCallIds: [] }
 
+  const topicTemplateRow = await getActivePromptTemplateFor('sweep_topic', primaryRule.vendor as AiVendorDb)
+  const topicPromptBody = topicTemplateRow?.content?.trim()
+    ? topicTemplateRow.content
+    : SWEEP_SHARED_PROMPT_TEMPLATE
+  const topicPromptTemplateId = topicTemplateRow?.id ?? null
+  const topicPromptTemplateVersion = topicTemplateRow?.version ?? null
+
   for (const topic of topics) {
     const seedText = topic.seeds.length > 0 ? topic.seeds.join(', ') : '(none)'
-    const prompt = buildDefaultPrompt(
+    const prompt = renderPromptTemplate(topicPromptBody, {
       purpose,
-      companySummary,
-      competitorLines,
-      `Topic: ${topic.name}\n${topic.description ?? ''}\nSeeds: ${seedText}`
-    )
+      company_summary: companySummary,
+      competitor_lines: competitorLines,
+      topic_lines: `Topic: ${topic.name}\n${topic.description ?? ''}\nSeeds: ${seedText}`,
+    })
     const client = getVendorClient(primaryRule.vendor, primaryRule.model)
     const started = Date.now()
     const res = await client.complete({
@@ -237,6 +211,8 @@ async function runTopicsPass(
       success: true,
       sweepId,
       responsePayload: res.rawResponse,
+      promptTemplateId: topicPromptTemplateId,
+      promptTemplateVersion: topicPromptTemplateVersion,
     })
     if (vc?.id) vendorCallIds.push(vc.id)
     const parsed = res.parsed ? sweepAiResponseSchema.safeParse(res.parsed) : null
@@ -272,12 +248,23 @@ async function runSelfPass(
 
   const purpose: AiPurposeDb = 'sweep_self'
   const routing = await getRoutingFor(purpose)
-  const prompt = buildSelfSweepPrompt({ legalName, primaryUrl, productNames, brandAliases, socialHandles })
 
   const vendorCallIds: string[] = []
   const merged: RawSweepItem[] = []
 
   for (const rule of routing.activeRules) {
+    const { prompt, promptTemplateId, promptTemplateVersion } = await renderSweepAiPrompt({
+      purpose,
+      vendor: rule.vendor as AiVendorDb,
+      fallbackTemplate: SWEEP_SELF_PROMPT_TEMPLATE,
+      variables: {
+        legal_name: legalName,
+        primary_url: primaryUrl,
+        product_names: productNames.join(', ') || '(none)',
+        brand_aliases: brandAliases.join(', ') || '(none)',
+        social_handles_json: JSON.stringify(socialHandles),
+      },
+    })
     const client = getVendorClient(rule.vendor, rule.model)
     const started = Date.now()
     try {
@@ -300,6 +287,8 @@ async function runSelfPass(
         citationCount: 0,
         responsePayload: res.rawResponse,
         sweepId,
+        promptTemplateId,
+        promptTemplateVersion,
       })
       if (vc?.id) vendorCallIds.push(vc.id)
 
