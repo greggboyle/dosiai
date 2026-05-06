@@ -5,11 +5,12 @@ import {
   Filter, 
   SlidersHorizontal, 
   X, 
-  Calendar,
   ArrowDownUp,
   MessageSquare,
   Users,
-  Eye
+  Eye,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -437,10 +438,18 @@ export function FeedClient({
   initialItems,
   reviewQueueThreshold = 30,
   initialSubject = 'competitors',
+  currentPage,
+  pageSize,
+  totalItems,
+  totalPages,
 }: {
   initialItems: IntelligenceItem[]
   reviewQueueThreshold?: number
   initialSubject?: SubjectFilter
+  currentPage: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
 }) {
   const [items, setItems] = React.useState<IntelligenceItem[]>(initialItems)
   React.useEffect(() => {
@@ -648,7 +657,7 @@ export function FeedClient({
             <div>
               <h1 className="text-xl font-semibold tracking-tight">Dossier Feed</h1>
               <p className="text-sm text-muted-foreground">
-                {filteredItems.length} intelligence item{filteredItems.length !== 1 ? 's' : ''}
+                {totalItems} intelligence item{totalItems !== 1 ? 's' : ''} total
               </p>
             </div>
             <DropdownMenu>
@@ -664,6 +673,7 @@ export function FeedClient({
                     const next = v === 'our-company' ? 'our-company' : 'competitors'
                     const params = new URLSearchParams(searchParams.toString())
                     params.set('subject', next)
+                    params.set('page', '1')
                     router.replace(`${pathname}?${params.toString()}`)
                     setSubject(next)
                   }}
@@ -900,6 +910,43 @@ export function FeedClient({
           selectedId={selectedItem?.id}
           onSelect={handleSelectItem}
         />
+        <div className="flex items-center justify-between border-t border-border px-6 py-3">
+          <div className="text-xs text-muted-foreground">
+            Page {currentPage} of {totalPages} · {pageSize} per page
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={currentPage <= 1}
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString())
+                const next = Math.max(1, currentPage - 1)
+                params.set('page', String(next))
+                router.replace(`${pathname}?${params.toString()}`)
+              }}
+            >
+              <ChevronLeft className="size-3 mr-1" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={currentPage >= totalPages}
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString())
+                const next = Math.min(totalPages, currentPage + 1)
+                params.set('page', String(next))
+                router.replace(`${pathname}?${params.toString()}`)
+              }}
+            >
+              Next
+              <ChevronRight className="size-3 ml-1" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Detail Panel - Desktop */}

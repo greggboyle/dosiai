@@ -73,6 +73,82 @@ export async function listFeedItems(
   })
 }
 
+export async function listFeedItemsPage(
+  workspaceId: string,
+  opts?: { page?: number; pageSize?: number; subject?: FeedSubject }
+): Promise<{ items: IntelligenceItem[]; total: number; page: number; pageSize: number; totalPages: number }> {
+  const pageSize = Math.max(1, Math.min(100, opts?.pageSize ?? 25))
+  const page = Math.max(1, opts?.page ?? 1)
+  const subject = opts?.subject ?? 'competitors'
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  const supabase = await createSupabaseServerClient()
+  let query = supabase
+    .from('intelligence_item')
+    .select('*', { count: 'exact' })
+    .eq('workspace_id', workspaceId)
+    .eq('visibility', 'feed')
+  query = subject === 'our-company' ? query.eq('is_about_self', true) : query.eq('is_about_self', false)
+
+  const { data: rows, error, count } = await query
+    .order('ingested_at', { ascending: false })
+    .range(from, to)
+
+  if (error) throw error
+  if (!rows?.length) {
+    const total = count ?? 0
+    return {
+      items: [],
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    }
+  }
+
+  const compIds = new Set<string>()
+  const topicIds = new Set<string>()
+  for (const r of rows) {
+    for (const id of r.related_competitors ?? []) compIds.add(id)
+    for (const id of r.related_topics ?? []) topicIds.add(id)
+  }
+
+  const [{ data: comps }, { data: tops }] = await Promise.all([
+    compIds.size
+      ? supabase.from('competitor').select('id,name').in('id', [...compIds])
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    topicIds.size
+      ? supabase.from('topic').select('id,name').in('id', [...topicIds])
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ])
+
+  const compById = Object.fromEntries((comps ?? []).map((c) => [c.id, c]))
+  const topById = Object.fromEntries((tops ?? []).map((t) => [t.id, t]))
+
+  const items = rows.map((row) => {
+    const item = intelligenceItemFromDb(row)
+    item.relatedCompetitors = (row.related_competitors ?? []).map((id) => ({
+      id,
+      name: compById[id]?.name ?? 'Competitor',
+    }))
+    item.relatedTopics = (row.related_topics ?? []).map((id) => ({
+      id,
+      name: topById[id]?.name ?? 'Topic',
+    }))
+    return item
+  })
+
+  const total = count ?? 0
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  }
+}
+
 /** Recent feed-visible items mentioning a competitor (for battle card interview context). */
 export async function listIntelItemsForCompetitor(
   workspaceId: string,
