@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { randomUUID } from 'crypto'
 import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { getEffectiveLimits } from '@/lib/billing/limits'
 import { sendInviteEmail } from '@/lib/email/resend'
 import { logAuditEvent } from '@/lib/audit/log'
@@ -264,4 +265,32 @@ export async function resendInvite(inviteId: string) {
     workspaceName: workspace.name,
     inviteUrl,
   })
+}
+
+export async function deleteWorkspace(confirmation: string) {
+  const { session, member, workspace } = await getWorkspaceContext()
+  if (member.role !== 'admin') throw new Error('Only workspace admins can delete this workspace')
+
+  const expected = `DELETE ${workspace.name}`
+  if (confirmation !== expected) {
+    throw new Error(`Type exactly: ${expected}`)
+  }
+
+  const admin = createSupabaseAdminClient()
+  const { error } = await admin.from('workspace').delete().eq('id', workspace.id)
+  if (error) throw error
+
+  await logAuditEvent({
+    severity: 'critical',
+    category: 'workspace',
+    operatorName: session.user.email ?? 'workspace_user',
+    operatorRole: 'system',
+    action: 'workspace_deleted',
+    targetType: 'workspace',
+    targetId: workspace.id,
+    targetName: workspace.name,
+    reason: 'Workspace permanently deleted by admin',
+  })
+
+  revalidatePath('/settings/members')
 }

@@ -12,7 +12,18 @@ import {
   resendInvite,
   leaveWorkspace,
   transferOwnership,
+  deleteWorkspace,
 } from '@/app/(app)/settings/members/actions'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { AlertTriangle } from 'lucide-react'
 import type { WorkspaceRole } from '@/lib/types/dosi'
 
 type MemberRow = {
@@ -34,17 +45,33 @@ export function MembersClient({
   currentRole,
   members,
   invites,
+  workspaceName,
 }: {
   currentUserId: string
   currentRole: WorkspaceRole
   members: MemberRow[]
   invites: InviteRow[]
+  workspaceName: string
 }) {
   const [email, setEmail] = React.useState('')
   const [role, setRole] = React.useState<WorkspaceRole>('viewer')
   const [error, setError] = React.useState<string | null>(null)
   const [info, setInfo] = React.useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = React.useState('')
+  const [deleteWorkspaceError, setDeleteWorkspaceError] = React.useState<string | null>(null)
+  const [isDeletingWorkspace, setIsDeletingWorkspace] = React.useState(false)
   const isAdmin = currentRole === 'admin'
+
+  const deleteConfirmationPhrase = `DELETE ${workspaceName}`
+  const deleteConfirmationMatches = deleteConfirmText === deleteConfirmationPhrase
+
+  React.useEffect(() => {
+    if (!deleteDialogOpen) {
+      setDeleteConfirmText('')
+      setDeleteWorkspaceError(null)
+    }
+  }, [deleteDialogOpen])
 
   async function onInvite() {
     try {
@@ -236,6 +263,83 @@ export function MembersClient({
           Leave workspace
         </Button>
       </div>
+
+      {isAdmin && (
+        <>
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-3">
+            <h2 className="font-medium text-destructive flex items-center gap-2">
+              <AlertTriangle className="size-4 shrink-0" aria-hidden />
+              Danger zone
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Permanently delete this workspace and all of its data. This cannot be undone.
+            </p>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setDeleteWorkspaceError(null)
+                setDeleteDialogOpen(true)
+              }}
+            >
+              Delete workspace
+            </Button>
+          </div>
+
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Delete workspace</DialogTitle>
+                <DialogDescription>
+                  This removes the workspace, members, competitors, intelligence, and billing references for this workspace.
+                  To confirm, type the phrase below exactly as shown (including spaces).
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="delete-workspace-confirm">Confirmation phrase</Label>
+                <code className="block rounded-md border bg-muted px-3 py-2 text-sm font-mono break-all">
+                  {deleteConfirmationPhrase}
+                </code>
+                <Input
+                  id="delete-workspace-confirm"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={deleteConfirmationPhrase}
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  className="font-mono text-sm"
+                  disabled={isDeletingWorkspace}
+                />
+                {deleteWorkspaceError && (
+                  <p className="text-sm text-destructive">{deleteWorkspaceError}</p>
+                )}
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeletingWorkspace}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={!deleteConfirmationMatches || isDeletingWorkspace}
+                  onClick={async () => {
+                    try {
+                      setDeleteWorkspaceError(null)
+                      setIsDeletingWorkspace(true)
+                      await deleteWorkspace(deleteConfirmText)
+                      window.location.href = '/onboarding'
+                    } catch (err) {
+                      setDeleteWorkspaceError(err instanceof Error ? err.message : 'Could not delete workspace')
+                      setIsDeletingWorkspace(false)
+                    }
+                  }}
+                >
+                  {isDeletingWorkspace ? 'Deleting…' : 'Delete workspace'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
     </div>
   )
 }

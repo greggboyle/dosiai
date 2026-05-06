@@ -32,12 +32,21 @@ export default async function MembersPage() {
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
 
+  const { data: workspaceRow } = await supabase
+    .from('workspace')
+    .select('name')
+    .eq('id', membership.workspace_id)
+    .single()
+
+  if (!workspaceRow) redirect('/onboarding')
+
   return (
     <MembersClient
       currentUserId={session.user.id}
       currentRole={membership.role}
       members={members ?? []}
       invites={invites ?? []}
+      workspaceName={workspaceRow.name}
     />
   )
 }
