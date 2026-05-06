@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth/session'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { withWorkspace } from '@/lib/auth/workspace'
 import { createOpenAiClient } from '@/lib/ai/vendors/openai'
+import { persistWorkspaceProfileEmbeddings } from '@/lib/workspace/profile-embeddings'
 
 interface CreateWorkspaceInput {
   name: string
@@ -79,6 +80,19 @@ export async function saveWorkspaceProfile(input: {
     })
 
     if (error) throw error
+
+    await persistWorkspaceProfileEmbeddings(supabase, workspace.id, workspace.plan, {
+      legalName: input.companyName,
+      primaryUrl: input.companyWebsite,
+      companySummary: input.companySummary?.trim() || null,
+      icpDescription: input.companyICP?.trim() || null,
+      industry: input.industry?.trim() || null,
+      productNames: [],
+      brandAliases: [],
+      valueProps: [],
+      differentiators: [],
+    })
+
     revalidatePath('/onboarding')
     return true
   })

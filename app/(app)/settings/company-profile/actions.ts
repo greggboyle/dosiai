@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { withWorkspace } from '@/lib/auth/workspace'
+import { persistWorkspaceProfileEmbeddings } from '@/lib/workspace/profile-embeddings'
 
 function parseLines(value: FormDataEntryValue | null): string[] {
   if (typeof value !== 'string') return []
@@ -36,20 +37,25 @@ export async function updateCompanyProfile(formData: FormData) {
       other: String(formData.get('otherSocial') ?? '').trim(),
     }
 
+    const productNames = parseLines(formData.get('productNames'))
+    const brandAliases = parseLines(formData.get('brandAliases'))
+    const valueProps = parseLines(formData.get('valueProps'))
+    const differentiators = parseLines(formData.get('differentiators'))
+
     const { error } = await supabase.from('workspace_profile').upsert({
       workspace_id: workspace.id,
       legal_name: legalName || null,
       primary_url: primaryUrl || null,
-      product_names: parseLines(formData.get('productNames')),
-      brand_aliases: parseLines(formData.get('brandAliases')),
+      product_names: productNames,
+      brand_aliases: brandAliases,
       founded_year: parseYear(formData.get('foundedYear')),
       headquarters: String(formData.get('headquarters') ?? '').trim() || null,
       industry: String(formData.get('industry') ?? '').trim() || null,
       geography_served: parseLines(formData.get('geographyServed')),
       company_summary: String(formData.get('companySummary') ?? '').trim() || null,
       icp_description: String(formData.get('icpDescription') ?? '').trim() || null,
-      value_props: parseLines(formData.get('valueProps')),
-      differentiators: parseLines(formData.get('differentiators')),
+      value_props: valueProps,
+      differentiators,
       social_handles: socialHandles,
       press_kit_url: String(formData.get('pressKitUrl') ?? '').trim() || null,
       updated_by: user.id,
@@ -61,6 +67,18 @@ export async function updateCompanyProfile(formData: FormData) {
     })
 
     if (error) throw error
+
+    await persistWorkspaceProfileEmbeddings(supabase, workspace.id, workspace.plan, {
+      legalName,
+      primaryUrl,
+      companySummary: String(formData.get('companySummary') ?? '').trim() || null,
+      icpDescription: String(formData.get('icpDescription') ?? '').trim() || null,
+      industry: String(formData.get('industry') ?? '').trim() || null,
+      productNames,
+      brandAliases,
+      valueProps,
+      differentiators,
+    })
 
     const autoBriefsAutoApprove = formData.get('autoBriefsAutoApprove') === 'on'
     const { error: wsError } = await supabase
