@@ -35,7 +35,7 @@ export async function listFeedItems(
     .eq('visibility', 'feed')
   query = subject === 'our-company' ? query.eq('is_about_self', true) : query.eq('is_about_self', false)
 
-  const { data: rows, error } = await query.order('mi_score', { ascending: false }).order('ingested_at', { ascending: false }).limit(limit)
+  const { data: rows, error } = await query.order('ingested_at', { ascending: false }).limit(limit)
 
   if (error) throw error
   if (!rows?.length) return []

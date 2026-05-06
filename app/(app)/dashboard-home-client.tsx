@@ -391,35 +391,50 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
             <Link href="/win-loss" className="block group">
               <div className="flex items-end justify-between mb-3">
                 <div>
-                  <span className="text-4xl font-semibold font-mono text-accent">64%</span>
+                  <span className="text-4xl font-semibold font-mono text-accent">
+                    {snapshot.winRatePulse.currentRate90 == null ? '—' : `${snapshot.winRatePulse.currentRate90}%`}
+                  </span>
                   <span className="text-sm text-muted-foreground ml-2">last 90 days</span>
                 </div>
-                {/* Simple sparkline placeholder */}
+                {/* Simple sparkline from recent 8 weekly buckets */}
                 <div className="flex items-end gap-0.5 h-8">
-                  {[58, 62, 60, 65, 63, 64, 66, 64].map((v, i) => (
+                  {snapshot.winRatePulse.sparkline.map((v, i) => (
                     <div
                       key={i}
                       className="w-1.5 bg-accent/30 rounded-t"
-                      style={{ height: `${(v - 55) * 3}px` }}
+                      style={{ height: `${Math.max(2, Math.min(30, v * 0.45))}px` }}
                     />
                   ))}
                 </div>
               </div>
               <div className="space-y-1.5 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">vs FreightHero</span>
-                  <span className="flex items-center gap-1 text-positive">
-                    <ArrowUpRight className="size-3" />
-                    +8%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">vs Acme Logistics</span>
-                  <span className="flex items-center gap-1 text-negative">
-                    <ArrowDownRight className="size-3" />
-                    -4%
-                  </span>
-                </div>
+                {snapshot.winRatePulse.competitorDeltas.length === 0 ? (
+                  <div className="text-muted-foreground text-xs">Not enough win/loss history yet.</div>
+                ) : (
+                  snapshot.winRatePulse.competitorDeltas.map((c) => (
+                    <div key={c.name} className="flex items-center justify-between">
+                      <span className="text-muted-foreground">vs {c.name}</span>
+                      <span
+                        className={cn(
+                          'flex items-center gap-1',
+                          c.delta > 0 && 'text-positive',
+                          c.delta < 0 && 'text-negative',
+                          c.delta === 0 && 'text-muted-foreground'
+                        )}
+                      >
+                        {c.delta > 0 ? (
+                          <ArrowUpRight className="size-3" />
+                        ) : c.delta < 0 ? (
+                          <ArrowDownRight className="size-3" />
+                        ) : (
+                          <Minus className="size-3" />
+                        )}
+                        {c.delta > 0 ? '+' : ''}
+                        {c.delta}%
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </Link>
           </DashboardModule>

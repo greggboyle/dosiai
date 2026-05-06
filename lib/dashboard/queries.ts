@@ -64,6 +64,12 @@ export type DashboardSnapshot = {
     itemsReviewed: number
     battleCardsCreated: number
   }
+  winRatePulse: {
+    currentRate90: number | null
+    trendDelta: number | null
+    sparkline: number[]
+    competitorDeltas: Array<{ name: string; delta: number }>
+  }
 }
 
 export function formatRelativeLabel(iso: string): string {
@@ -101,6 +107,7 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
     suggestedRes,
     reviewQueueRes,
     heatmapRes,
+    winLossRes,
   ] = await Promise.all([
     listFeedItems(workspaceId, 8),
     supabase.from('competitor').select('id,name').eq('workspace_id', workspaceId).eq('status', 'active').limit(24),
@@ -143,6 +150,11 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
       .select('related_competitors')
       .eq('workspace_id', workspaceId)
       .gte('ingested_at', new Date(Date.now() - 7 * 86400000).toISOString()),
+    supabase
+      .from('win_loss_outcome')
+      .select('competitor_id,outcome,close_date')
+      .eq('workspace_id', workspaceId)
+      .in('outcome', ['won', 'lost']),
   ])
 
   const competitors = competitorsRes.data ?? []
@@ -191,6 +203,65 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
 
   const latestSweep = latestSweepRes.data
 
+  const outcomes = winLossRes.data ?? []
+  const nowMs = Date.now()
+  const inDays = (iso: string, days: number) => new Date(iso).getTime() >= nowMs - days * 86400000
+  const calcRate = (rows: Array<{ outcome: string }>) => {
+    const won = rows.filter((r) => r.outcome === 'won').length
+    const lost = rows.filter((r) => r.outcome === 'lost').length
+    const total = won + lost
+    return total > 0 ? Math.round((won / total) * 100) : null
+  }
+
+  const last90 = outcomes.filter((r) => inDays(r.close_date, 90))
+  const prior90 = outcomes.filter((r) => {
+    const t = new Date(r.close_date).getTime()
+    return t < nowMs - 90 * 86400000 && t >= nowMs - 180 * 86400000
+  })
+  const currentRate90 = calcRate(last90)
+  const priorRate90 = calcRate(prior90)
+  const trendDelta =
+    currentRate90 != null && priorRate90 != null ? currentRate90 - priorRate90 : null
+
+  const sparkline: number[] = []
+  for (let i = 7; i >= 0; i -= 1) {
+    const end = nowMs - i * 7 * 86400000
+    const start = end - 7 * 86400000
+    const bucket = outcomes.filter((r) => {
+      const t = new Date(r.close_date).getTime()
+      return t >= start && t < end
+    })
+    sparkline.push(calcRate(bucket) ?? 0)
+  }
+
+  const compNameById = Object.fromEntries(competitors.map((c) => [c.id, c.name]))
+  const byCompetitor = new Map<string, { won90: number; lost90: number; wonPrev90: number; lostPrev90: number }>()
+  for (const o of outcomes) {
+    const agg = byCompetitor.get(o.competitor_id) ?? { won90: 0, lost90: 0, wonPrev90: 0, lostPrev90: 0 }
+    const t = new Date(o.close_date).getTime()
+    if (t >= nowMs - 90 * 86400000) {
+      if (o.outcome === 'won') agg.won90 += 1
+      else agg.lost90 += 1
+    } else if (t >= nowMs - 180 * 86400000) {
+      if (o.outcome === 'won') agg.wonPrev90 += 1
+      else agg.lostPrev90 += 1
+    }
+    byCompetitor.set(o.competitor_id, agg)
+  }
+  const competitorDeltas = [...byCompetitor.entries()]
+    .map(([id, a]) => {
+      const curDen = a.won90 + a.lost90
+      const prevDen = a.wonPrev90 + a.lostPrev90
+      if (curDen === 0 || prevDen === 0) return null
+      const cur = Math.round((a.won90 / curDen) * 100)
+      const prev = Math.round((a.wonPrev90 / prevDen) * 100)
+      return { name: compNameById[id] ?? 'Competitor', delta: cur - prev, volume: curDen }
+    })
+    .filter((v): v is { name: string; delta: number; volume: number } => Boolean(v))
+    .sort((a, b) => b.volume - a.volume)
+    .slice(0, 2)
+    .map(({ name, delta }) => ({ name, delta }))
+
   return {
     feed,
     competitorHeatmap,
@@ -215,6 +286,12 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
       sweepsRun: sweepCountRes.count ?? 0,
       itemsReviewed: reviewedCountRes.count ?? 0,
       battleCardsCreated: battleCardCountRes.count ?? 0,
+    },
+    winRatePulse: {
+      currentRate90,
+      trendDelta,
+      sparkline,
+      competitorDeltas,
     },
   }
 }
