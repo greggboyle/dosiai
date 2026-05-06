@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import {
   Select,
@@ -50,6 +50,8 @@ import { MutationGuard } from '@/components/mutation-guard'
 import { useWorkspaceContext } from '@/components/workspace-context'
 import { canMutate, mutationBlockedReason } from '@/lib/auth/permissions'
 import type { Topic, TopicImportance } from '@/lib/types'
+import { createTopic, updateTopic, archiveTopic } from '@/lib/topics/actions'
+import { toast } from 'sonner'
 import {
   LineChart,
   Line,
@@ -160,7 +162,7 @@ function TopicFormModal({
   open: boolean
   onOpenChange: (open: boolean) => void
   topic?: Topic
-  onSave: (data: TopicFormData) => void
+  onSave: (data: TopicFormData) => Promise<void>
 }) {
   const isEdit = !!topic
   const [name, setName] = React.useState(topic?.name || '')
@@ -169,6 +171,7 @@ function TopicFormModal({
   const [seeds, setSeeds] = React.useState<string[]>(topic?.searchSeeds || [])
   const [seedInput, setSeedInput] = React.useState('')
   const [isSuggesting, setIsSuggesting] = React.useState(false)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   React.useEffect(() => {
     if (topic) {
@@ -228,9 +231,14 @@ function TopicFormModal({
     setIsSuggesting(false)
   }
 
-  const handleSubmit = () => {
-    onSave({ name, description, importance, searchSeeds: seeds })
-    onOpenChange(false)
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true)
+      await onSave({ name, description, importance, searchSeeds: seeds })
+      onOpenChange(false)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -347,11 +355,11 @@ function TopicFormModal({
         </div>
         
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!name.trim()}>
-            {isEdit ? 'Save Changes' : 'Create Topic'}
+          <Button onClick={() => void handleSubmit()} disabled={!name.trim() || isSubmitting}>
+            {isSubmitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Topic'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -480,6 +488,8 @@ export function TopicsPageClient({ initialTopics }: { initialTopics: Topic[] }) 
   const [topics, setTopics] = React.useState(initialTopics)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   const [editingTopic, setEditingTopic] = React.useState<Topic | undefined>()
+  const [archivingTopicId, setArchivingTopicId] = React.useState<string | null>(null)
+  const router = useRouter()
   const { workspace } = useWorkspaceContext()
   const canAddTopic = canMutate({ status: workspace.status }, 'add_topic')
 
@@ -493,37 +503,51 @@ export function TopicsPageClient({ initialTopics }: { initialTopics: Topic[] }) 
     setIsModalOpen(true)
   }
 
-  const handleArchive = (topicId: string) => {
-    setTopics(topics.filter(t => t.id !== topicId))
+  const handleArchive = async (topicId: string) => {
+    try {
+      setArchivingTopicId(topicId)
+      await archiveTopic({ workspaceId: workspace.id, topicId })
+      setTopics((prev) => prev.filter((t) => t.id !== topicId))
+      toast.success('Topic archived')
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to archive topic')
+    } finally {
+      setArchivingTopicId(null)
+    }
   }
 
-  const handleSave = (data: TopicFormData) => {
-    if (editingTopic) {
-      // Update existing topic
-      setTopics(topics.map(t => 
-        t.id === editingTopic.id 
-          ? { ...t, ...data, updatedAt: new Date().toISOString() }
-          : t
-      ))
-    } else {
-      // Create new topic
-      const         newTopic: Topic = {
-        id: String(Date.now()),
-        ...data,
-        // E6: activitySparkline computed on demand, not stored
-        itemCountLast7Days: 0,
-        itemCountLast7DaysChange: 0,
-        itemCountLast30Days: 0,
-        itemCountLast30DaysChange: 0,
-        linkedCompetitorIds: [],
-        linkedCompetitorNames: [],
-        relatedTopicIds: [],
-        relatedTopicNames: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: 'active',
+  const handleSave = async (data: TopicFormData) => {
+    try {
+      if (editingTopic) {
+        await updateTopic({
+          workspaceId: workspace.id,
+          topicId: editingTopic.id,
+          name: data.name,
+          description: data.description,
+          importance: data.importance,
+          searchSeeds: data.searchSeeds,
+        })
+        setTopics((prev) =>
+          prev.map((t) =>
+            t.id === editingTopic.id ? { ...t, ...data, updatedAt: new Date().toISOString() } : t
+          )
+        )
+        toast.success('Topic saved')
+      } else {
+        await createTopic({
+          workspaceId: workspace.id,
+          name: data.name,
+          description: data.description,
+          importance: data.importance,
+          searchSeeds: data.searchSeeds,
+        })
+        toast.success('Topic created')
       }
-      setTopics([newTopic, ...topics])
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to save topic')
+      throw e
     }
   }
 
@@ -567,7 +591,10 @@ export function TopicsPageClient({ initialTopics }: { initialTopics: Topic[] }) 
               key={topic.id}
               topic={topic}
               onEdit={() => handleEdit(topic)}
-              onArchive={() => handleArchive(topic.id)}
+              onArchive={() => {
+                if (archivingTopicId) return
+                void handleArchive(topic.id)
+              }}
             />
           ))}
         </div>
