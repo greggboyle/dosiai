@@ -58,6 +58,8 @@ function buildSelfSweepPrompt(params: {
   return `You are a media monitoring analyst. Find recent items (within 7d)
 that mention the following company by any of its identifiers:
 
+Return output as valid JSON only. The response must be a JSON object matching {"items":[...]}.
+
 Legal name: ${params.legalName}
 Primary URL: ${params.primaryUrl}
 Products: ${params.productNames.join(', ') || '(none)'}
