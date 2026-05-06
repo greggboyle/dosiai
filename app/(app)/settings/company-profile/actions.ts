@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { withWorkspace } from '@/lib/auth/workspace'
 
 function parseLines(value: FormDataEntryValue | null): string[] {
@@ -85,4 +86,5 @@ export async function updateCompanyProfile(formData: FormData) {
 
   revalidatePath('/settings/company-profile')
   revalidatePath('/settings')
+  redirect('/settings/company-profile?saved=1')
 }

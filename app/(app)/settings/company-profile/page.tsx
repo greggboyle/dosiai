@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { updateCompanyProfile } from './actions'
+import { CompanyProfileSaveToast } from './save-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -46,6 +47,7 @@ export default async function CompanyProfilePage() {
 
   return (
     <div className="max-w-4xl space-y-6">
+      <CompanyProfileSaveToast />
       <div>
         <h1 className="text-2xl font-semibold">Company Profile</h1>
         <p className="text-sm text-muted-foreground">
