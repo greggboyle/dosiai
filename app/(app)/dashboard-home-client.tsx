@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowRight,
   ArrowUpRight,
@@ -40,6 +41,7 @@ import { ReadOnlyDashboardModule } from '@/components/billing/read-only-state'
 import type { TrialUsageStats } from '@/lib/billing-types'
 import { useWorkspaceContext } from '@/components/workspace-context'
 import { formatRelativeLabel, type DashboardSnapshot } from '@/lib/dashboard/queries'
+import { triggerManualSweep } from '@/app/(app)/dashboard/actions'
 
 
 // =============================================================================
@@ -79,8 +81,13 @@ interface DashboardHomeClientProps {
 }
 
 export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClientProps) {
-  const { subscription } = useWorkspaceContext()
+  const router = useRouter()
+  const { subscription, memberRole } = useWorkspaceContext()
+  const [refreshing, setRefreshing] = React.useState(false)
   const [sweepRunning, setSweepRunning] = React.useState(false)
+  const [sweepError, setSweepError] = React.useState<string | null>(null)
+
+  const canRunSweepManually = memberRole === 'admin' && subscription.status !== 'read_only'
 
   const usageStats: TrialUsageStats = {
     competitorsAdded: snapshot.usageStats.competitorsAdded,
@@ -139,10 +146,14 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setSweepRunning(true)}
-            disabled={sweepRunning}
+            onClick={() => {
+              setRefreshing(true)
+              router.refresh()
+              window.setTimeout(() => setRefreshing(false), 800)
+            }}
+            disabled={refreshing}
           >
-            {sweepRunning ? (
+            {refreshing ? (
               <RefreshCw className="size-4 mr-2 animate-spin" />
             ) : (
               <RefreshCw className="size-4 mr-2" />
@@ -287,16 +298,35 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
                 variant="outline"
                 size="sm"
                 className="w-full mt-2"
-                disabled={sweepRunning}
+                disabled={!canRunSweepManually || sweepRunning}
+                title={
+                  !canRunSweepManually
+                    ? memberRole !== 'admin'
+                      ? 'Only workspace admins can run a sweep.'
+                      : 'Sweeps are unavailable while this workspace is read-only.'
+                    : undefined
+                }
                 onClick={() => {
-                  setSweepRunning(true)
-                  setTimeout(() => setSweepRunning(false), 3000)
+                  void (async () => {
+                    setSweepError(null)
+                    setSweepRunning(true)
+                    try {
+                      const result = await triggerManualSweep()
+                      if (!result.ok) {
+                        setSweepError(result.error)
+                        return
+                      }
+                      router.refresh()
+                    } finally {
+                      setSweepRunning(false)
+                    }
+                  })()
                 }}
               >
                 {sweepRunning ? (
                   <>
                     <RefreshCw className="size-3 mr-2 animate-spin" />
-                    Running...
+                    Scheduling…
                   </>
                 ) : (
                   <>
@@ -305,6 +335,9 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
                   </>
                 )}
               </Button>
+              {sweepError ? (
+                <p className="text-xs text-destructive mt-2">{sweepError}</p>
+              ) : null}
             </div>
           </DashboardModule>
         </div>

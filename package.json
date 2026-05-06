@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "purge-system": "tsx scripts/purge-system.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
@@ -78,6 +79,7 @@
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",
+    "tsx": "^4.19.2",
     "typescript": "5.7.3",
     "vitest": "^2.1.9"
   }

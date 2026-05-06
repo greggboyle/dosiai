@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import { createWorkspace, saveCompetitors, saveTopics, saveWorkspaceProfile } from '@/app/onboarding/actions'
+import { triggerManualSweep } from '@/app/(app)/dashboard/actions'
 
 // Step definitions
 const STEPS = [
@@ -79,6 +80,7 @@ export default function OnboardingPage() {
   const [competitorsSaved, setCompetitorsSaved] = React.useState(false)
   const [topicsSaved, setTopicsSaved] = React.useState(false)
   const [onboardingError, setOnboardingError] = React.useState<string | null>(null)
+  const [isSchedulingSweep, setIsSchedulingSweep] = React.useState(false)
   
   // Form state
   const [workspaceName, setWorkspaceName] = React.useState('')
@@ -285,21 +287,34 @@ export default function OnboardingPage() {
     }
   }
   
-  // Launch sweep
-  const launchSweep = () => {
-    setShowSweepProgress(true)
-    
-    // Simulate sweep progress
+  // After a sweep is queued, advance the onboarding progress UI (real work runs via Inngest).
+  React.useEffect(() => {
+    if (!showSweepProgress) return
     const interval = setInterval(() => {
-      setSweepStageIndex(prev => {
-        if (prev >= SWEEP_STAGES.length - 1) {
-          clearInterval(interval)
-          return prev
-        }
+      setSweepStageIndex((prev) => {
+        if (prev >= SWEEP_STAGES.length - 1) return prev
         return prev + 1
       })
-      setEstimatedTimeRemaining(prev => Math.max(0, prev - 40))
+      setEstimatedTimeRemaining((prev) => Math.max(0, prev - 40))
     }, 3000)
+    return () => clearInterval(interval)
+  }, [showSweepProgress])
+
+  const launchSweep = async () => {
+    setOnboardingError(null)
+    setIsSchedulingSweep(true)
+    try {
+      const result = await triggerManualSweep({ onboardingFirstSweep: true })
+      if (!result.ok) {
+        setOnboardingError(result.error)
+        return
+      }
+      setSweepStageIndex(0)
+      setEstimatedTimeRemaining(300)
+      setShowSweepProgress(true)
+    } finally {
+      setIsSchedulingSweep(false)
+    }
   }
   
   // Navigate to dashboard when sweep is done
@@ -337,10 +352,9 @@ export default function OnboardingPage() {
                 {sweepComplete ? 'Your workspace is ready!' : 'Running your first sweep...'}
               </h2>
               <p className="text-sm text-muted-foreground text-center mb-6">
-                {sweepComplete 
+                {sweepComplete
                   ? 'We found intelligence across your competitive landscape.'
-                  : "We'll email you when it's ready. Feel free to navigate away."
-                }
+                  : "Your sweep is running in the background. Feel free to navigate away—we'll email you when it's ready."}
               </p>
               
               {/* Progress indicator */}
@@ -824,18 +838,26 @@ export default function OnboardingPage() {
             </div>
             
             {/* Launch button */}
-            <Button 
-              onClick={launchSweep}
+            <Button
+              onClick={() => void launchSweep()}
               size="lg"
               className="w-full mt-6"
-              disabled
-              title="Sweeps available once Phase 2 ships"
+              disabled={!workspaceId || isSchedulingSweep}
+              title={!workspaceId ? 'Workspace not ready — go back and complete earlier steps' : undefined}
             >
-              Run my first sweep
+              {isSchedulingSweep ? (
+                <>
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  Starting sweep…
+                </>
+              ) : (
+                'Run my first sweep'
+              )}
             </Button>
-            
+
             <p className="text-xs text-muted-foreground text-center">
-              Sweeps available once Phase 2 ships.
+              Queues your first intelligence sweep from the competitors and topics you set up. You can open
+              the dashboard anytime while it runs.
             </p>
           </div>
         )}

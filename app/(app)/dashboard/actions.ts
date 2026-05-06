@@ -1,10 +1,19 @@
 'use server'
 
 import { getSession } from '@/lib/auth/session'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { inngest } from '@/inngest/client'
 import { checkCostBudget } from '@/lib/ai/cost'
 import type { WorkspacePlan } from '@/lib/types/dosi'
+
+export type TriggerManualSweepOptions = {
+  /**
+   * Trial workspaces only: allow one sweep when none have run yet (onboarding completion).
+   * Eligibility is enforced server-side from `sweep` row count.
+   */
+  onboardingFirstSweep?: boolean
+}
 
 async function requireWorkspaceAdmin(): Promise<{ workspaceId: string; userId: string; plan: WorkspacePlan }> {
   const session = await getSession()
@@ -39,11 +48,29 @@ async function requireWorkspaceAdmin(): Promise<{ workspaceId: string; userId: s
   }
 }
 
-export async function triggerManualSweep(): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function triggerManualSweep(
+  options?: TriggerManualSweepOptions
+): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const { workspaceId, userId, plan } = await requireWorkspaceAdmin()
     if (plan === 'trial') {
-      return { ok: false, error: 'Manual sweeps require Starter or higher on this workspace.' }
+      if (options?.onboardingFirstSweep) {
+        const supabaseAdmin = createSupabaseAdminClient()
+        const { count, error: countErr } = await supabaseAdmin
+          .from('sweep')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+        if (countErr) throw countErr
+        if ((count ?? 0) > 0) {
+          return {
+            ok: false,
+            error:
+              'This workspace already ran its first sweep. Upgrade to Starter or higher to run more manual sweeps.',
+          }
+        }
+      } else {
+        return { ok: false, error: 'Manual sweeps require Starter or higher on this workspace.' }
+      }
     }
 
     const budget = await checkCostBudget(workspaceId, plan)
