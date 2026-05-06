@@ -39,6 +39,44 @@ function sourceCredibility(sourceType?: string): number {
   return 60
 }
 
+function sourceMagnitude(sourceType?: string): number {
+  // Start with source credibility as a proxy, then adjust for impact scale.
+  const cred = sourceCredibility(sourceType)
+  const t = (sourceType ?? '').toLowerCase()
+  if (/major|wsj|wall-street-journal|techcrunch|forbes|bloomberg|reuters/.test(t)) return Math.max(cred, 90)
+  if (/reddit|hacker-news|community|forum/.test(t)) return Math.min(cred, 55)
+  return cred
+}
+
+function isProcurementRelevantSource(sourceType?: string): boolean {
+  const t = (sourceType ?? '').toLowerCase()
+  return /g2|capterra|trustradius|trust-radius|app-store|review|procurement/.test(t)
+}
+
+function computeSelfRelevance(item: ParsedSweepItem): number {
+  let base = 50
+  const sentiment = item.reviewMetadata?.sentiment
+  if (sentiment === 'negative') base = 95
+  else if (sentiment === 'mixed') base = 70
+  else if (sentiment === 'neutral') base = 40
+  else if (sentiment === 'positive') base = 65
+
+  const mag = sourceMagnitude(item.sourceType)
+  base = (base + mag) / 2
+
+  if (isProcurementRelevantSource(item.sourceType)) {
+    base = Math.min(100, base + 10)
+  }
+
+  const crisisKeywords = ['outage', 'breach', 'lawsuit', 'investigation', 'acquired', 'lays off', 'shutters', 'data leak']
+  const haystack = `${item.title} ${item.summary}`.toLowerCase()
+  if (crisisKeywords.some((kw) => haystack.includes(kw))) {
+    base = Math.min(100, base + 15)
+  }
+
+  return Math.round(base)
+}
+
 const DEFAULT_WEIGHTS: Record<string, number> = {
   proximity: 0.18,
   magnitude: 0.08,
@@ -82,11 +120,12 @@ function hashComponents(c: Record<string, number>): string {
 
 export async function computeMis(
   context: SweepContext,
-  item: ParsedSweepItem,
+  item: ParsedSweepItem & { isAboutSelf?: boolean },
   itemEmbedding: number[] | null,
   vendorConsensus: { confirmed: number; total: number }
 ): Promise<MisComputation> {
   const w = { ...DEFAULT_WEIGHTS, ...context.scoringWeights }
+  const isAboutSelf = Boolean(item.isAboutSelf)
   let proximity = 50
   if (itemEmbedding && context.companyEmbedding) {
     proximity = clamp(cosineSimilarity(itemEmbedding, context.companyEmbedding) * 100)
@@ -123,12 +162,25 @@ export async function computeMis(
     topic_relevance = clamp(topic_relevance)
   }
   const segment_match = context.segmentRelevance.length ? 70 : 50
+  const self_relevance = isAboutSelf ? computeSelfRelevance(item) : 50
+
+  // Own-company items use self relevance in place of competitor weight,
+  // and de-emphasize proximity because it's already saturated by definition.
+  const effectiveWeights = { ...w }
+  if (isAboutSelf) {
+    effectiveWeights.self_relevance = effectiveWeights.competitor_weight ?? DEFAULT_WEIGHTS.competitor_weight
+    effectiveWeights.competitor_weight = 0
+    effectiveWeights.proximity = Math.max(0.04, (effectiveWeights.proximity ?? DEFAULT_WEIGHTS.proximity) * 0.5)
+  } else {
+    effectiveWeights.self_relevance = 0
+  }
 
   const components: Record<string, number> = {
     proximity,
     magnitude,
     recency,
     competitor_weight,
+    self_relevance,
     source_credibility,
     vendor_consensus: vconf,
     category_weight,
@@ -139,14 +191,17 @@ export async function computeMis(
 
   let value = 0
   let denom = 0
-  for (const key of Object.keys(DEFAULT_WEIGHTS)) {
-    const weight = w[key] ?? DEFAULT_WEIGHTS[key] ?? 0
+  for (const key of Object.keys(effectiveWeights)) {
+    const weight = effectiveWeights[key] ?? 0
     value += (components[key] ?? 50) * weight
     denom += weight
   }
   value = denom > 0 ? value / denom : 50
   if (proximity < 30) value *= 0.5
   value = clamp(value)
+  if (isAboutSelf && self_relevance >= 80) {
+    value = Math.max(value, 65)
+  }
 
   const band = getMISBand(value) as MisBand
   const compHash = hashComponents(components)
@@ -164,7 +219,7 @@ async function generateExplanation(
   plan: WorkspacePlan,
   value: number,
   components: Record<string, number>,
-  item: ParsedSweepItem
+  item: ParsedSweepItem & { isAboutSelf?: boolean }
 ): Promise<string> {
   try {
     const routing = await getRoutingFor('scoring')

@@ -2,6 +2,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { intelligenceItemFromDb } from '@/lib/intelligence/map-row'
 import type { IntelligenceItem } from '@/lib/types'
 
+export type FeedSubject = 'competitors' | 'our-company'
+
 export async function getWorkspaceIdForUser(): Promise<string | null> {
   const supabase = await createSupabaseServerClient()
   const {
@@ -19,16 +21,21 @@ export async function getWorkspaceIdForUser(): Promise<string | null> {
   return member?.workspace_id ?? null
 }
 
-export async function listFeedItems(workspaceId: string, limit = 100): Promise<IntelligenceItem[]> {
+export async function listFeedItems(
+  workspaceId: string,
+  opts?: { limit?: number; subject?: FeedSubject }
+): Promise<IntelligenceItem[]> {
+  const limit = opts?.limit ?? 100
+  const subject = opts?.subject ?? 'competitors'
   const supabase = await createSupabaseServerClient()
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from('intelligence_item')
     .select('*')
     .eq('workspace_id', workspaceId)
     .eq('visibility', 'feed')
-    .order('mi_score', { ascending: false })
-    .order('ingested_at', { ascending: false })
-    .limit(limit)
+  query = subject === 'our-company' ? query.eq('is_about_self', true) : query.eq('is_about_self', false)
+
+  const { data: rows, error } = await query.order('mi_score', { ascending: false }).order('ingested_at', { ascending: false }).limit(limit)
 
   if (error) throw error
   if (!rows?.length) return []

@@ -642,8 +642,21 @@ create table if not exists public.workspace_profile (
   icp text,
   industry text,
   geography text,
+  legal_name text,
+  primary_url text,
+  product_names text[] default '{}'::text[],
+  brand_aliases text[] default '{}'::text[],
+  founded_year integer,
+  headquarters text,
+  geography_served text[] default '{}'::text[],
+  icp_description text,
+  value_props text[] default '{}'::text[],
+  differentiators text[] default '{}'::text[],
+  social_handles jsonb default '{}'::jsonb,
+  press_kit_url text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  updated_by uuid references auth.users(id) on delete set null
 );
 
 create or replace function public.set_workspace_profile_updated_at()
@@ -1412,6 +1425,7 @@ begin
       'sweep_sell',
       'sweep_channel',
       'sweep_regulatory',
+      'sweep_self',
       'sweep_topic',
       'scoring',
       'embedding',
@@ -1440,7 +1454,9 @@ alter table public.workspace
 alter table public.workspace_profile
   add column if not exists embedding vector(1536),
   add column if not exists differentiators_embedding vector(1536),
-  add column if not exists segment_relevance text[] default '{}'::text[];
+  add column if not exists segment_relevance text[] default '{}'::text[],
+  add column if not exists summary_embedding vector(1536),
+  add column if not exists value_prop_embedding vector(1536);
 
 -- Competitor: full profile + embedding
 alter table public.competitor
@@ -1595,11 +1611,15 @@ create table if not exists public.intelligence_item (
   reviewed_by uuid references auth.users(id) on delete set null,
   reviewed_at timestamptz,
   user_notes text,
-  dedup_of_item_id uuid references public.intelligence_item(id) on delete set null
+  dedup_of_item_id uuid references public.intelligence_item(id) on delete set null,
+  is_about_self boolean not null default false
 );
 
 create index if not exists idx_intel_workspace_ingested on public.intelligence_item(workspace_id, ingested_at desc);
 create index if not exists idx_intel_visibility on public.intelligence_item(workspace_id, visibility);
+create index if not exists intelligence_item_self_idx
+  on public.intelligence_item (workspace_id, is_about_self, ingested_at desc)
+  where is_about_self = true;
 create index if not exists idx_intel_embedding on public.intelligence_item
   using hnsw (embedding vector_cosine_ops)
   with (m = 16, ef_construction = 64)
@@ -1886,6 +1906,7 @@ values
   ('sweep_sell', 'single-vendor', '[{"vendor":"openai","model":"gpt-4o","isPrimary":true,"isEnabled":true}]'::jsonb),
   ('sweep_channel', 'single-vendor', '[{"vendor":"xai","model":"grok-4","isPrimary":true,"isEnabled":true}]'::jsonb),
   ('sweep_regulatory', 'multi-vendor', '[{"vendor":"anthropic","model":"claude-opus-4-7","isPrimary":true,"isEnabled":true},{"vendor":"xai","model":"grok-4","isPrimary":false,"isEnabled":true}]'::jsonb),
+  ('sweep_self', 'single-vendor', '[{"vendor":"openai","model":"gpt-4o","isPrimary":true,"isEnabled":true}]'::jsonb),
   ('sweep_topic', 'single-vendor', '[{"vendor":"openai","model":"gpt-4o","isPrimary":true,"isEnabled":true}]'::jsonb),
   ('scoring', 'single-vendor', '[{"vendor":"anthropic","model":"claude-opus-4-7","isPrimary":true,"isEnabled":true}]'::jsonb),
   ('embedding', 'single-vendor', '[{"vendor":"openai","model":"text-embedding-3-small","isPrimary":true,"isEnabled":true}]'::jsonb),

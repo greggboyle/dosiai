@@ -52,6 +52,7 @@ export function intelligenceItemFromDb(row: IntelRow): IntelligenceItem {
     reviewedBy: row.reviewed_by ?? undefined,
     reviewedAt: row.reviewed_at ?? undefined,
     userNotes: row.user_notes ?? undefined,
+    isAboutSelf: row.is_about_self ?? false,
   }
 }
 

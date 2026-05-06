@@ -46,6 +46,39 @@ Each item must include: title, summary, confidence (low|medium|high), confidence
 Produce 1-3 realistic items if data is thin; focus on verifiable claims.`
 }
 
+type RawSweepItem = ParsedSweepItem & { isAboutSelf?: boolean }
+
+function buildSelfSweepPrompt(params: {
+  legalName: string
+  primaryUrl: string
+  productNames: string[]
+  brandAliases: string[]
+  socialHandles: Record<string, unknown>
+}): string {
+  return `You are a media monitoring analyst. Find recent items (within 7d)
+that mention the following company by any of its identifiers:
+
+Legal name: ${params.legalName}
+Primary URL: ${params.primaryUrl}
+Products: ${params.productNames.join(', ') || '(none)'}
+Brand aliases / common name variants: ${params.brandAliases.join(', ') || '(none)'}
+Social handles: ${JSON.stringify(params.socialHandles)}
+
+For each item found, return a structured record with:
+- title, summary, confidence (low|medium|high), confidenceReason
+- sourceUrls (every claim should be sourced when possible)
+- sourceType
+- category (one of: buy-side, sell-side, channel, regulatory)
+- subcategory (optional)
+- eventAt (optional ISO string)
+- entitiesMentioned (optional array of {name})
+- reviewMetadata only for review/community sources:
+  {platform, rating, sentiment (positive/negative/mixed/neutral), reviewerRole, excerpt}
+
+Refuse to fabricate. If no grounded result exists, return {"items":[]}.
+Do not include listicle/roundup mentions without substantive context.`
+}
+
 async function runCategoryPrompt(
   workspaceId: string,
   plan: WorkspacePlan,
@@ -198,6 +231,109 @@ async function runTopicsPass(
   return { items: merged, vendorCallIds }
 }
 
+async function runSelfPass(
+  workspaceId: string,
+  plan: WorkspacePlan,
+  sweepId: string,
+  profile: Record<string, unknown> | null
+): Promise<{ items: RawSweepItem[]; vendorCallIds: string[] }> {
+  const legalName = String(profile?.legal_name ?? profile?.company_name ?? '').trim()
+  const primaryUrl = String(profile?.primary_url ?? profile?.company_website ?? '').trim()
+  if (!legalName || !primaryUrl) return { items: [], vendorCallIds: [] }
+
+  const productNames = Array.isArray(profile?.product_names)
+    ? (profile?.product_names as string[]).map((v) => String(v).trim()).filter(Boolean)
+    : []
+  const brandAliases = Array.isArray(profile?.brand_aliases)
+    ? (profile?.brand_aliases as string[]).map((v) => String(v).trim()).filter(Boolean)
+    : []
+  const socialHandles =
+    profile?.social_handles && typeof profile.social_handles === 'object'
+      ? (profile.social_handles as Record<string, unknown>)
+      : {}
+
+  const purpose: AiPurposeDb = 'sweep_self'
+  const routing = await getRoutingFor(purpose)
+  const prompt = buildSelfSweepPrompt({ legalName, primaryUrl, productNames, brandAliases, socialHandles })
+
+  const vendorCallIds: string[] = []
+  const merged: RawSweepItem[] = []
+
+  for (const rule of routing.activeRules) {
+    const client = getVendorClient(rule.vendor, rule.model)
+    const started = Date.now()
+    try {
+      const res = await client.complete({
+        prompt,
+        responseSchema: sweepAiResponseSchema,
+        maxTokens: 4096,
+      })
+      const usage = res.usage
+      const cost = estimateCallCostCents(rule.model, usage.inputTokens, usage.outputTokens)
+      const vc = await recordVendorCall(workspaceId, plan, {
+        purpose,
+        vendor: rule.vendor,
+        model: rule.model,
+        requestTokens: usage.inputTokens,
+        responseTokens: usage.outputTokens,
+        costCents: cost,
+        latencyMs: Date.now() - started,
+        success: true,
+        citationCount: 0,
+        responsePayload: res.rawResponse,
+        sweepId,
+      })
+      if (vc?.id) vendorCallIds.push(vc.id)
+
+      const parsed = res.parsed ? sweepAiResponseSchema.safeParse(res.parsed) : null
+      if (parsed?.success) {
+        for (const it of parsed.data.items) {
+          merged.push({ ...it, isAboutSelf: true })
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      await recordVendorCall(workspaceId, plan, {
+        purpose,
+        vendor: rule.vendor,
+        model: rule.model,
+        requestTokens: 0,
+        responseTokens: 0,
+        costCents: 0,
+        latencyMs: Date.now() - started,
+        success: false,
+        errorMessage: msg,
+        sweepId,
+      })
+      throw e
+    }
+  }
+
+  return { items: merged, vendorCallIds }
+}
+
+function applyBrandAliasMatching(items: RawSweepItem[], profile: Record<string, unknown> | null): RawSweepItem[] {
+  const aliases: string[] = [
+    String(profile?.legal_name ?? profile?.company_name ?? '').trim().toLowerCase(),
+    String(profile?.primary_url ?? profile?.company_website ?? '').trim().toLowerCase(),
+    ...(Array.isArray(profile?.product_names) ? (profile?.product_names as string[]) : []).map((n) =>
+      String(n).trim().toLowerCase()
+    ),
+    ...(Array.isArray(profile?.brand_aliases) ? (profile?.brand_aliases as string[]) : []).map((n) =>
+      String(n).trim().toLowerCase()
+    ),
+  ].filter(Boolean)
+
+  if (aliases.length === 0) return items
+
+  return items.map((item) => {
+    if (item.isAboutSelf) return item
+    const haystack = `${item.title} ${item.summary}`.toLowerCase()
+    const matched = aliases.some((alias) => haystack.includes(alias))
+    return matched ? { ...item, isAboutSelf: true } : item
+  })
+}
+
 function parseVectorString(s: string | null): number[] | null {
   if (!s) return null
   try {
@@ -322,7 +458,15 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       competitorLines
     )
 
-    let rawItems = [...catResults.flatMap((r) => r.items), ...topicPassResult.items]
+    const selfPassResult = await runSelfPass(input.workspaceId, plan, sweepId, profile as Record<string, unknown> | null)
+
+    let rawItems: RawSweepItem[] = [
+      ...catResults.flatMap((r) => r.items),
+      ...selfPassResult.items,
+      ...topicPassResult.items,
+    ]
+
+    rawItems = applyBrandAliasMatching(rawItems, profile as Record<string, unknown> | null)
 
     // Deduplicate within sweep by title slug + category
     const seen = new Set<string>()
@@ -412,11 +556,12 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
         mi_score_explanation: mis.explanation,
         confidence: item.confidence,
         confidence_reason: item.confidenceReason,
-        review_metadata: null,
+        review_metadata: item.reviewMetadata ?? null,
         embedding: emb ? formatVectorLiteral(emb) : null,
         visibility,
         event_at: item.eventAt ?? new Date().toISOString(),
         ingested_at: new Date().toISOString(),
+        is_about_self: Boolean(item.isAboutSelf),
       }
 
       const { data: inserted, error: insErr } = await supabase

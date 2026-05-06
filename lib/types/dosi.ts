@@ -56,6 +56,7 @@ export type AiPurpose =
   | 'sweep_sell'
   | 'sweep_channel'
   | 'sweep_regulatory'
+  | 'sweep_self'
   | 'sweep_topic'
   | 'scoring'
   | 'embedding'

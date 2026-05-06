@@ -105,6 +105,15 @@ export const parsedSweepItemSchema = z.object({
     .array(z.object({ name: z.string(), role: z.string().optional() }))
     .optional(),
   relatedCompetitorNames: z.array(z.string()).optional(),
+  reviewMetadata: z
+    .object({
+      platform: z.string().optional(),
+      rating: z.number().optional(),
+      sentiment: z.enum(['positive', 'negative', 'mixed', 'neutral']).optional(),
+      reviewerRole: z.string().optional(),
+      excerpt: z.string().optional(),
+    })
+    .optional(),
 })
 
 export const sweepAiResponseSchema = z.object({

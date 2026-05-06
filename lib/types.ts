@@ -139,6 +139,7 @@ export interface IntelligenceItem {
   userNotes?: string // Analyst-attached notes
   reviewedBy?: string // userId for Review Queue flow
   reviewedAt?: string // timestamp for Review Queue flow
+  isAboutSelf?: boolean
   
   // DEPRECATED: User state fields - moved to ItemUserState for multi-user support
   // These are kept temporarily for v1 single-user-per-workspace but should migrate

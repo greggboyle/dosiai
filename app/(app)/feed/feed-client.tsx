@@ -37,7 +37,7 @@ import { FeedList } from '@/components/feed/feed-list'
 import { FeedDetail } from '@/components/feed/feed-detail'
 import type { IntelligenceItem, Category } from '@/lib/types'
 import { useMediaQuery } from '@/hooks/use-media-query'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { markIntelligenceItemReviewed } from '@/lib/intelligence/actions'
 
 // Helper to create mock dates relative to "now" - using fixed offsets in hours
@@ -424,6 +424,7 @@ Note: Reddit reports are unverified and may not represent the full scope of the 
 
 type ViewTab = 'today' | 'week' | 'watching' | 'all' | 'review'
 type SortOption = 'score' | 'recent' | 'competitor'
+type SubjectFilter = 'competitors' | 'our-company'
 
 const categoryFilters: { value: Category; label: string }[] = [
   { value: 'buy-side', label: 'Buy-side' },
@@ -435,9 +436,11 @@ const categoryFilters: { value: Category; label: string }[] = [
 export function FeedClient({
   initialItems,
   reviewQueueThreshold = 30,
+  initialSubject = 'competitors',
 }: {
   initialItems: IntelligenceItem[]
   reviewQueueThreshold?: number
+  initialSubject?: SubjectFilter
 }) {
   const [items, setItems] = React.useState<IntelligenceItem[]>(initialItems)
   React.useEffect(() => {
@@ -461,10 +464,15 @@ export function FeedClient({
   
   // View tabs
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [activeTab, setActiveTab] = React.useState<ViewTab>('all')
+  const [subject, setSubject] = React.useState<SubjectFilter>(initialSubject)
 
   React.useEffect(() => {
     if (searchParams.get('tab') === 'review') setActiveTab('review')
+    const subjectFromUrl = searchParams.get('subject') === 'our-company' ? 'our-company' : 'competitors'
+    setSubject(subjectFromUrl)
   }, [searchParams])
   
   // Filters
@@ -643,6 +651,32 @@ export function FeedClient({
                 {filteredItems.length} intelligence item{filteredItems.length !== 1 ? 's' : ''}
               </p>
             </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs">
+                  Subject: {subject === 'our-company' ? 'Our company' : 'Competitors'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuRadioGroup
+                  value={subject}
+                  onValueChange={(v) => {
+                    const next = v === 'our-company' ? 'our-company' : 'competitors'
+                    const params = new URLSearchParams(searchParams.toString())
+                    params.set('subject', next)
+                    router.replace(`${pathname}?${params.toString()}`)
+                    setSubject(next)
+                  }}
+                >
+                  <DropdownMenuRadioItem value="competitors" className="text-xs">
+                    Competitors
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="our-company" className="text-xs">
+                    Our company
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* View Tabs */}

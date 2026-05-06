@@ -47,6 +47,7 @@ const EMBEDDED_PROMPTS: EmbeddedPromptDefault[] = [
   { purpose: 'sweep_sell', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
   { purpose: 'sweep_channel', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
   { purpose: 'sweep_regulatory', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
+  { purpose: 'sweep_self', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
   { purpose: 'sweep_topic', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
   {
     purpose: 'scoring',

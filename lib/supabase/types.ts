@@ -5,6 +5,7 @@ export type AiPurposeDb =
   | 'sweep_sell'
   | 'sweep_channel'
   | 'sweep_regulatory'
+  | 'sweep_self'
   | 'sweep_topic'
   | 'scoring'
   | 'embedding'
@@ -315,11 +316,26 @@ export interface Database {
           icp: string | null
           industry: string | null
           geography: string | null
+          legal_name: string | null
+          primary_url: string | null
+          product_names: string[] | null
+          brand_aliases: string[] | null
+          founded_year: number | null
+          headquarters: string | null
+          geography_served: string[] | null
+          icp_description: string | null
+          value_props: string[] | null
+          differentiators: string[] | null
+          social_handles: Json | null
+          press_kit_url: string | null
           created_at: string
           updated_at: string
           embedding: string | null
           differentiators_embedding: string | null
           segment_relevance: string[] | null
+          summary_embedding: string | null
+          value_prop_embedding: string | null
+          updated_by: string | null
         }
         Insert: {
           workspace_id: string
@@ -329,11 +345,26 @@ export interface Database {
           icp?: string | null
           industry?: string | null
           geography?: string | null
+          legal_name?: string | null
+          primary_url?: string | null
+          product_names?: string[] | null
+          brand_aliases?: string[] | null
+          founded_year?: number | null
+          headquarters?: string | null
+          geography_served?: string[] | null
+          icp_description?: string | null
+          value_props?: string[] | null
+          differentiators?: string[] | null
+          social_handles?: Json | null
+          press_kit_url?: string | null
           created_at?: string
           updated_at?: string
           embedding?: string | null
           differentiators_embedding?: string | null
           segment_relevance?: string[] | null
+          summary_embedding?: string | null
+          value_prop_embedding?: string | null
+          updated_by?: string | null
         }
         Update: Partial<Database['public']['Tables']['workspace_profile']['Insert']>
       }
@@ -519,6 +550,7 @@ export interface Database {
           reviewed_at: string | null
           user_notes: string | null
           dedup_of_item_id: string | null
+          is_about_self: boolean
         }
         Insert: {
           id?: string
@@ -552,6 +584,7 @@ export interface Database {
           reviewed_at?: string | null
           user_notes?: string | null
           dedup_of_item_id?: string | null
+          is_about_self?: boolean
         }
         Update: Partial<Database['public']['Tables']['intelligence_item']['Insert']>
       }
