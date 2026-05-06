@@ -36,7 +36,7 @@ export default async function BriefEditPage({ params }: { params: Promise<{ id: 
       : 'Teammate'
 
   const brief = briefRowToBrief(row, authorLabel)
-  const feedItems = await listFeedItems(member.workspace_id, 250)
+  const feedItems = await listFeedItems(member.workspace_id, { limit: 250 })
   const readOnly = workspace?.status === 'read_only'
 
   return <BriefEditorClient initialBrief={brief} feedItems={feedItems} readOnly={readOnly} />

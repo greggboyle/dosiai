@@ -109,7 +109,7 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
     heatmapRes,
     winLossRes,
   ] = await Promise.all([
-    listFeedItems(workspaceId, 8),
+    listFeedItems(workspaceId, { limit: 10 }),
     supabase.from('competitor').select('id,name').eq('workspace_id', workspaceId).eq('status', 'active').limit(24),
     supabase.from('topic').select('id,name').eq('workspace_id', workspaceId).eq('status', 'active').limit(12),
     supabase
