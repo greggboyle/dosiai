@@ -252,6 +252,12 @@ export function AppSidebar({ workspace, member, subscription, navBadgeCounts }: 
                     Settings
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild className="gap-2 p-2">
+                  <Link href="/settings/company-profile">
+                    <Building2 className="size-4" />
+                    Company Profile
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="gap-2 p-2 text-destructive" onClick={signOut}>
                   Sign out
