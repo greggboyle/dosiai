@@ -442,6 +442,7 @@ export function FeedClient({
   pageSize,
   totalItems,
   totalPages,
+  initialSelectedItem,
 }: {
   initialItems: IntelligenceItem[]
   reviewQueueThreshold?: number
@@ -450,11 +451,25 @@ export function FeedClient({
   pageSize: number
   totalItems: number
   totalPages: number
+  initialSelectedItem?: IntelligenceItem | null
 }) {
-  const [items, setItems] = React.useState<IntelligenceItem[]>(initialItems)
+  const [items, setItems] = React.useState<IntelligenceItem[]>(() => {
+    if (!initialSelectedItem) return initialItems
+    return initialItems.some((i) => i.id === initialSelectedItem.id)
+      ? initialItems
+      : [initialSelectedItem, ...initialItems]
+  })
   React.useEffect(() => {
-    setItems(initialItems)
-  }, [initialItems])
+    if (!initialSelectedItem) {
+      setItems(initialItems)
+      return
+    }
+    setItems(
+      initialItems.some((i) => i.id === initialSelectedItem.id)
+        ? initialItems
+        : [initialSelectedItem, ...initialItems]
+    )
+  }, [initialItems, initialSelectedItem])
 
   const dataSource = items
 
@@ -483,6 +498,15 @@ export function FeedClient({
     const subjectFromUrl = searchParams.get('subject') === 'our-company' ? 'our-company' : 'competitors'
     setSubject(subjectFromUrl)
   }, [searchParams])
+
+  React.useEffect(() => {
+    const selectedId = searchParams.get('item')
+    if (!selectedId) return
+    const matched = items.find((i) => i.id === selectedId) ?? initialSelectedItem ?? null
+    if (!matched) return
+    setSelectedItem(matched)
+    if (!isDesktop) setDetailOpen(true)
+  }, [searchParams, items, initialSelectedItem, isDesktop])
   
   // Filters
   const [selectedCategories, setSelectedCategories] = React.useState<Category[]>([])
@@ -493,7 +517,7 @@ export function FeedClient({
   const [showUnreadOnly, setShowUnreadOnly] = React.useState(false)
   
   // Sort
-  const [sortBy, setSortBy] = React.useState<SortOption>('score')
+  const [sortBy, setSortBy] = React.useState<SortOption>('recent')
   
   // Use client-only state to avoid hydration mismatches with date calculations
   const [mounted, setMounted] = React.useState(false)

@@ -1,6 +1,11 @@
 import { Suspense } from 'react'
 import { FeedClient } from './feed-client'
-import { getWorkspaceIdForUser, listFeedItemsPage, type FeedSubject } from '@/lib/feed/queries'
+import {
+  getFeedItemsByIds,
+  getWorkspaceIdForUser,
+  listFeedItemsPage,
+  type FeedSubject,
+} from '@/lib/feed/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export default async function FeedPage({
@@ -12,6 +17,7 @@ export default async function FeedPage({
   const subjectParam = Array.isArray(params.subject) ? params.subject[0] : params.subject
   const subject: FeedSubject = subjectParam === 'our-company' ? 'our-company' : 'competitors'
   const pageParam = Array.isArray(params.page) ? params.page[0] : params.page
+  const itemParam = Array.isArray(params.item) ? params.item[0] : params.item
   const parsedPage = Number.parseInt(pageParam ?? '1', 10)
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
   const pageSize = 25
@@ -20,6 +26,8 @@ export default async function FeedPage({
   const paged = workspaceId
     ? await listFeedItemsPage(workspaceId, { subject, page, pageSize })
     : { items: [], total: 0, page: 1, pageSize, totalPages: 1 }
+  const selectedItem =
+    workspaceId && itemParam ? (await getFeedItemsByIds(workspaceId, [itemParam]))[0] ?? null : null
 
   let reviewQueueThreshold = 30
   if (workspaceId) {
@@ -42,6 +50,7 @@ export default async function FeedPage({
         pageSize={paged.pageSize}
         totalItems={paged.total}
         totalPages={paged.totalPages}
+        initialSelectedItem={selectedItem}
       />
     </Suspense>
   )
