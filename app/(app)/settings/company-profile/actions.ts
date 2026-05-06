@@ -66,8 +66,23 @@ export async function updateCompanyProfile(formData: FormData) {
       .from('workspace')
       .update({ auto_briefs_auto_approve: autoBriefsAutoApprove })
       .eq('id', workspace.id)
-    if (wsError) throw wsError
+
+    // Allow profile save to succeed in environments where this newer column
+    // has not been migrated yet.
+    if (wsError) {
+      const msg = (wsError.message ?? '').toLowerCase()
+      const details = (wsError.details ?? '').toLowerCase()
+      const hint = (wsError.hint ?? '').toLowerCase()
+      const missingAutoBriefsColumn =
+        wsError.code === '42703' ||
+        wsError.code === 'PGRST204' ||
+        msg.includes('auto_briefs_auto_approve') ||
+        details.includes('auto_briefs_auto_approve') ||
+        hint.includes('auto_briefs_auto_approve')
+      if (!missingAutoBriefsColumn) throw wsError
+    }
   })
 
   revalidatePath('/settings/company-profile')
+  revalidatePath('/settings')
 }
