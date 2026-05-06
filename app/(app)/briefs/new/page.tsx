@@ -1,7 +1,12 @@
 import { redirect } from 'next/navigation'
-import { createBriefDraft } from '@/lib/brief/actions'
+import { createEmptyBriefDraftForSession } from '@/lib/brief/create-empty-draft'
+
+export const dynamic = 'force-dynamic'
 
 export default async function NewBriefPage() {
-  const id = await createBriefDraft()
-  redirect(`/briefs/${id}/edit`)
+  const result = await createEmptyBriefDraftForSession()
+  if (!result.ok) {
+    redirect('/briefs')
+  }
+  redirect(`/briefs/${result.id}/edit`)
 }

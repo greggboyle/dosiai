@@ -14,7 +14,7 @@ export type DashboardFeedRow = {
 export type SidebarNavBadgeCounts = {
   /** Feed items in review queue (same logic as dashboard `reviewQueueCount`). */
   feedReviewQueue: number
-  /** Total briefs in the workspace. */
+  /** Non-archived briefs in the workspace (archived are hidden from the count). */
   briefCount: number
 }
 
@@ -37,7 +37,11 @@ export async function loadSidebarNavBadgeCounts(workspaceId: string): Promise<Si
       .eq('visibility', 'feed')
       .lt('mi_score', threshold)
       .is('reviewed_at', null),
-    supabase.from('brief').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
+    supabase
+      .from('brief')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .neq('status', 'archived'),
   ])
 
   return {

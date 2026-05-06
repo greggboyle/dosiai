@@ -130,6 +130,11 @@ export function BriefEditorClient({ initialBrief, feedItems, readOnly }: BriefEd
         linkedItemIds,
         status,
       })
+      if (status === 'archived') {
+        toast.success('Brief archived')
+        router.replace('/briefs')
+        return
+      }
       router.refresh()
       toast.success('Saved')
     } catch (e) {

@@ -51,34 +51,20 @@ async function requireAuthorWorkspace(): Promise<{
 
 /** Creates an empty draft brief and returns its id (for redirect). */
 export async function createBriefDraft(): Promise<string> {
-  const ctx = await requireAuthorWorkspace()
-  if (ctx.status === 'read_only') throw new Error('Workspace is read-only')
-
-  const supabase = await createSupabaseServerClient()
-  const { data, error } = await supabase
-    .from('brief')
-    .insert({
-      workspace_id: ctx.workspaceId,
-      author_id: ctx.userId,
-      title: 'Untitled brief',
-      summary: '',
-      body: '',
-      word_count: 0,
-      audience: 'general',
-      priority: 'medium',
-      status: 'draft',
-      ai_drafted: false,
-      human_reviewed: false,
-      linked_item_ids: [],
-      linked_topic_ids: [],
-      linked_competitor_ids: [],
-    })
-    .select('id')
-    .single()
-
-  if (error) throw error
-  revalidatePath('/briefs')
-  return data.id
+  const { createEmptyBriefDraftForSession } = await import('@/lib/brief/create-empty-draft')
+  const result = await createEmptyBriefDraftForSession()
+  if (!result.ok) {
+    const msg =
+      result.reason === 'unauthorized'
+        ? 'Unauthorized'
+        : result.reason === 'forbidden'
+          ? 'Forbidden'
+          : result.reason === 'read_only'
+            ? 'Workspace is read-only'
+            : result.message ?? 'Could not create brief'
+    throw new Error(msg)
+  }
+  return result.id
 }
 
 export async function saveBrief(input: {
@@ -135,6 +121,9 @@ export async function saveBrief(input: {
   revalidatePath('/briefs')
   revalidatePath(`/briefs/${input.briefId}`)
   revalidatePath(`/briefs/${input.briefId}/edit`)
+  if (input.status === 'archived') {
+    revalidatePath('/')
+  }
 }
 
 export async function publishBrief(briefId: string): Promise<void> {
