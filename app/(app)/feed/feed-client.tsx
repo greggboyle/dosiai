@@ -672,9 +672,9 @@ export function FeedClient({
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex h-[calc(100vh-4rem)] px-2 md:px-3">
       {/* Feed List Panel */}
-      <div className="flex-1 flex flex-col min-w-0 xl:max-w-[60%] border-r border-border">
+      <div className="flex-1 xl:basis-3/5 xl:shrink-0 flex flex-col min-w-0 border-r border-border">
         {/* Header */}
         <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-border bg-background">
           <div className="flex items-center justify-between mb-4">
@@ -975,7 +975,7 @@ export function FeedClient({
 
       {/* Detail Panel - Desktop */}
       {isDesktop && (
-        <div className="hidden xl:flex w-[40%] flex-col bg-card">
+        <div className="hidden xl:flex xl:basis-2/5 min-w-0 flex-col bg-card">
           <FeedDetail item={selectedItem} onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)} />
         </div>
       )}
