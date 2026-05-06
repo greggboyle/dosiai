@@ -534,6 +534,9 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     return { time: `${String(new Date(from).getHours()).padStart(2, '0')}:00`, depth }
   })
 
+  const vendorCalls24 = vendor24Res.data ?? []
+  const vendorCalls1h = vendor1hRes.data ?? []
+
   const systemErrorSeries = Array.from({ length: 24 }, (_, i) => {
     const from = now - (23 - i) * 60 * 60 * 1000
     const to = from + 60 * 60 * 1000
@@ -549,9 +552,6 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     }).length
     return { time: `${String(new Date(from).getHours()).padStart(2, '0')}:00`, errors: sweepErrors + vendorErrors }
   })
-
-  const vendorCalls24 = vendor24Res.data ?? []
-  const vendorCalls1h = vendor1hRes.data ?? []
   const vendorGroups = new Map<string, { total: number; ok: number; lat: number; latN: number; cost: number; h: number }>()
   for (const c of vendorCalls24) {
     const g = vendorGroups.get(c.vendor) ?? { total: 0, ok: 0, lat: 0, latN: 0, cost: 0, h: 0 }
