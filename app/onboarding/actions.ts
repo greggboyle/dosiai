@@ -1,9 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 import { getSession } from '@/lib/auth/session'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { withWorkspace } from '@/lib/auth/workspace'
+import { createOpenAiClient } from '@/lib/ai/vendors/openai'
 
 interface CreateWorkspaceInput {
   name: string
@@ -79,6 +81,45 @@ export async function saveWorkspaceProfile(input: {
     if (error) throw error
     revalidatePath('/onboarding')
     return true
+  })
+}
+
+const draftCompanyProfileSchema = z.object({
+  companySummary: z.string(),
+  companyICP: z.string(),
+})
+
+export async function draftCompanyProfile(input: {
+  workspaceId: string
+  companyName: string
+  companyWebsite: string
+  industry?: string
+}) {
+  return withWorkspace(input.workspaceId, ['admin', 'analyst'], async () => {
+    const client = createOpenAiClient('gpt-4.1-mini')
+    const prompt = `Create concise onboarding drafts for a B2B company profile.
+Return JSON only with keys:
+- companySummary: 2-4 sentences about what the company does
+- companyICP: 1-2 sentences describing the ideal customer profile
+
+Company name: ${input.companyName || 'Unknown company'}
+Company website: ${input.companyWebsite || 'Unknown website'}
+Industry: ${input.industry || 'Unknown'}
+
+Write practical, specific drafts and avoid generic buzzwords.`
+    const result = await client.complete({
+      prompt,
+      responseSchema: draftCompanyProfileSchema,
+      maxTokens: 400,
+    })
+    const parsed = result.parsed as z.infer<typeof draftCompanyProfileSchema> | undefined
+    if (!parsed) {
+      throw new Error('Failed to generate company profile draft')
+    }
+    return {
+      companySummary: parsed.companySummary.trim(),
+      companyICP: parsed.companyICP.trim(),
+    }
   })
 }
 

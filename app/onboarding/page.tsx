@@ -17,10 +17,15 @@ import {
   Trash2,
   Loader2,
   Upload,
-  Sparkles,
   X,
 } from 'lucide-react'
-import { createWorkspace, saveCompetitors, saveTopics, saveWorkspaceProfile } from '@/app/onboarding/actions'
+import {
+  createWorkspace,
+  draftCompanyProfile,
+  saveCompetitors,
+  saveTopics,
+  saveWorkspaceProfile,
+} from '@/app/onboarding/actions'
 import { triggerManualSweep } from '@/app/(app)/dashboard/actions'
 
 // Step definitions
@@ -91,7 +96,6 @@ export default function OnboardingPage() {
   const [companySummary, setCompanySummary] = React.useState('')
   const [companyICP, setCompanyICP] = React.useState('')
   const [isLoadingSummary, setIsLoadingSummary] = React.useState(false)
-  const [summaryGenerated, setSummaryGenerated] = React.useState(false)
   
   const [competitors, setCompetitors] = React.useState<CompetitorInput[]>([
     { id: '1', name: '', website: '' },
@@ -110,20 +114,25 @@ export default function OnboardingPage() {
   
   const currentStep = STEPS[currentStepIndex]
   
-  // Simulate AI summary generation
+  // Generate AI draft on demand.
   const generateSummary = async () => {
-    if (!companyWebsite) return
+    if (!workspaceId || !companyName.trim() || !companyWebsite.trim()) return
     setIsLoadingSummary(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setCompanySummary(
-      `${companyName || 'Your company'} provides enterprise-grade logistics management solutions designed for mid-market shippers. The platform combines AI-powered route optimization with real-time visibility to help logistics teams reduce costs and improve delivery performance. Founded with a mission to modernize freight operations, the company serves over 500 customers across North America.`
-    )
-    setCompanyICP(
-      'VP of Logistics or Supply Chain Director at mid-market manufacturing and retail companies with 100-5,000 employees shipping 500+ loads per month.'
-    )
-    setSummaryGenerated(true)
-    setIsLoadingSummary(false)
+    setOnboardingError(null)
+    try {
+      const draft = await draftCompanyProfile({
+        workspaceId,
+        companyName: companyName.trim(),
+        companyWebsite: companyWebsite.trim(),
+        industry,
+      })
+      setCompanySummary(draft.companySummary)
+      setCompanyICP(draft.companyICP)
+    } catch {
+      setOnboardingError('We could not generate drafts right now. Please try again.')
+    } finally {
+      setIsLoadingSummary(false)
+    }
   }
   
   // Add competitor row
@@ -522,11 +531,6 @@ export default function OnboardingPage() {
                     placeholder="e.g., acme.com"
                     value={companyWebsite}
                     onChange={(e) => setCompanyWebsite(e.target.value)}
-                    onBlur={() => {
-                      if (companyWebsite && !summaryGenerated) {
-                        generateSummary()
-                      }
-                    }}
                   />
                 </div>
               </div>
@@ -534,18 +538,22 @@ export default function OnboardingPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="company-summary">Company summary</Label>
-                  {isLoadingSummary && (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                      <Loader2 className="size-3 animate-spin" />
-                      Drafting from your website...
-                    </span>
-                  )}
-                  {summaryGenerated && !isLoadingSummary && (
-                    <span className="text-xs text-accent flex items-center gap-1">
-                      <Sparkles className="size-3" />
-                      AI-drafted
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => void generateSummary()}
+                    disabled={isLoadingSummary || !workspaceId || !companyName.trim() || !companyWebsite.trim()}
+                    className="text-xs text-accent hover:underline disabled:text-muted-foreground disabled:no-underline"
+                    title={!companyName.trim() || !companyWebsite.trim() ? 'Enter company name and website first' : undefined}
+                  >
+                    {isLoadingSummary ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Loader2 className="size-3 animate-spin" />
+                        Drafting with AI...
+                      </span>
+                    ) : (
+                      'Draft with AI'
+                    )}
+                  </button>
                 </div>
                 <Textarea
                   id="company-summary"
@@ -560,12 +568,15 @@ export default function OnboardingPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="company-icp">Ideal Customer Profile (ICP)</Label>
-                  {summaryGenerated && (
-                    <span className="text-xs text-accent flex items-center gap-1">
-                      <Sparkles className="size-3" />
-                      AI-drafted
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => void generateSummary()}
+                    disabled={isLoadingSummary || !workspaceId || !companyName.trim() || !companyWebsite.trim()}
+                    className="text-xs text-accent hover:underline disabled:text-muted-foreground disabled:no-underline"
+                    title={!companyName.trim() || !companyWebsite.trim() ? 'Enter company name and website first' : undefined}
+                  >
+                    Draft with AI
+                  </button>
                 </div>
                 <Textarea
                   id="company-icp"
