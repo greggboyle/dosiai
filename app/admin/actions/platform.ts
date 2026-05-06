@@ -337,7 +337,6 @@ export async function seedPromptTemplatesFromCode() {
   if (missingRows.length > 0) {
     const { error } = await admin.from('prompt_template').insert(missingRows)
     if (error) throw error
-    revalidatePath('/admin/prompts')
   }
 
   return { created: missingRows.length }

@@ -13,10 +13,12 @@ export type OperatorRow = {
 export async function requireOperator(): Promise<{ operator: OperatorRow }> {
   const supabase = await createSupabaseServerClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+  if (userError) throw userError
 
-  const email = session?.user?.email?.trim().toLowerCase()
+  const email = user?.email?.trim().toLowerCase()
   if (!email) {
     throw new Error('Unauthorized')
   }
