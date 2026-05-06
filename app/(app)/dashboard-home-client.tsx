@@ -107,7 +107,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
   const staleCards = battleCards.filter((c) => c.staleSections > 0)
   const reviewQueueCount = snapshot.reviewQueueCount
 
-  const recentBriefs: Array<{ id: string; title: string; audience: string; priority: string; author: string; timestamp: string }> = []
+  const recentBriefs = snapshot.recentBriefs
 
   const heatRanked = [...snapshot.competitorHeatmap].sort((a, b) => b.count - a.count)
   const customerVoice = heatRanked.slice(0, 4).map((c, i) => ({

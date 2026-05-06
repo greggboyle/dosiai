@@ -158,6 +158,7 @@ export async function publishBrief(briefId: string): Promise<void> {
     .update({
       status: 'published',
       published_at: publishedAt,
+      human_reviewed: true,
     })
     .eq('id', briefId)
 

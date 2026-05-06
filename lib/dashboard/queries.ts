@@ -48,6 +48,14 @@ export async function loadSidebarNavBadgeCounts(workspaceId: string): Promise<Si
 
 export type DashboardSnapshot = {
   feed: DashboardFeedRow[]
+  recentBriefs: Array<{
+    id: string
+    title: string
+    audience: 'leadership' | 'sales' | 'product' | 'general'
+    priority: 'critical' | 'high' | 'medium'
+    author: string
+    timestamp: string
+  }>
   competitorHeatmap: Array<{ id: string; name: string; initial: string; count: number }>
   topicActivity: Array<{ name: string; count: number; trend: 'up' | 'down' | 'neutral'; delta: number }>
   reviewQueueCount: number
@@ -104,6 +112,7 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
     reviewedCountRes,
     battleCardCountRes,
     latestSweepRes,
+    recentBriefsRes,
     suggestedRes,
     reviewQueueRes,
     heatmapRes,
@@ -132,6 +141,12 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from('brief')
+      .select('id,title,audience,priority,published_at,updated_at,status')
+      .eq('workspace_id', workspaceId)
+      .order('updated_at', { ascending: false })
+      .limit(5),
     supabase
       .from('suggested_competitor')
       .select('id,name,description_snippet,discovery_confidence')
@@ -264,6 +279,14 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
 
   return {
     feed,
+    recentBriefs: (recentBriefsRes.data ?? []).map((b) => ({
+      id: b.id,
+      title: b.title,
+      audience: b.audience,
+      priority: b.priority,
+      author: 'Team',
+      timestamp: formatRelativeLabel(b.published_at ?? b.updated_at),
+    })),
     competitorHeatmap,
     topicActivity,
     reviewQueueCount: reviewQueueRes.count ?? 0,
