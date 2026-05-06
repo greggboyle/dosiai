@@ -54,6 +54,7 @@ import {
   Plus,
   History,
   ExternalLink,
+  Trash2,
 } from 'lucide-react'
 import type { AIPurposeConfig, AIRoutingRule, AIVendor, AIPurpose } from '@/lib/admin-types'
 import type { AiRoutingDbRow } from '@/lib/admin/map-ai-routing-db'
@@ -263,6 +264,32 @@ export function AiRoutingClient({ initialConfigs, initialAuditRows }: AiRoutingC
     setNewModel('')
   }
 
+  const handleDeleteVendor = (purpose: AIPurpose, ruleId: string) => {
+    setPurposeConfigs((prev) =>
+      prev.map((cfg) => {
+        if (cfg.purpose !== purpose) return cfg
+        if (cfg.rules.length <= 1) {
+          toast.error('At least one vendor must remain for each purpose.')
+          return cfg
+        }
+
+        const target = cfg.rules.find((r) => r.id === ruleId)
+        if (!target) return cfg
+
+        const remaining = cfg.rules.filter((r) => r.id !== ruleId)
+        if (target.isPrimary && remaining.length > 0 && !remaining.some((r) => r.isPrimary)) {
+          remaining[0] = { ...remaining[0], isPrimary: true }
+        }
+
+        return {
+          ...cfg,
+          rules: remaining,
+        }
+      })
+    )
+    toast.success('Vendor removed. Click "Save to database" to persist this change.')
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -372,6 +399,7 @@ export function AiRoutingClient({ initialConfigs, initialAuditRows }: AiRoutingC
                         )}
                         <TableHead className="text-[11px]">Notes</TableHead>
                         <TableHead className="text-[11px] w-[120px]">Last Changed</TableHead>
+                        <TableHead className="text-[11px] w-[80px] text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -456,6 +484,22 @@ export function AiRoutingClient({ initialConfigs, initialAuditRows }: AiRoutingC
                           <TableCell className="py-2 text-[11px] text-muted-foreground">
                             <div>{formatDaysAgo(rule.lastChangedAt)}</div>
                             <div className="text-[10px]">by {rule.lastChangedBy}</div>
+                          </TableCell>
+                          <TableCell className="py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-[11px] text-destructive hover:text-destructive"
+                              onClick={() => {
+                                const okay = window.confirm(
+                                  `Remove ${vendorInfo[rule.vendor].name} (${rule.model}) from ${config.name}?`
+                                )
+                                if (!okay) return
+                                handleDeleteVendor(config.purpose, rule.id)
+                              }}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
