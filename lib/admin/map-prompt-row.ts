@@ -11,6 +11,11 @@ export function promptRowToUi(row: PromptRow): PromptTemplate {
     variables = []
   }
 
+  const deploymentHistory = Array.isArray(row.deployment_history)
+    ? (row.deployment_history as PromptTemplate['deploymentHistory'])
+    : []
+  const latestDeployment = deploymentHistory[0]
+
   return {
     id: row.id,
     name: row.name,
@@ -27,9 +32,9 @@ export function promptRowToUi(row: PromptRow): PromptTemplate {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     updatedBy: row.updated_by_operator_id ?? 'operator',
-    deployedAt: null,
-    deployedBy: null,
-    deploymentHistory: [],
+    deployedAt: latestDeployment?.deployedAt ?? null,
+    deployedBy: latestDeployment?.deployedBy ?? null,
+    deploymentHistory,
     abTest: undefined,
   }
 }

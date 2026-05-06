@@ -7,25 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
   AreaChart,
   Area,
   ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip,
 } from 'recharts'
 import {
   Building2,
-  RefreshCw,
-  CheckCircle2,
   XCircle,
   Clock,
   UserCheck,
@@ -35,8 +22,8 @@ import {
   TrendingDown,
   ArrowRight,
   AlertCircle,
-  CircleDot,
 } from 'lucide-react'
+import { getAdminDashboardData, type AdminDashboardData } from '@/app/admin/actions/platform'
 
 // Types for operator dashboard
 interface PlatformHealth {
@@ -93,7 +80,7 @@ interface QueueDepthPoint {
 }
 
 // Mock data with realistic seed values from spec
-const platformHealth: PlatformHealth = {
+const fallbackPlatformHealth: PlatformHealth = {
   activeWorkspacesToday: 247,
   sweepsCompleted24h: 3892,
   sweepsSuccessRate: 98.7,
@@ -103,7 +90,7 @@ const platformHealth: PlatformHealth = {
   activeImpersonations: 1,
 }
 
-const attentionItems: AttentionItem[] = [
+const fallbackAttentionItems: AttentionItem[] = [
   {
     id: 'att-1',
     severity: 'critical',
@@ -146,7 +133,7 @@ const attentionItems: AttentionItem[] = [
   },
 ]
 
-const vendorHealthData: VendorHealth[] = [
+const fallbackVendorHealthData: VendorHealth[] = [
   {
     vendor: 'OpenAI',
     status: 'healthy',
@@ -173,7 +160,7 @@ const vendorHealthData: VendorHealth[] = [
   },
 ]
 
-const recentActivity: RecentActivity[] = [
+const fallbackRecentActivity: RecentActivity[] = [
   {
     id: 'act-1',
     type: 'signup',
@@ -232,7 +219,7 @@ const recentActivity: RecentActivity[] = [
   },
 ]
 
-const activeImpersonations: ImpersonationSession[] = [
+const fallbackActiveImpersonations: ImpersonationSession[] = [
   {
     id: 'imp-1',
     workspaceName: 'ChainCo Logistics',
@@ -244,7 +231,7 @@ const activeImpersonations: ImpersonationSession[] = [
 ]
 
 // Sweep queue depth data (24 hours, hourly) - static values for SSR consistency
-const queueDepthData: QueueDepthPoint[] = [
+const fallbackQueueDepthData: QueueDepthPoint[] = [
   { time: '00:00', depth: 4 },
   { time: '01:00', depth: 3 },
   { time: '02:00', depth: 2 },
@@ -272,17 +259,28 @@ const queueDepthData: QueueDepthPoint[] = [
 ]
 
 // Current queue stats
-const queueStats = {
+const fallbackQueueStats = {
   currentDepth: 12,
   avgWaitTimeMinutes: 2.4,
   longestWaitMinutes: 8,
 }
 
 // System errors
-const systemErrors = {
+const fallbackSystemErrors = {
   countLast24h: 147,
   trend: -12, // 12% fewer than previous 24h
 }
+
+const fallbackSystemErrorSeries = [
+  { time: '00:00', errors: 4 }, { time: '01:00', errors: 3 }, { time: '02:00', errors: 2 },
+  { time: '03:00', errors: 5 }, { time: '04:00', errors: 8 }, { time: '05:00', errors: 6 },
+  { time: '06:00', errors: 7 }, { time: '07:00', errors: 9 }, { time: '08:00', errors: 12 },
+  { time: '09:00', errors: 15 }, { time: '10:00', errors: 11 }, { time: '11:00', errors: 8 },
+  { time: '12:00', errors: 6 }, { time: '13:00', errors: 7 }, { time: '14:00', errors: 9 },
+  { time: '15:00', errors: 5 }, { time: '16:00', errors: 4 }, { time: '17:00', errors: 6 },
+  { time: '18:00', errors: 3 }, { time: '19:00', errors: 4 }, { time: '20:00', errors: 5 },
+  { time: '21:00', errors: 3 }, { time: '22:00', errors: 2 }, { time: '23:00', errors: 4 },
+]
 
 // Helper functions
 function formatLatency(ms: number): string {
@@ -310,6 +308,32 @@ function StatusDot({ status }: { status: 'healthy' | 'degraded' | 'down' | 'acti
 }
 
 export default function AdminDashboardPage() {
+  const [dashboard, setDashboard] = React.useState<AdminDashboardData | null>(null)
+
+  React.useEffect(() => {
+    let mounted = true
+    void getAdminDashboardData()
+      .then((data) => {
+        if (mounted) setDashboard(data)
+      })
+      .catch(() => {
+        if (mounted) setDashboard(null)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const platformHealth = dashboard?.platformHealth ?? fallbackPlatformHealth
+  const attentionItems = dashboard?.attentionItems ?? fallbackAttentionItems
+  const vendorHealthData = dashboard?.vendorHealth ?? fallbackVendorHealthData
+  const recentActivity = dashboard?.recentActivity ?? fallbackRecentActivity
+  const activeImpersonations = dashboard?.activeImpersonations ?? fallbackActiveImpersonations
+  const queueDepthData = dashboard?.queueDepthData ?? fallbackQueueDepthData
+  const systemErrorSeries = dashboard?.systemErrorSeries ?? fallbackSystemErrorSeries
+  const queueStats = dashboard?.queueStats ?? fallbackQueueStats
+  const systemErrors = dashboard?.systemErrors ?? fallbackSystemErrors
+
   return (
     <div className="space-y-4">
       {/* Platform Health Strip - Full width, 1 row */}
@@ -658,16 +682,7 @@ export default function AdminDashboardPage() {
             </div>
             <div className="h-16 mt-2">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={[
-                  { time: 0, errors: 4 }, { time: 1, errors: 3 }, { time: 2, errors: 2 },
-                  { time: 3, errors: 5 }, { time: 4, errors: 8 }, { time: 5, errors: 6 },
-                  { time: 6, errors: 7 }, { time: 7, errors: 9 }, { time: 8, errors: 12 },
-                  { time: 9, errors: 15 }, { time: 10, errors: 11 }, { time: 11, errors: 8 },
-                  { time: 12, errors: 6 }, { time: 13, errors: 7 }, { time: 14, errors: 9 },
-                  { time: 15, errors: 5 }, { time: 16, errors: 4 }, { time: 17, errors: 6 },
-                  { time: 18, errors: 3 }, { time: 19, errors: 4 }, { time: 20, errors: 5 },
-                  { time: 21, errors: 3 }, { time: 22, errors: 2 }, { time: 23, errors: 4 },
-                ]}>
+                <AreaChart data={systemErrorSeries}>
                   <Area
                     type="monotone"
                     dataKey="errors"

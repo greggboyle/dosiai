@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -64,7 +65,14 @@ import {
   Loader2,
 } from 'lucide-react'
 import type { PromptTemplate, PromptVariable, AIVendor, AIPurpose } from '@/lib/admin-types'
-import { updatePromptTemplate } from '@/app/admin/actions/platform'
+import {
+  activatePromptTemplate,
+  clonePromptDraftFromActive,
+  createPromptTemplate,
+  rollbackPromptTemplate,
+  updatePromptTemplate,
+  validatePromptTemplate,
+} from '@/app/admin/actions/platform'
 import { toast } from 'sonner'
 
 // Purpose labels
@@ -127,6 +135,7 @@ interface PromptsClientProps {
 }
 
 export function PromptsClient({ initialTemplates }: PromptsClientProps) {
+  const router = useRouter()
   const [templates, setTemplates] = React.useState<PromptTemplate[]>(initialTemplates)
   const [selectedTemplate, setSelectedTemplate] = React.useState<PromptTemplate | null>(initialTemplates[0] ?? null)
   const [filterPurpose, setFilterPurpose] = React.useState<string>('all')
@@ -144,6 +153,15 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
   const [rollbackOpen, setRollbackOpen] = React.useState(false)
   const [rollbackReason, setRollbackReason] = React.useState('')
   const [savingDraft, setSavingDraft] = React.useState(false)
+  const [creatingTemplate, setCreatingTemplate] = React.useState(false)
+  const [activating, setActivating] = React.useState(false)
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [newTemplateName, setNewTemplateName] = React.useState('')
+  const [newTemplatePurpose, setNewTemplatePurpose] = React.useState<AIPurpose>('sweep_buy')
+  const [newTemplateVendor, setNewTemplateVendor] = React.useState<AIVendor>('openai')
+  const [newTemplateContent, setNewTemplateContent] = React.useState('')
+  const [cloningDraft, setCloningDraft] = React.useState(false)
+  const [rollingBack, setRollingBack] = React.useState(false)
 
   const persistDraft = async () => {
     if (!selectedTemplate) return
@@ -195,23 +213,106 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
   })
 
   const handleRunTest = () => {
+    if (!selectedTemplate) return
     setIsRunningTest(true)
-    // Simulate API call
-    setTimeout(() => {
-      setTestResult(JSON.stringify({
-        items: [
-          {
-            title: "Acme Logistics announces partnership with Walmart",
-            source_url: "https://freightwaves.com/news/acme-walmart",
-            published_date: "2026-05-02",
-            competitors: ["Acme Logistics"],
-            summary: "Acme Logistics has signed a 3-year preferred carrier agreement with Walmart...",
-            confidence: "high"
-          }
-        ]
-      }, null, 2))
-      setIsRunningTest(false)
-    }, 2000)
+    setTestResult(null)
+    void validatePromptTemplate({
+      id: selectedTemplate.id,
+      variables: testInputs,
+      contentOverride: editedContent,
+    })
+      .then((res) => {
+        setTestResult(
+          JSON.stringify(
+            {
+              vendor: res.vendor,
+              model: res.model,
+              latencyMs: res.latencyMs,
+              usage: res.usage,
+              preview: res.preview,
+            },
+            null,
+            2
+          )
+        )
+      })
+      .catch((e) => {
+        setTestResult(`Validation failed: ${e instanceof Error ? e.message : 'Unknown error'}`)
+      })
+      .finally(() => setIsRunningTest(false))
+  }
+
+  const handleCreateTemplate = async () => {
+    if (!newTemplateName.trim() || !newTemplateContent.trim()) return
+    setCreatingTemplate(true)
+    try {
+      await createPromptTemplate({
+        name: newTemplateName.trim(),
+        purpose: newTemplatePurpose,
+        vendor: newTemplateVendor,
+        content: newTemplateContent,
+      })
+      toast.success('Template created')
+      setCreateOpen(false)
+      setNewTemplateName('')
+      setNewTemplateContent('')
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Create failed')
+    } finally {
+      setCreatingTemplate(false)
+    }
+  }
+
+  const handleDeployTemplate = async () => {
+    if (!selectedTemplate) return
+    setActivating(true)
+    try {
+      await activatePromptTemplate({
+        id: selectedTemplate.id,
+        reason: `Activated from operator console (${selectedTemplate.name})`,
+      })
+      toast.success('Template activated and deployed to 100%')
+      setDeployOpen(false)
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Deploy failed')
+    } finally {
+      setActivating(false)
+    }
+  }
+
+  const handleCloneDraft = async () => {
+    if (!selectedTemplate) return
+    setCloningDraft(true)
+    try {
+      await clonePromptDraftFromActive({
+        id: selectedTemplate.id,
+        note: `Draft cloned from active v${selectedTemplate.version}`,
+      })
+      toast.success('Draft cloned from active version')
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Clone failed')
+    } finally {
+      setCloningDraft(false)
+    }
+  }
+
+  const handleRollback = async () => {
+    if (!selectedTemplate || !rollbackReason.trim()) return
+    setRollingBack(true)
+    try {
+      await rollbackPromptTemplate({ id: selectedTemplate.id, reason: rollbackReason.trim() })
+      toast.success('Rollback completed')
+      setRollbackOpen(false)
+      setRollbackReason('')
+      router.refresh()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Rollback failed')
+    } finally {
+      setRollingBack(false)
+    }
   }
 
   return (
@@ -222,9 +323,9 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
         <div className="p-4 border-b border-slate-200">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-lg font-semibold text-slate-900">Prompt Templates</h1>
-            <Button size="sm" className="h-8">
+            <Button size="sm" className="h-8" onClick={() => setCreateOpen(true)}>
               <Plus className="mr-1 size-3" />
-              New version
+              New template
             </Button>
           </div>
           
@@ -437,6 +538,10 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
                     <Button variant="outline" size="sm" disabled={savingDraft} onClick={() => void persistDraft()}>
                       <Save className="mr-1 size-3" />
                       {savingDraft ? 'Saving…' : 'Save Draft'}
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={cloningDraft} onClick={() => void handleCloneDraft()}>
+                      <Plus className="mr-1 size-3" />
+                      {cloningDraft ? 'Cloning…' : 'Clone active to draft'}
                     </Button>
                     <Button size="sm" onClick={() => setDeployOpen(true)}>
                       <Rocket className="mr-1 size-3" />
@@ -677,9 +782,9 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeployOpen(false)}>Cancel</Button>
-            <Button onClick={() => setDeployOpen(false)}>
+            <Button onClick={() => void handleDeployTemplate()} disabled={activating}>
               <Rocket className="mr-2 size-4" />
-              Deploy to 100%
+              {activating ? 'Deploying…' : 'Deploy to 100%'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -708,14 +813,66 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
             <Button variant="outline" onClick={() => setRollbackOpen(false)}>Cancel</Button>
             <Button
               variant="destructive"
-              disabled={!rollbackReason.trim()}
-              onClick={() => {
-                setRollbackOpen(false)
-                setRollbackReason('')
-              }}
+              disabled={!rollbackReason.trim() || rollingBack}
+              onClick={() => void handleRollback()}
             >
               <RotateCcw className="mr-2 size-4" />
-              Roll back
+              {rollingBack ? 'Rolling back…' : 'Roll back'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create prompt template</DialogTitle>
+            <DialogDescription>
+              Create a new template and save as draft. You can deploy it after reviewing.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>Name</Label>
+              <Input value={newTemplateName} onChange={(e) => setNewTemplateName(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Purpose</Label>
+                <Select value={newTemplatePurpose} onValueChange={(v) => setNewTemplatePurpose(v as AIPurpose)}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(purposeLabels).map(([k, label]) => (
+                      <SelectItem key={k} value={k}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Vendor</Label>
+                <Select value={newTemplateVendor} onValueChange={(v) => setNewTemplateVendor(v as AIVendor)}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai">OpenAI</SelectItem>
+                    <SelectItem value="anthropic">Anthropic</SelectItem>
+                    <SelectItem value="xai">xAI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Template content</Label>
+              <Textarea
+                value={newTemplateContent}
+                onChange={(e) => setNewTemplateContent(e.target.value)}
+                className="mt-1 min-h-[180px] font-mono text-[12px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button onClick={() => void handleCreateTemplate()} disabled={creatingTemplate || !newTemplateName.trim() || !newTemplateContent.trim()}>
+              {creatingTemplate ? 'Creating…' : 'Create draft'}
             </Button>
           </DialogFooter>
         </DialogContent>
