@@ -13,6 +13,7 @@ import {
   Swords,
   TrendingUp,
   MessageSquare,
+  FolderOpen,
   Settings,
   ChevronDown,
   Plus,
@@ -72,6 +73,7 @@ const coreNavItems: NavItemConfig[] = [
 
 const moreNavItems: NavItemConfig[] = [
   { label: 'Topics', href: '/topics', icon: Hash },
+  { label: 'Resources', href: '/resources', icon: FolderOpen },
   {
     label: 'Briefs',
     href: '/briefs',
