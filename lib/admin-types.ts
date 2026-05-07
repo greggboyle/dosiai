@@ -100,6 +100,7 @@ export type AIPurpose =
   | 'embedding'
   | 'brief_drafting'
   | 'battle_card_interview'
+  | 'battle_card_draft'
 
 export interface AIRoutingRule {
   id: string

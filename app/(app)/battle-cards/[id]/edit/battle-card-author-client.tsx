@@ -25,6 +25,7 @@ import {
   updateBattleSectionContent,
 } from '@/lib/battle-cards/actions'
 import type { BattleCardSectionRow } from '@/lib/battle-cards/queries'
+import type { BattleCardGenerationRunRow, BattleCardRecommendationRow } from '@/lib/battle-cards/queries'
 import type { BattleCardSectionType } from '@/lib/types'
 
 export interface BattleCardAuthorClientProps {
@@ -34,6 +35,8 @@ export interface BattleCardAuthorClientProps {
   status: string
   freshnessScore: number | null
   sections: BattleCardSectionRow[]
+  recommendations: BattleCardRecommendationRow[]
+  latestGenerationRun: BattleCardGenerationRunRow | null
   readOnly: boolean
 }
 
@@ -44,6 +47,8 @@ export function BattleCardAuthorClient({
   status,
   freshnessScore,
   sections,
+  recommendations,
+  latestGenerationRun,
   readOnly,
 }: BattleCardAuthorClientProps) {
   const router = useRouter()
@@ -133,6 +138,11 @@ export function BattleCardAuthorClient({
           <h1 className="text-2xl font-semibold tracking-tight">{competitorName}</h1>
           <div className="flex flex-wrap gap-2 mt-2">
             <Badge variant={status === 'published' ? 'default' : 'secondary'}>{status}</Badge>
+            {latestGenerationRun ? (
+              <Badge variant="outline" className="capitalize">
+                AI Draft {latestGenerationRun.status}
+              </Badge>
+            ) : null}
             {freshnessScore !== null ? (
               <Badge variant="outline">
                 Freshness {freshnessScore}
@@ -166,6 +176,21 @@ export function BattleCardAuthorClient({
       </div>
 
       <Separator />
+
+      {recommendations.length > 0 ? (
+        <div className="rounded-lg border p-3">
+          <p className="text-xs font-medium">AI improvement suggestions</p>
+          <div className="mt-2 space-y-2">
+            {recommendations.slice(0, 6).map((rec) => (
+              <div key={rec.id} className="rounded-md border p-2">
+                <div className="text-xs text-muted-foreground capitalize">{rec.section_type.replaceAll('_', ' ')}</div>
+                <div className="text-sm">{rec.suggested_content}</div>
+                {rec.rationale ? <div className="text-xs text-muted-foreground mt-1">{rec.rationale}</div> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as BattleCardSectionType)}>
         <TabsList className="flex flex-wrap h-auto gap-1 justify-start">

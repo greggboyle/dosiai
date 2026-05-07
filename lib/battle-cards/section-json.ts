@@ -104,3 +104,28 @@ export function parseSectionContent(type: BattleCardSectionType, raw: unknown): 
     return fallback
   }
 }
+
+export function isSectionContentEmpty(type: BattleCardSectionType, raw: unknown): boolean {
+  const parsed = parseSectionContent(type, raw) as any
+  switch (type) {
+    case 'tldr':
+      return !parsed.theyPosition?.trim() && !parsed.weCounter?.trim() && !parsed.remember?.trim()
+    case 'why_we_win':
+    case 'why_they_win':
+      return !Array.isArray(parsed.bullets) || parsed.bullets.length === 0
+    case 'objections':
+      return !Array.isArray(parsed.pairs) || parsed.pairs.length === 0
+    case 'trap_setters':
+      return !Array.isArray(parsed.questions) || parsed.questions.length === 0
+    case 'proof_points':
+      return !Array.isArray(parsed.points) || parsed.points.length === 0
+    case 'pricing':
+      return !parsed.theirs?.trim() && !parsed.ours?.trim()
+    case 'recent_activity':
+      return !Array.isArray(parsed.items) || parsed.items.length === 0
+    case 'talk_tracks':
+      return !Array.isArray(parsed.tracks) || parsed.tracks.length === 0
+    default:
+      return true
+  }
+}

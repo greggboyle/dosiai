@@ -89,6 +89,7 @@ const purposeLabels: Record<AIPurpose, string> = {
   embedding: 'Embedding',
   brief_drafting: 'Brief Drafting',
   battle_card_interview: 'Battle Card Interview',
+  battle_card_draft: 'Battle Card Draft',
 }
 
 const vendorLabels: Record<AIVendor, string> = {

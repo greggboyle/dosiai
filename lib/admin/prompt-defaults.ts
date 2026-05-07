@@ -153,6 +153,46 @@ Rules:
       { name: 'json_shape', type: 'string', description: 'Expected output schema snippet.', example: 'Shape: {"bullets":[...]}' },
     ],
   },
+  {
+    purpose: 'battle_card_draft',
+    content: `You are generating a full sales battle card for competitor "{{competitor_name}}".
+
+Use only the provided context. If evidence is insufficient, return null for the fill and explain why in rationale.
+
+Resource context:
+{{resource_context}}
+
+Recent intelligence context:
+{{intel_context}}
+
+Current section content:
+{{existing_sections}}
+
+Return ONLY valid JSON (no markdown fences) with this shape:
+{
+  "results": [
+    {
+      "sectionType": "tldr|why_we_win|why_they_win|objections|trap_setters|proof_points|pricing|recent_activity|talk_tracks",
+      "fill": object|null,
+      "improvementSuggestion": string|null,
+      "rationale": "string",
+      "confidence": number,
+      "citations": [{"source":"string","quote":"string"}]
+    }
+  ]
+}
+
+Rules:
+- fill is used only when section is empty; it must match the exact section JSON schema.
+- If section is not empty, provide improvementSuggestion instead of overwriting.
+- Ground everything in provided context. No fabricated logos, pricing, funding, customer names, or timelines.`,
+    variables: [
+      { name: 'competitor_name', type: 'string', description: 'Competitor display name.', example: 'Acme Logistics' },
+      { name: 'resource_context', type: 'string', description: 'Selected resource excerpts.', example: '## Resource 1 ...' },
+      { name: 'intel_context', type: 'string', description: 'Recent intelligence excerpts.', example: '## Intel 1 ...' },
+      { name: 'existing_sections', type: 'string', description: 'Current card section JSON content.', example: '{"tldr":{"theyPosition":""}}' },
+    ],
+  },
 ]
 
 export function getEmbeddedPromptDefault(purpose: AIPurpose): EmbeddedPromptDefault | null {

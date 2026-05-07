@@ -3,6 +3,7 @@ import { trialWarningCheck } from '@/inngest/functions/trial-warning-check'
 import { refreshBattleCardRecentActivity } from '@/inngest/functions/refresh-battle-card-recent-activity'
 import { synthesizeBattleCardSection } from '@/inngest/functions/synthesize-battle-card-section'
 import { draftBrief } from '@/inngest/functions/draft-brief'
+import { draftBattleCard } from '@/inngest/functions/draft-battle-card'
 import { trialExpirationCheck } from '@/inngest/functions/trial-expiration-check'
 import { monthlyCostReset } from '@/inngest/functions/monthly-cost-reset'
 import { populateCompetitorProfile } from '@/inngest/functions/populate-competitor-profile'
@@ -21,6 +22,7 @@ export const functions = [
   synthesizeBattleCardSection,
   refreshBattleCardRecentActivity,
   draftBrief,
+  draftBattleCard,
   trialExpirationCheck,
   monthlyCostReset,
   populateCompetitorProfile,

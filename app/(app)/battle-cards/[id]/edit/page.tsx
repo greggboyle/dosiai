@@ -1,6 +1,11 @@
 import { notFound } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getBattleCardRow, listSections } from '@/lib/battle-cards/queries'
+import {
+  getBattleCardRow,
+  getLatestGenerationRun,
+  listOpenRecommendations,
+  listSections,
+} from '@/lib/battle-cards/queries'
 import { BattleCardAuthorClient } from './battle-card-author-client'
 
 export default async function BattleCardEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,6 +33,10 @@ export default async function BattleCardEditPage({ params }: { params: Promise<{
   const { data: competitor } = await supabase.from('competitor').select('name').eq('id', card.competitor_id).single()
 
   const sections = await listSections(id)
+  const [recommendations, latestRun] = await Promise.all([
+    listOpenRecommendations(id),
+    getLatestGenerationRun(id),
+  ])
 
   const { data: workspace } = await supabase.from('workspace').select('status').eq('id', member.workspace_id).single()
 
@@ -39,6 +48,8 @@ export default async function BattleCardEditPage({ params }: { params: Promise<{
       status={card.status}
       freshnessScore={card.freshness_score}
       sections={sections}
+      recommendations={recommendations}
+      latestGenerationRun={latestRun}
       readOnly={workspace?.status === 'read_only'}
     />
   )

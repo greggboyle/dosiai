@@ -76,6 +76,67 @@ export async function createBattleCardFromForm(formData: FormData): Promise<void
   redirect(`/battle-cards/${id}/interview`)
 }
 
+export async function createBattleCardAiDraftFromForm(formData: FormData): Promise<void> {
+  const competitorId = formData.get('competitorId')
+  if (typeof competitorId !== 'string' || !competitorId) throw new Error('Missing competitor')
+  const includeIntel = formData.get('includeIntel') === 'on'
+  const selectedResourceIds = formData
+    .getAll('resourceDocumentIds')
+    .filter((v): v is string => typeof v === 'string' && v.length > 0)
+
+  const ctx = await requireAnalystWorkspace()
+  const supabase = await createSupabaseServerClient()
+  let validResourceIds: string[] = []
+  if (selectedResourceIds.length > 0) {
+    const { data: resourceRows } = await supabase
+      .from('resource_document' as any)
+      .select('id,status,approved_for_ai')
+      .eq('workspace_id', ctx.workspaceId)
+      .in('id', selectedResourceIds)
+    validResourceIds = (resourceRows ?? [])
+      .filter((r: any) => r.status === 'ready' && r.approved_for_ai !== false)
+      .map((r: any) => String(r.id))
+  }
+
+  const battleCardId = await createBattleCard(competitorId)
+  const { data: run, error: runErr } = await supabase
+    .from('battle_card_generation_run' as any)
+    .insert({
+      workspace_id: ctx.workspaceId,
+      battle_card_id: battleCardId,
+      created_by: ctx.userId,
+      routing_purpose: 'battle_card_draft',
+      status: 'queued',
+      include_intel: includeIntel,
+      selected_resource_ids: validResourceIds,
+      input_snapshot: {
+        competitorId,
+        includeIntel,
+        selectedResourceIds: validResourceIds,
+      },
+    } as any)
+    .select('id')
+    .single()
+  if (runErr || !run?.id) throw runErr ?? new Error('Failed to queue AI draft run')
+
+  await inngest.send({
+    name: 'battle-card/draft-requested',
+    data: {
+      runId: run.id as string,
+      workspaceId: ctx.workspaceId,
+      battleCardId,
+      competitorId,
+      includeIntel,
+      selectedResourceIds: validResourceIds,
+      requestedBy: ctx.userId,
+    },
+  })
+
+  revalidatePath('/battle-cards')
+  revalidatePath(`/battle-cards/${battleCardId}/edit`)
+  redirect(`/battle-cards/${battleCardId}/edit`)
+}
+
 export async function createBattleCard(competitorId: string): Promise<string> {
   const ctx = await requireAnalystWorkspace()
   if (ctx.workspaceStatus === 'read_only') throw new Error('Workspace is read-only')

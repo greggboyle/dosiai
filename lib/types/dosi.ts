@@ -63,6 +63,7 @@ export type AiPurpose =
   | 'embedding'
   | 'brief_drafting'
   | 'battle_card_interview'
+  | 'battle_card_draft'
 
 export interface AiRoutingRuleRow {
   vendor: AiVendor

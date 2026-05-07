@@ -7,6 +7,8 @@ import type { BattleCardSectionType } from '@/lib/types'
 
 export type BattleCardRow = Database['public']['Tables']['battle_card']['Row']
 export type BattleCardSectionRow = Database['public']['Tables']['battle_card_section']['Row']
+export type BattleCardRecommendationRow = Database['public']['Tables']['battle_card_section_recommendation']['Row']
+export type BattleCardGenerationRunRow = Database['public']['Tables']['battle_card_generation_run']['Row']
 
 export async function getBattleCardRow(id: string): Promise<BattleCardRow | null> {
   const supabase = await createSupabaseServerClient()
@@ -83,4 +85,30 @@ export function parseAllSectionContents(rows: BattleCardSectionRow[]) {
 export function orderedSectionTypesPresent(rows: BattleCardSectionRow[]): BattleCardSectionType[] {
   const have = new Set(rows.map((r) => r.section_type as BattleCardSectionType))
   return BATTLE_SECTION_ORDER.filter((t) => have.has(t))
+}
+
+export async function listOpenRecommendations(battleCardId: string): Promise<BattleCardRecommendationRow[]> {
+  const supabase = await createSupabaseServerClient()
+  const { data, error } = await supabase
+    .from('battle_card_section_recommendation')
+    .select('*')
+    .eq('battle_card_id', battleCardId)
+    .eq('status', 'open')
+    .order('created_at', { ascending: false })
+    .limit(20)
+  if (error) throw error
+  return data ?? []
+}
+
+export async function getLatestGenerationRun(battleCardId: string): Promise<BattleCardGenerationRunRow | null> {
+  const supabase = await createSupabaseServerClient()
+  const { data, error } = await supabase
+    .from('battle_card_generation_run')
+    .select('*')
+    .eq('battle_card_id', battleCardId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data
 }

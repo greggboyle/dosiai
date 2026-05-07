@@ -92,6 +92,7 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
   embedding: { name: 'embedding', description: 'Embedding model (proximity, dedup, competitor matching)' },
   brief_drafting: { name: 'brief_drafting', description: 'AI-drafted brief generation' },
   battle_card_interview: { name: 'battle_card_interview', description: 'Battle card interview-driven build' },
+  battle_card_draft: { name: 'battle_card_draft', description: 'AI draft generation for full battle cards' },
 }
 
 const basePurposeConfigs: AIPurposeConfig[] = (Object.entries(purposeInfo) as Array<

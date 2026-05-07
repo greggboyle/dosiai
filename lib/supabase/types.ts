@@ -12,6 +12,7 @@ export type AiPurposeDb =
   | 'embedding'
   | 'brief_drafting'
   | 'battle_card_interview'
+  | 'battle_card_draft'
 
 export type AiVendorDb = 'openai' | 'anthropic' | 'xai'
 
@@ -781,6 +782,78 @@ export interface Database {
           gap_count?: number
         }
         Update: Partial<Database['public']['Tables']['battle_card_section']['Insert']>
+      }
+      battle_card_generation_run: {
+        Row: {
+          id: string
+          workspace_id: string
+          battle_card_id: string
+          created_by: string | null
+          routing_purpose: AiPurposeDb
+          vendor: AiVendorDb | null
+          model: string | null
+          status: 'queued' | 'processing' | 'ready' | 'failed'
+          include_intel: boolean
+          selected_resource_ids: string[]
+          input_snapshot: Json
+          output_snapshot: Json | null
+          error: string | null
+          created_at: string
+          updated_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          battle_card_id: string
+          created_by?: string | null
+          routing_purpose?: AiPurposeDb
+          vendor?: AiVendorDb | null
+          model?: string | null
+          status?: 'queued' | 'processing' | 'ready' | 'failed'
+          include_intel?: boolean
+          selected_resource_ids?: string[]
+          input_snapshot?: Json
+          output_snapshot?: Json | null
+          error?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['battle_card_generation_run']['Insert']>
+      }
+      battle_card_section_recommendation: {
+        Row: {
+          id: string
+          workspace_id: string
+          battle_card_id: string
+          battle_card_section_id: string
+          run_id: string
+          section_type: string
+          suggested_content: string
+          rationale: string | null
+          citations: Json
+          confidence: number | null
+          status: 'open' | 'accepted' | 'dismissed'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          battle_card_id: string
+          battle_card_section_id: string
+          run_id: string
+          section_type: string
+          suggested_content: string
+          rationale?: string | null
+          citations?: Json
+          confidence?: number | null
+          status?: 'open' | 'accepted' | 'dismissed'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['battle_card_section_recommendation']['Insert']>
       }
       battle_card_share_link: {
         Row: {
