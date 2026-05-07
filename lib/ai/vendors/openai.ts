@@ -24,16 +24,14 @@ export function createOpenAiClient(modelDefault: string): AiVendorClient {
       let lastErr: unknown
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
-          const completion = await client.chat.completions.create({
+          const response = await client.responses.create({
             model,
-            messages: [{ role: 'user', content: input.prompt }],
-            max_tokens: input.maxTokens ?? 4096,
-            ...(input.responseSchema
-              ? { response_format: { type: 'json_object' as const } }
-              : {}),
+            input: input.prompt,
+            max_output_tokens: input.maxTokens ?? 4096,
+            ...(input.webSearch ? { tools: [{ type: 'web_search_preview' as const }] } : {}),
           })
-          const text = completion.choices[0]?.message?.content ?? ''
-          const usage = completion.usage
+          const text = extractResponseText(response as unknown as Record<string, unknown>)
+          const usage = (response as unknown as { usage?: { input_tokens?: number; output_tokens?: number } }).usage
           let parsed: unknown
           if (input.responseSchema) {
             const json = parseJsonFromLlmText(text)
@@ -47,10 +45,10 @@ export function createOpenAiClient(modelDefault: string): AiVendorClient {
             content: text,
             parsed,
             usage: {
-              inputTokens: usage?.prompt_tokens ?? 0,
-              outputTokens: usage?.completion_tokens ?? 0,
+              inputTokens: usage?.input_tokens ?? 0,
+              outputTokens: usage?.output_tokens ?? 0,
             },
-            rawResponse: completion,
+            rawResponse: response,
           }
         } catch (e: unknown) {
           lastErr = e
@@ -83,4 +81,24 @@ export function createOpenAiClient(modelDefault: string): AiVendorClient {
       }
     },
   }
+}
+
+function extractResponseText(payload: Record<string, unknown>): string {
+  const outputText = payload.output_text
+  if (typeof outputText === 'string' && outputText.trim()) return outputText
+
+  const output = payload.output
+  if (!Array.isArray(output)) return ''
+  const chunks: string[] = []
+  for (const o of output) {
+    if (!o || typeof o !== 'object') continue
+    const content = (o as { content?: unknown }).content
+    if (!Array.isArray(content)) continue
+    for (const c of content) {
+      if (!c || typeof c !== 'object') continue
+      const text = (c as { text?: unknown }).text
+      if (typeof text === 'string' && text.trim()) chunks.push(text)
+    }
+  }
+  return chunks.join('\n').trim()
 }

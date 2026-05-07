@@ -10,7 +10,6 @@ import { buildPromptTemplateName, getEmbeddedPromptDefault } from '@/lib/admin/p
 import { getVendorClient } from '@/lib/ai/factory'
 import { getRoutingFor } from '@/lib/ai/router'
 import { sweepAiResponseSchema, type ParsedSweepItem } from '@/lib/sweep/schemas'
-import { dedupeSourcesByUrl, formatSourcesBlock, retrieveWebSourcesForSweepPassDetailed } from '@/lib/ai/retrieval'
 import { validateSweepItemSources } from '@/lib/sweep/validate-sources'
 
 export async function listAiRoutingConfigs() {
@@ -307,15 +306,6 @@ export async function simulateSweepBuyTemplate(input: {
   const competitorLines = input.variables.competitor_lines ?? '(none)'
   const topicLines = input.variables.topic_lines ?? '(none)'
 
-  const retrieval = await retrieveWebSourcesForSweepPassDetailed({
-    purpose: 'sweep_buy',
-    queries: ['buy market updates', competitorLines.replace(/\n/g, ' '), topicLines.replace(/\n/g, ' ')],
-    maxResults: 25,
-  })
-  const sources = dedupeSourcesByUrl(retrieval.sources)
-  const webGroundedSweepsEnabled = process.env.WEB_GROUNDED_SWEEPS === '1'
-  const enforceAllowlist = webGroundedSweepsEnabled && sources.length > 0
-
   const template = input.contentOverride?.trim() || row.draft_content || row.content
   const prompt = interpolatePrompt(template, {
     ...input.variables,
@@ -323,7 +313,6 @@ export async function simulateSweepBuyTemplate(input: {
     company_summary: companySummary,
     competitor_lines: competitorLines,
     topic_lines: topicLines,
-    sources_block: formatSourcesBlock(sources),
   })
 
   const providerResults: Array<Record<string, unknown>> = []
@@ -334,6 +323,7 @@ export async function simulateSweepBuyTemplate(input: {
       const out = await client.complete({
         prompt,
         responseSchema: sweepAiResponseSchema,
+        webSearch: true,
         maxTokens: 4096,
       })
       const parsed = out.parsed ? sweepAiResponseSchema.safeParse(out.parsed) : null
@@ -342,8 +332,7 @@ export async function simulateSweepBuyTemplate(input: {
           ? parsed.data.items.map((it) => ({ ...it, category: it.category ?? 'buy-side' }))
           : []
       const validated = validateSweepItemSources(items, {
-        enforceRetrievedSourceMembership: enforceAllowlist,
-        allowedSources: sources,
+        enforceRetrievedSourceMembership: false,
       })
 
       providerResults.push({
@@ -376,11 +365,7 @@ export async function simulateSweepBuyTemplate(input: {
       activeRules: routing.activeRules,
     },
     retrieval: {
-      webGroundedSweepsEnabled,
-      sourcesCount: sources.length,
-      enforceAllowlist,
-      sourceUrls: sources.map((s) => s.url).slice(0, 25),
-      diagnostics: retrieval.diagnostics,
+      webSearchEnabled: true,
     },
     providerResults,
   }
@@ -507,7 +492,7 @@ export async function seedPromptTemplatesFromCode() {
     }
   }
 
-  // Keep sweep variable metadata aligned with embedded defaults (sources_block and future additions).
+  // Keep sweep variable metadata aligned with embedded defaults.
   const sweepPurposes: AIPurpose[] = [
     'sweep_buy',
     'sweep_sell',

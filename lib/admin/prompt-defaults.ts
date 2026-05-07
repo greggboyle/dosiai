@@ -18,14 +18,10 @@ Tracked competitors:
 Active topics:
 {{topic_lines}}
 
-Retrieved web sources for this run (authoritative citation allowlist):
-{{sources_block}}
-
 Each item must include: title, summary, confidence (low|medium|high), confidenceReason, category as exactly one of the strings "buy-side", "sell-side", "channel", or "regulatory" (no other labels), sourceUrls (array of {name,url,domain}), optional fiveWH as an object {"who","what","when","where","why","how"} strings or omit entirely (never a bare string), optional eventAt ISO string, optional sourceType, optional relatedCompetitorNames (string[]), optional entitiesMentioned ([{name}]).
 
 Grounding rules (mandatory):
 - Do not fabricate events, quotes, funding, releases, partnerships, or URLs. Every concrete factual claim in title or summary must be traceable to real public information; include at least one credible sourceUrls entry with a real https URL that would plausibly support the claim.
-- Cite only URLs present in Retrieved web sources when that block is populated. If a claim cannot be supported by an allowlisted source URL, omit the item.
 - If you cannot cite verifiable sources for an item, omit that item. If nothing qualifies for this purpose, return {"items":[]}.
 - Prefer fewer, well-sourced items over padding the list. Use confidence "low" and explain gaps or weak evidence in confidenceReason when appropriate.
 - Never use placeholder, example, or obviously fake domains.`
@@ -52,12 +48,6 @@ const SWEEP_VARIABLES: PromptVariable[] = [
     description: 'Active topic lines for current workspace.',
     example: '- Pricing trends: quarterly packaging shifts',
   },
-  {
-    name: 'sources_block',
-    type: 'string',
-    description: 'Retrieved source allowlist block for this run.',
-    example: '### Source 1\n- title: ...\n- domain: ...\n- url: https://...',
-  },
 ]
 
 const SWEEP_SELF_VARIABLES: PromptVariable[] = [
@@ -80,12 +70,6 @@ const SWEEP_SELF_VARIABLES: PromptVariable[] = [
     type: 'string',
     description: 'JSON object of known social handles (stringified).',
     example: '{"twitter":"exampleco"}',
-  },
-  {
-    name: 'sources_block',
-    type: 'string',
-    description: 'Retrieved source allowlist block for this run.',
-    example: '### Source 1\n- title: ...\n- domain: ...\n- url: https://...',
   },
 ]
 

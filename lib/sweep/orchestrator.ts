@@ -17,12 +17,6 @@ import { shouldAutoRefreshTrialOnFirstSweep } from '@/lib/competitors/profile-re
 import { getActivePromptTemplateFor, renderPromptTemplate } from '@/lib/ai/prompt-template'
 import { SWEEP_SHARED_PROMPT_TEMPLATE } from '@/lib/admin/prompt-defaults'
 import { SWEEP_SELF_PROMPT_TEMPLATE } from '@/lib/sweep/self-prompt-template'
-import {
-  dedupeSourcesByUrl,
-  formatSourcesBlock,
-  retrieveWebSourcesForSweepPass,
-  type WebSource,
-} from '@/lib/ai/retrieval'
 import { validateSweepItemSources } from '@/lib/sweep/validate-sources'
 
 export interface OrchestrateSweepInput {
@@ -67,24 +61,12 @@ async function runCategoryPrompt(
   companySummary: string,
   competitorLines: string,
   topicLines: string
-): Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[]; sources: WebSource[] }> {
+): Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[] }> {
   const purpose = categoryToPurpose(cat)
   const routing = await getRoutingFor(purpose)
 
   const vendorCallIds: string[] = []
   const merged: ParsedSweepItem[] = []
-  const sources = dedupeSourcesByUrl(
-    await retrieveWebSourcesForSweepPass({
-      purpose,
-      queries: [
-        `${cat} market updates`,
-        competitorLines.replace(/\n/g, ' '),
-        topicLines.replace(/\n/g, ' '),
-      ],
-      maxResults: 25,
-    })
-  )
-  const sourcesBlock = formatSourcesBlock(sources)
 
   for (const rule of routing.activeRules) {
     const { prompt, promptTemplateId, promptTemplateVersion } = await renderSweepAiPrompt({
@@ -96,7 +78,6 @@ async function runCategoryPrompt(
         company_summary: companySummary,
         competitor_lines: competitorLines,
         topic_lines: topicLines,
-        sources_block: sourcesBlock,
       },
     })
     const client = getVendorClient(rule.vendor, rule.model)
@@ -105,6 +86,7 @@ async function runCategoryPrompt(
       const res = await client.complete({
         prompt,
         responseSchema: sweepAiResponseSchema,
+        webSearch: true,
         maxTokens: 4096,
       })
       const usage = res.usage
@@ -150,7 +132,7 @@ async function runCategoryPrompt(
     }
   }
 
-  return { items: merged, vendorCallIds, sources }
+  return { items: merged, vendorCallIds }
 }
 
 function enforceCategory(
@@ -187,16 +169,15 @@ async function runTopicsPass(
   topics: { id: string; name: string; description: string | null; seeds: string[] }[],
   companySummary: string,
   competitorLines: string
-): Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[]; sources: WebSource[] }> {
-  if (topics.length === 0) return { items: [], vendorCallIds: [], sources: [] }
+): Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[] }> {
+  if (topics.length === 0) return { items: [], vendorCallIds: [] }
   const purpose: AiPurposeDb = 'sweep_topic'
   const routing = await getRoutingFor(purpose)
   const vendorCallIds: string[] = []
   const merged: ParsedSweepItem[] = []
 
   const primaryRule = routing.activeRules[0]
-  if (!primaryRule) return { items: [], vendorCallIds: [], sources: [] }
-  const allSources: WebSource[] = []
+  if (!primaryRule) return { items: [], vendorCallIds: [] }
 
   const topicTemplateRow = await getActivePromptTemplateFor('sweep_topic', primaryRule.vendor as AiVendorDb)
   const topicPromptBody = topicTemplateRow?.content?.trim()
@@ -207,26 +188,18 @@ async function runTopicsPass(
 
   for (const topic of topics) {
     const seedText = topic.seeds.length > 0 ? topic.seeds.join(', ') : '(none)'
-    const sources = dedupeSourcesByUrl(
-      await retrieveWebSourcesForSweepPass({
-        purpose,
-        queries: [topic.name, topic.description ?? '', seedText, competitorLines.replace(/\n/g, ' ')],
-        maxResults: 20,
-      })
-    )
-    allSources.push(...sources)
     const prompt = renderPromptTemplate(topicPromptBody, {
       purpose,
       company_summary: companySummary,
       competitor_lines: competitorLines,
       topic_lines: `Topic: ${topic.name}\n${topic.description ?? ''}\nSeeds: ${seedText}`,
-      sources_block: formatSourcesBlock(sources),
     })
     const client = getVendorClient(primaryRule.vendor, primaryRule.model)
     const started = Date.now()
     const res = await client.complete({
       prompt,
       responseSchema: sweepAiResponseSchema,
+      webSearch: true,
       maxTokens: 4096,
     })
     const cost = estimateCallCostCents(primaryRule.model, res.usage.inputTokens, res.usage.outputTokens)
@@ -252,7 +225,7 @@ async function runTopicsPass(
       }
     }
   }
-  return { items: merged, vendorCallIds, sources: dedupeSourcesByUrl(allSources) }
+  return { items: merged, vendorCallIds }
 }
 
 async function runSelfPass(
@@ -260,10 +233,10 @@ async function runSelfPass(
   plan: WorkspacePlan,
   sweepId: string,
   profile: Record<string, unknown> | null
-): Promise<{ items: RawSweepItem[]; vendorCallIds: string[]; sources: WebSource[] }> {
+): Promise<{ items: RawSweepItem[]; vendorCallIds: string[] }> {
   const legalName = String(profile?.legal_name ?? profile?.company_name ?? '').trim()
   const primaryUrl = String(profile?.primary_url ?? profile?.company_website ?? '').trim()
-  if (!legalName || !primaryUrl) return { items: [], vendorCallIds: [], sources: [] }
+  if (!legalName || !primaryUrl) return { items: [], vendorCallIds: [] }
 
   const productNames = Array.isArray(profile?.product_names)
     ? (profile?.product_names as string[]).map((v) => String(v).trim()).filter(Boolean)
@@ -278,13 +251,6 @@ async function runSelfPass(
 
   const purpose: AiPurposeDb = 'sweep_self'
   const routing = await getRoutingFor(purpose)
-  const sources = dedupeSourcesByUrl(
-    await retrieveWebSourcesForSweepPass({
-      purpose,
-      queries: [legalName, primaryUrl, productNames.join(', '), brandAliases.join(', ')],
-      maxResults: 25,
-    })
-  )
 
   const vendorCallIds: string[] = []
   const merged: RawSweepItem[] = []
@@ -300,7 +266,6 @@ async function runSelfPass(
         product_names: productNames.join(', ') || '(none)',
         brand_aliases: brandAliases.join(', ') || '(none)',
         social_handles_json: JSON.stringify(socialHandles),
-        sources_block: formatSourcesBlock(sources),
       },
     })
     const client = getVendorClient(rule.vendor, rule.model)
@@ -309,6 +274,7 @@ async function runSelfPass(
       const res = await client.complete({
         prompt,
         responseSchema: sweepAiResponseSchema,
+        webSearch: true,
         maxTokens: 4096,
       })
       const usage = res.usage
@@ -354,7 +320,7 @@ async function runSelfPass(
     }
   }
 
-  return { items: merged, vendorCallIds, sources }
+  return { items: merged, vendorCallIds }
 }
 
 function applyBrandAliasMatching(items: RawSweepItem[], profile: Record<string, unknown> | null): RawSweepItem[] {
@@ -468,7 +434,6 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
   }
 
   const scoringWeights = (ws.scoring_weights as Record<string, number> | null) ?? {}
-  const webGroundedSweepsEnabled = process.env.WEB_GROUNDED_SWEEPS === '1'
 
   const sweepCtxBase: Omit<SweepContext, 'workspaceId' | 'plan'> = {
     companyEmbedding: profileVecs.company,
@@ -511,20 +476,9 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
 
     const selfPassResult = await runSelfPass(input.workspaceId, plan, sweepId, profile as Record<string, unknown> | null)
 
-    const categoryValidations = catResults.map((r) =>
-      validateSweepItemSources(r.items, {
-        enforceRetrievedSourceMembership: webGroundedSweepsEnabled && r.sources.length > 0,
-        allowedSources: r.sources,
-      })
-    )
-    const selfValidation = validateSweepItemSources(selfPassResult.items, {
-      enforceRetrievedSourceMembership: webGroundedSweepsEnabled && selfPassResult.sources.length > 0,
-      allowedSources: selfPassResult.sources,
-    })
-    const topicValidation = validateSweepItemSources(topicPassResult.items, {
-      enforceRetrievedSourceMembership: webGroundedSweepsEnabled && topicPassResult.sources.length > 0,
-      allowedSources: topicPassResult.sources,
-    })
+    const categoryValidations = catResults.map((r) => validateSweepItemSources(r.items))
+    const selfValidation = validateSweepItemSources(selfPassResult.items)
+    const topicValidation = validateSweepItemSources(topicPassResult.items)
 
     let rawItems: RawSweepItem[] = [
       ...categoryValidations.flatMap((v) => v.kept),
@@ -671,7 +625,6 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
         sweepId,
         rejectedBadUrl,
         rejectedUnknownUrl,
-        webGroundedSweepsEnabled,
       })
     }
 
