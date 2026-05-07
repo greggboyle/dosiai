@@ -8,6 +8,10 @@ import type { VendorAggregateRow, WorkspaceCostRow } from '@/lib/admin/platform-
 import type { AIPurpose, AIVendor, PromptVariable } from '@/lib/admin-types'
 import { buildPromptTemplateName, getEmbeddedPromptDefault } from '@/lib/admin/prompt-defaults'
 import { getVendorClient } from '@/lib/ai/factory'
+import { getRoutingFor } from '@/lib/ai/router'
+import { sweepAiResponseSchema, type ParsedSweepItem } from '@/lib/sweep/schemas'
+import { dedupeSourcesByUrl, formatSourcesBlock, retrieveWebSourcesForSweepPass } from '@/lib/ai/retrieval'
+import { validateSweepItemSources } from '@/lib/sweep/validate-sources'
 
 export async function listAiRoutingConfigs() {
   await requireOperatorAdminOrOwner()
@@ -283,6 +287,100 @@ export async function validatePromptTemplate(input: {
     latencyMs,
     usage: out.usage,
     preview: out.content.slice(0, 2000),
+  }
+}
+
+export async function simulateSweepBuyTemplate(input: {
+  id: string
+  variables: Record<string, string>
+  contentOverride?: string
+}) {
+  await requireOperatorAdminOrOwner()
+  const admin = createSupabaseAdminClient()
+  const { data: row, error } = await admin.from('prompt_template').select('*').eq('id', input.id).single()
+  if (error || !row) throw error ?? new Error('Template not found')
+  if (row.purpose !== 'sweep_buy') throw new Error('Sweep simulation only supported for sweep_buy in this mode')
+
+  const routing = await getRoutingFor('sweep_buy')
+  const companySummary = input.variables.company_summary ?? '(none)'
+  const competitorLines = input.variables.competitor_lines ?? '(none)'
+  const topicLines = input.variables.topic_lines ?? '(none)'
+
+  const sources = dedupeSourcesByUrl(
+    await retrieveWebSourcesForSweepPass({
+      purpose: 'sweep_buy',
+      queries: ['buy market updates', competitorLines.replace(/\n/g, ' '), topicLines.replace(/\n/g, ' ')],
+      maxResults: 25,
+    })
+  )
+  const webGroundedSweepsEnabled = process.env.WEB_GROUNDED_SWEEPS === '1'
+  const enforceAllowlist = webGroundedSweepsEnabled && sources.length > 0
+
+  const template = input.contentOverride?.trim() || row.draft_content || row.content
+  const prompt = interpolatePrompt(template, {
+    ...input.variables,
+    purpose: 'sweep_buy',
+    company_summary: companySummary,
+    competitor_lines: competitorLines,
+    topic_lines: topicLines,
+    sources_block: formatSourcesBlock(sources),
+  })
+
+  const providerResults: Array<Record<string, unknown>> = []
+  for (const rule of routing.activeRules) {
+    const client = getVendorClient(rule.vendor, rule.model)
+    const started = Date.now()
+    try {
+      const out = await client.complete({
+        prompt,
+        responseSchema: sweepAiResponseSchema,
+        maxTokens: 4096,
+      })
+      const parsed = out.parsed ? sweepAiResponseSchema.safeParse(out.parsed) : null
+      const items: ParsedSweepItem[] =
+        parsed?.success
+          ? parsed.data.items.map((it) => ({ ...it, category: it.category ?? 'buy-side' }))
+          : []
+      const validated = validateSweepItemSources(items, {
+        enforceRetrievedSourceMembership: enforceAllowlist,
+        allowedSources: sources,
+      })
+
+      providerResults.push({
+        vendor: rule.vendor,
+        model: rule.model,
+        latencyMs: Date.now() - started,
+        usage: out.usage,
+        parsedItemCount: items.length,
+        keptItemCount: validated.kept.length,
+        rejectedBadUrl: validated.rejectedBadUrl,
+        rejectedUnknownUrl: validated.rejectedUnknownUrl,
+        keptItemsPreview: validated.kept.slice(0, 10),
+      })
+    } catch (e) {
+      providerResults.push({
+        vendor: rule.vendor,
+        model: rule.model,
+        error: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
+  return {
+    mode: 'sweep_buy_simulation',
+    routing: {
+      mode: routing.mode,
+      primaryVendor: routing.vendor,
+      primaryModel: routing.model,
+      activeRules: routing.activeRules,
+    },
+    retrieval: {
+      webGroundedSweepsEnabled,
+      sourcesCount: sources.length,
+      enforceAllowlist,
+      sourceUrls: sources.map((s) => s.url).slice(0, 25),
+    },
+    providerResults,
   }
 }
 

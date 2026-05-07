@@ -70,6 +70,7 @@ import {
   clonePromptDraftFromActive,
   createPromptTemplate,
   rollbackPromptTemplate,
+  simulateSweepBuyTemplate,
   updatePromptTemplate,
   validatePromptTemplate,
 } from '@/app/admin/actions/platform'
@@ -250,25 +251,32 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
     if (!selectedTemplate) return
     setIsRunningTest(true)
     setTestResult(null)
-    void validatePromptTemplate({
-      id: selectedTemplate.id,
-      variables: testInputs,
-      contentOverride: editedContent,
-    })
+    const runner =
+      selectedTemplate.purpose === 'sweep_buy'
+        ? simulateSweepBuyTemplate({
+            id: selectedTemplate.id,
+            variables: testInputs,
+            contentOverride: editedContent,
+          })
+        : validatePromptTemplate({
+            id: selectedTemplate.id,
+            variables: testInputs,
+            contentOverride: editedContent,
+          })
+    void runner
       .then((res) => {
-        setTestResult(
-          JSON.stringify(
-            {
-              vendor: res.vendor,
-              model: res.model,
-              latencyMs: res.latencyMs,
-              usage: res.usage,
-              preview: res.preview,
-            },
-            null,
-            2
-          )
-        )
+        if (selectedTemplate.purpose === 'sweep_buy') {
+          setTestResult(JSON.stringify(res, null, 2))
+          return
+        }
+        const standard = res as {
+          vendor: string
+          model: string
+          latencyMs: number
+          usage: unknown
+          preview: string
+        }
+        setTestResult(JSON.stringify(standard, null, 2))
       })
       .catch((e) => {
         setTestResult(`Validation failed: ${e instanceof Error ? e.message : 'Unknown error'}`)
