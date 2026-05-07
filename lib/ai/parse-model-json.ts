@@ -4,8 +4,7 @@
  */
 export function parseJsonFromLlmText(text: string): unknown {
   const trimmed = text.trim()
-  const fenced = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)```/i)
-  const payload = fenced ? fenced[1].trim() : trimmed
+  const payload = stripCommonFencing(trimmed)
 
   let firstErr: unknown
   try {
@@ -24,6 +23,18 @@ export function parseJsonFromLlmText(text: string): unknown {
   }
   if (firstErr instanceof Error) throw firstErr
   throw new SyntaxError('Could not parse JSON from model output')
+}
+
+function stripCommonFencing(s: string): string {
+  // Proper fenced block
+  const fenced = s.match(/```(?:json)?\s*\n?([\s\S]*?)```/i)
+  if (fenced) return fenced[1].trim()
+
+  // Unclosed opening fence: remove opening marker and parse remainder.
+  const withoutOpenFence = s.replace(/^```(?:json)?\s*/i, '').trim()
+  // Optional trailing fence only.
+  const withoutAnyFence = withoutOpenFence.replace(/```$/i, '').trim()
+  return withoutAnyFence
 }
 
 function extractBalancedJsonValue(s: string, openChar: '{' | '['): string | null {
