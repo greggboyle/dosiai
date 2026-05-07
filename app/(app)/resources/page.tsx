@@ -5,9 +5,18 @@ import { Button } from '@/components/ui/button'
 import { Upload, FolderOpen, FileText, BookOpen, Download } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { uploadResource } from '@/lib/resources/actions'
-import { listWorkspaceResources } from '@/lib/resources/storage'
+import { retryResourceProcessing, uploadResource } from '@/lib/resources/actions'
+import { listWorkspaceResourceDocuments, type ResourceDocumentStatus } from '@/lib/resources/storage'
 import { formatRelativeLabel } from '@/lib/dashboard/queries'
+
+const statusTone: Record<ResourceDocumentStatus, string> = {
+  uploaded: 'text-muted-foreground',
+  queued: 'text-amber-600 dark:text-amber-400',
+  processing: 'text-blue-600 dark:text-blue-400',
+  ready: 'text-positive',
+  failed: 'text-negative',
+  archived: 'text-muted-foreground',
+}
 
 export default async function ResourcesPage() {
   const workspaceId = await getWorkspaceIdForUser()
@@ -27,7 +36,7 @@ export default async function ResourcesPage() {
     .limit(1)
     .maybeSingle()
   const canUpload = member?.role === 'admin' || member?.role === 'analyst'
-  const resources = await listWorkspaceResources(workspaceId)
+  const resources = await listWorkspaceResourceDocuments(workspaceId)
 
   return (
     <div className="space-y-6 p-6">
@@ -112,15 +121,29 @@ export default async function ResourcesPage() {
                       {(resource.sizeBytes / 1024).toFixed(1)} KB
                       {resource.updatedAt ? ` · Updated ${formatRelativeLabel(resource.updatedAt)}` : ''}
                     </p>
+                    <p className={`text-xs capitalize ${statusTone[resource.status]}`}>{resource.status}</p>
+                    {resource.lastError ? (
+                      <p className="text-xs text-negative">Error: {resource.lastError}</p>
+                    ) : null}
                   </div>
-                  {resource.signedUrl ? (
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={resource.signedUrl} target="_blank" rel="noopener noreferrer">
-                        <Download className="mr-2 size-3.5" />
-                        Open
-                      </a>
-                    </Button>
-                  ) : null}
+                  <div className="flex items-center gap-2">
+                    {resource.status === 'failed' ? (
+                      <form action={retryResourceProcessing}>
+                        <input type="hidden" name="documentId" value={resource.id} />
+                        <Button variant="outline" size="sm" type="submit">
+                          Retry
+                        </Button>
+                      </form>
+                    ) : null}
+                    {resource.signedUrl ? (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={resource.signedUrl} target="_blank" rel="noopener noreferrer">
+                          <Download className="mr-2 size-3.5" />
+                          Open
+                        </a>
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>

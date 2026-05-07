@@ -19,6 +19,19 @@ export type WorkspaceResource = {
   signedUrl: string | null
 }
 
+export type ResourceDocumentStatus = 'uploaded' | 'queued' | 'processing' | 'ready' | 'failed' | 'archived'
+
+export type ResourceDocumentListItem = {
+  id: string
+  name: string
+  path: string
+  sizeBytes: number
+  updatedAt: string
+  status: ResourceDocumentStatus
+  lastError: string | null
+  signedUrl: string | null
+}
+
 export async function ensureResourcesBucket(): Promise<void> {
   const admin = createSupabaseAdminClient()
   const { error } = await admin.storage.createBucket(RESOURCES_BUCKET, {
@@ -49,6 +62,48 @@ export async function listWorkspaceResources(workspaceId: string): Promise<Works
         path: objectPath,
         sizeBytes: file.metadata?.size ?? 0,
         updatedAt: file.updated_at ?? file.created_at ?? null,
+        signedUrl: signed?.signedUrl ?? null,
+      }
+    })
+  )
+  return resources
+}
+
+export async function listWorkspaceResourceDocuments(
+  workspaceId: string
+): Promise<ResourceDocumentListItem[]> {
+  await ensureResourcesBucket()
+  const admin = createSupabaseAdminClient()
+  const { data, error } = await admin
+    .from('resource_document' as any)
+    .select('id,file_name,storage_path,size_bytes,updated_at,status,last_error')
+    .eq('workspace_id', workspaceId)
+    .order('updated_at', { ascending: false })
+    .limit(200)
+  if (error) throw error
+  const rows = (data ?? []) as Array<{
+    id: string
+    file_name: string
+    storage_path: string
+    size_bytes: number
+    updated_at: string
+    status: ResourceDocumentStatus
+    last_error: string | null
+  }>
+  const resources = await Promise.all(
+    rows.map(async (row) => {
+      const { data: signed } = await admin
+        .storage
+        .from(RESOURCES_BUCKET)
+        .createSignedUrl(row.storage_path, 3600)
+      return {
+        id: row.id,
+        name: row.file_name,
+        path: row.storage_path,
+        sizeBytes: row.size_bytes,
+        updatedAt: row.updated_at,
+        status: row.status,
+        lastError: row.last_error,
         signedUrl: signed?.signedUrl ?? null,
       }
     })
