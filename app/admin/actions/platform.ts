@@ -10,7 +10,7 @@ import { buildPromptTemplateName, getEmbeddedPromptDefault } from '@/lib/admin/p
 import { getVendorClient } from '@/lib/ai/factory'
 import { getRoutingFor } from '@/lib/ai/router'
 import { sweepAiResponseSchema, type ParsedSweepItem } from '@/lib/sweep/schemas'
-import { dedupeSourcesByUrl, formatSourcesBlock, retrieveWebSourcesForSweepPass } from '@/lib/ai/retrieval'
+import { dedupeSourcesByUrl, formatSourcesBlock, retrieveWebSourcesForSweepPassDetailed } from '@/lib/ai/retrieval'
 import { validateSweepItemSources } from '@/lib/sweep/validate-sources'
 
 export async function listAiRoutingConfigs() {
@@ -306,13 +306,12 @@ export async function simulateSweepBuyTemplate(input: {
   const competitorLines = input.variables.competitor_lines ?? '(none)'
   const topicLines = input.variables.topic_lines ?? '(none)'
 
-  const sources = dedupeSourcesByUrl(
-    await retrieveWebSourcesForSweepPass({
-      purpose: 'sweep_buy',
-      queries: ['buy market updates', competitorLines.replace(/\n/g, ' '), topicLines.replace(/\n/g, ' ')],
-      maxResults: 25,
-    })
-  )
+  const retrieval = await retrieveWebSourcesForSweepPassDetailed({
+    purpose: 'sweep_buy',
+    queries: ['buy market updates', competitorLines.replace(/\n/g, ' '), topicLines.replace(/\n/g, ' ')],
+    maxResults: 25,
+  })
+  const sources = dedupeSourcesByUrl(retrieval.sources)
   const webGroundedSweepsEnabled = process.env.WEB_GROUNDED_SWEEPS === '1'
   const enforceAllowlist = webGroundedSweepsEnabled && sources.length > 0
 
@@ -379,6 +378,7 @@ export async function simulateSweepBuyTemplate(input: {
       sourcesCount: sources.length,
       enforceAllowlist,
       sourceUrls: sources.map((s) => s.url).slice(0, 25),
+      diagnostics: retrieval.diagnostics,
     },
     providerResults,
   }
