@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { z } from 'zod'
+import { parseJsonFromLlmText } from '@/lib/ai/parse-model-json'
 import type { AiVendorClient, CompleteInput, CompleteResult, EmbedInput, EmbedResult } from '@/lib/ai/types'
 import { AiRateLimitError, AiVendorError } from '@/lib/ai/types'
 
@@ -32,7 +33,7 @@ export function createAnthropicClient(modelDefault: string): AiVendorClient {
           const text = textBlock && textBlock.type === 'text' ? textBlock.text : ''
           let parsed: unknown
           if (input.responseSchema) {
-            const json = JSON.parse(text)
+            const json = parseJsonFromLlmText(text)
             const safe = (input.responseSchema as z.ZodType<unknown>).safeParse(json)
             if (!safe.success) {
               throw new AiVendorError(`Anthropic JSON did not match schema: ${safe.error.message}`)
