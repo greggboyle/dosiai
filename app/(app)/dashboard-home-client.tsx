@@ -489,7 +489,17 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
           <DashboardModule title="Competitor Activity">
             <div className="space-y-2.5">
               {(() => {
-                const rows = [...snapshot.competitorHeatmap].sort((a, b) => b.count - a.count).slice(0, 8)
+                const rows = [...snapshot.competitorHeatmap]
+                  .filter((row) => row.count > 0)
+                  .sort((a, b) => b.count - a.count)
+                  .slice(0, 8)
+                if (rows.length === 0) {
+                  return (
+                    <div className="text-xs text-muted-foreground">
+                      No competitor activity in the last 7 days.
+                    </div>
+                  )
+                }
                 const maxCount = Math.max(1, ...rows.map((r) => r.count))
                 return rows.map((item) => {
                   const widthPercent = (item.count / maxCount) * 100
