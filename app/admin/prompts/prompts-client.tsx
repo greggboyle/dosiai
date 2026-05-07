@@ -235,18 +235,10 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
     return keys.map((purpose) => ({ purpose, templates: buckets.get(purpose)! }))
   }, [filteredTemplates, purposeOrder])
 
-  /** Purposes whose groups are collapsed in the sidebar (default: all expanded). */
-  const [collapsedPurposeGroups, setCollapsedPurposeGroups] = React.useState<Set<string>>(() => new Set())
-
-  React.useEffect(() => {
-    if (!selectedTemplate) return
-    setCollapsedPurposeGroups((prev) => {
-      if (!prev.has(selectedTemplate.purpose)) return prev
-      const next = new Set(prev)
-      next.delete(selectedTemplate.purpose)
-      return next
-    })
-  }, [selectedTemplate?.purpose, selectedTemplate?.id])
+  /** Purposes whose groups are collapsed in the sidebar (default: all collapsed). */
+  const [collapsedPurposeGroups, setCollapsedPurposeGroups] = React.useState<Set<string>>(
+    () => new Set(initialTemplates.map((t) => t.purpose))
+  )
 
   const handleRunTest = () => {
     if (!selectedTemplate) return
