@@ -428,6 +428,12 @@ type ViewTab = 'today' | 'week' | 'watching' | 'all' | 'review'
 type SortOption = 'score' | 'recent' | 'competitor'
 type SubjectFilter = 'competitors' | 'our-company'
 
+function getEventTimestampMs(item: IntelligenceItem): number {
+  const eventMs = item.eventDate ? new Date(item.eventDate).getTime() : Number.NaN
+  if (Number.isFinite(eventMs)) return eventMs
+  return new Date(item.timestamp).getTime()
+}
+
 const categoryFilters: { value: Category; label: string }[] = [
   { value: 'buy-side', label: 'Customer Deployments' },
   { value: 'sell-side', label: 'Vendor Updates' },
@@ -603,7 +609,7 @@ export function FeedClient({
   const weekCount = React.useMemo(() => {
     if (!mounted) return dataSource.length // Default to all for SSR
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    return dataSource.filter(i => new Date(i.timestamp) >= weekAgo).length
+    return dataSource.filter((i) => getEventTimestampMs(i) >= weekAgo.getTime()).length
   }, [mounted, dataSource])
   
   const watchingCount = dataSource.filter(i => i.isWatching).length
@@ -627,7 +633,7 @@ export function FeedClient({
       case 'week': {
         if (mounted) {
           const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-          items = items.filter(i => new Date(i.timestamp) >= weekAgo)
+          items = items.filter((i) => getEventTimestampMs(i) >= weekAgo.getTime())
         }
         break
       }
