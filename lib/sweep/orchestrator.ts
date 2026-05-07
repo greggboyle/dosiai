@@ -513,16 +513,16 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
 
     const categoryValidations = catResults.map((r) =>
       validateSweepItemSources(r.items, {
-        enforceRetrievedSourceMembership: webGroundedSweepsEnabled,
+        enforceRetrievedSourceMembership: webGroundedSweepsEnabled && r.sources.length > 0,
         allowedSources: r.sources,
       })
     )
     const selfValidation = validateSweepItemSources(selfPassResult.items, {
-      enforceRetrievedSourceMembership: webGroundedSweepsEnabled,
+      enforceRetrievedSourceMembership: webGroundedSweepsEnabled && selfPassResult.sources.length > 0,
       allowedSources: selfPassResult.sources,
     })
     const topicValidation = validateSweepItemSources(topicPassResult.items, {
-      enforceRetrievedSourceMembership: webGroundedSweepsEnabled,
+      enforceRetrievedSourceMembership: webGroundedSweepsEnabled && topicPassResult.sources.length > 0,
       allowedSources: topicPassResult.sources,
     })
 
