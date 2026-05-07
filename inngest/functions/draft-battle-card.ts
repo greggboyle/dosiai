@@ -37,9 +37,11 @@ const draftResponseSchema = z.object({
   ),
 })
 
-function formatIntelContext(rows: Array<{ title: string; summary: string | null }>): string {
+function formatIntelContext(rows: Array<{ id: string; title: string; summary: string | null }>): string {
   if (rows.length === 0) return '(No recent competitor intel was selected or available.)'
-  return rows.map((r, i) => `### Intel ${i + 1}\n${r.title}\n${r.summary ?? ''}`).join('\n\n')
+  return rows
+    .map((r, i) => `### Intel ${i + 1}\nid: ${r.id}\n${r.title}\n${r.summary ?? ''}`)
+    .join('\n\n')
 }
 
 function formatResourceContext(rows: Array<{ file_name: string; content: string }>): string {

@@ -155,9 +155,113 @@ Rules:
   },
   {
     purpose: 'battle_card_draft',
-    content: `You are generating a full sales battle card for competitor "{{competitor_name}}".
+    content: `You are the competitive intelligence authoring assistant for {{competitor_name}}.
 
-Use only the provided context. If evidence is insufficient, return null for the fill and explain why in rationale.
+## Objective
+Produce seller-ready battle card content grounded ONLY in the blocks below: internal resources, recent intel, win/loss history, and existing section JSON. Your audience is account executives and solution consultants preparing live conversations—not marketing fluff.
+
+## Inputs (trust hierarchy)
+1. **Resource context** — approved internal documents (highest authority for positioning and messaging nuance).
+2. **Recent intelligence** — external/market signals; use for “recent_activity”, proof, and timely facts. Each intel excerpt includes a UUID **id** line—preserve those ids exactly when populating recent_activity.
+3. **Win/loss context** — closed deals and reason tags; use for realistic objections, why-we-win / why-they-win, and talk tracks. Do not invent outcomes not reflected here.
+4. **Existing sections** — JSON snapshot per section. Respect user-entered text.
+
+If a section would require facts not present in any block: set \`fill\` to null for empty sections (and briefly explain in \`rationale\`) OR supply \`improvementSuggestion\` that asks for missing data instead of inventing numbers.
+
+## Voice and quality bar
+- Short clauses; bullets over paragraphs where the schema asks for lists.
+- Prefer “we / they” framing that reps can read aloud.
+- Name {{competitor_name}} consistently (same spelling as inputs).
+- Never invent: funding rounds, logos, named customers, dollar amounts, dates, SLAs, certifications, awards, headcount, regions served, or competitor product names unless they appear in the provided context.
+- If you infer something weaker than a fact, lower \`confidence\` and say what was inferred in \`rationale\`.
+
+## fill vs improvementSuggestion (critical)
+Inspect **existing_sections** for each section type:
+- If that section is **empty** (no substantive content): provide **fill** with a complete JSON object matching the section schema below. Set **improvementSuggestion** to null.
+- If that section **already has content**: set **fill** to null; provide **improvementSuggestion** with concise edits or additive bullets the author could paste—do not repeat the entire section unless necessary.
+
+## citations
+Populate \`citations\` when a claim draws on a specific intel title, resource filename, or win/loss outcome. Use \`source\` like \`Intel: <title>\` or \`Resource: <file>\` or \`Win/loss\`; optional \`quote\` = short excerpt.
+
+---
+
+## Section schemas (\`fill\` must match exactly)
+
+**tldr** — \`sectionType\`: \`tldr\`
+\`\`\`json
+{"theyPosition":"","weCounter":"","remember":""}
+\`\`\`
+- theyPosition: how {{competitor_name}} positions / shows up in deals (from context).
+- weCounter: our differentiated response in plain language.
+- remember: 2–4 memorable bullets reps should internalize.
+
+**why_we_win** — \`why_we_win\`
+\`\`\`json
+{"bullets":[{"text":"","evidenceItemId":""}]}
+\`\`\`
+- Up to 6 bullets; \`evidenceItemId\` optional—when tied to intel, use that intel’s \`id\` UUID from Recent intelligence.
+
+**why_they_win** — \`why_they_win\`
+Same shape as why_we_win. Be fair and specific; ground in win/loss or intel.
+
+**objections** — \`objections\`
+\`\`\`json
+{"pairs":[{"objection":"","response":""}]}
+\`\`\`
+- Real objections buyers raise about us vs {{competitor_name}}; responses grounded in resources/intel/win-loss.
+
+**trap_setters** — \`trap_setters\`
+\`\`\`json
+{"questions":["",""]}
+\`\`\`
+- Neutral discovery questions that surface gaps in {{competitor_name}}’s story (no “gotcha” insults).
+
+**proof_points** — \`proof_points\`
+\`\`\`json
+{"points":[{"headline":"","detail":"","customer":"","quote":""}]}
+\`\`\`
+- \`customer\` / \`quote\` only if present in context; otherwise omit or leave empty strings.
+
+**pricing** — \`pricing\`
+\`\`\`json
+{"theirs":"","ours":""}
+\`\`\`
+- Describe positioning bands or packaging qualitatively unless exact figures appear in context.
+
+**recent_activity** — \`recent_activity\`
+\`\`\`json
+{"items":[{"itemId":"","title":""}]}
+\`\`\`
+- Optional per item when known from intel: \`ingestedAt\` (ISO), \`miScore\` (number).
+- **itemId** MUST equal an intel \`id\` from Recent intelligence (same UUID string).
+- **title** should match or tightly summarize that intel item’s title.
+- Omit \`ingestedAt\` and \`miScore\` unless those values appear in context (do not default them to zero).
+
+**talk_tracks** — \`talk_tracks\`
+\`\`\`json
+{"tracks":[{"scenario":"","content":""}]}
+\`\`\`
+- Scenarios like “Executive briefing”, “Technical deep-dive”, “Procurement / ROI”; content = short script bullets.
+
+---
+
+Include **at most one \`results\` entry per section type** (nine types exist). Omit sections that need no updates; prioritize filling **empty** sections first.
+
+Return ONLY valid JSON (no markdown fences) with this shape:
+{
+  "results": [
+    {
+      "sectionType": "tldr|why_we_win|why_they_win|objections|trap_setters|proof_points|pricing|recent_activity|talk_tracks",
+      "fill": {},
+      "improvementSuggestion": null,
+      "rationale": "",
+      "confidence": 0.85,
+      "citations": [{"source":"","quote":""}]
+    }
+  ]
+}
+
+---
 
 Resource context:
 {{resource_context}}
@@ -168,31 +272,12 @@ Recent intelligence context:
 Win/loss context:
 {{win_loss_context}}
 
-Current section content:
-{{existing_sections}}
-
-Return ONLY valid JSON (no markdown fences) with this shape:
-{
-  "results": [
-    {
-      "sectionType": "tldr|why_we_win|why_they_win|objections|trap_setters|proof_points|pricing|recent_activity|talk_tracks",
-      "fill": object|null,
-      "improvementSuggestion": string|null,
-      "rationale": "string",
-      "confidence": number,
-      "citations": [{"source":"string","quote":"string"}]
-    }
-  ]
-}
-
-Rules:
-- fill is used only when section is empty; it must match the exact section JSON schema.
-- If section is not empty, provide improvementSuggestion instead of overwriting.
-- Ground everything in provided context. No fabricated logos, pricing, funding, customer names, or timelines.`,
+Current section content (JSON snapshot):
+{{existing_sections}}`,
     variables: [
       { name: 'competitor_name', type: 'string', description: 'Competitor display name.', example: 'Acme Logistics' },
       { name: 'resource_context', type: 'string', description: 'Selected resource excerpts.', example: '## Resource 1 ...' },
-      { name: 'intel_context', type: 'string', description: 'Recent intelligence excerpts.', example: '## Intel 1 ...' },
+      { name: 'intel_context', type: 'string', description: 'Recent intelligence excerpts with ids.', example: '### Intel 1\nid: uuid…' },
       { name: 'win_loss_context', type: 'string', description: 'Win/loss outcomes and reason trends.', example: '## Outcomes ...' },
       { name: 'existing_sections', type: 'string', description: 'Current card section JSON content.', example: '{"tldr":{"theyPosition":""}}' },
     ],
