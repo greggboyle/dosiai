@@ -2,11 +2,32 @@ import { redirect } from 'next/navigation'
 import { getWorkspaceIdForUser } from '@/lib/feed/queries'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Upload, FolderOpen, FileText, BookOpen } from 'lucide-react'
+import { Upload, FolderOpen, FileText, BookOpen, Download } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { uploadResource } from '@/lib/resources/actions'
+import { listWorkspaceResources } from '@/lib/resources/storage'
+import { formatRelativeLabel } from '@/lib/dashboard/queries'
 
 export default async function ResourcesPage() {
   const workspaceId = await getWorkspaceIdForUser()
   if (!workspaceId) redirect('/sign-in')
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session?.user) redirect('/sign-in')
+  const { data: member } = await supabase
+    .from('workspace_member')
+    .select('role')
+    .eq('user_id', session.user.id)
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .order('joined_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  const canUpload = member?.role === 'admin' || member?.role === 'analyst'
+  const resources = await listWorkspaceResources(workspaceId)
 
   return (
     <div className="space-y-6 p-6">
@@ -54,10 +75,56 @@ export default async function ResourcesPage() {
               </p>
             </div>
           </div>
-          <Button size="sm" disabled>
-            <Upload className="mr-2 size-4" />
-            Upload resources (coming soon)
-          </Button>
+          {canUpload ? (
+            <form action={uploadResource} className="flex flex-wrap items-center gap-2">
+              <Input name="file" type="file" required className="max-w-sm" />
+              <Button size="sm" type="submit">
+                <Upload className="mr-2 size-4" />
+                Upload resource
+              </Button>
+            </form>
+          ) : (
+            <p className="text-xs text-muted-foreground">Only admins and analysts can upload resources.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Uploaded Resources</CardTitle>
+          <CardDescription>
+            Files are workspace-scoped and ready to be used as future AI context.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {resources.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No resources uploaded yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {resources.map((resource) => (
+                <div
+                  key={resource.path}
+                  className="flex items-center justify-between rounded-md border px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{resource.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(resource.sizeBytes / 1024).toFixed(1)} KB
+                      {resource.updatedAt ? ` · Updated ${formatRelativeLabel(resource.updatedAt)}` : ''}
+                    </p>
+                  </div>
+                  {resource.signedUrl ? (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={resource.signedUrl} target="_blank" rel="noopener noreferrer">
+                        <Download className="mr-2 size-3.5" />
+                        Open
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
