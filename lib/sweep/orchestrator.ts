@@ -361,6 +361,22 @@ function parseVectorString(s: string | null): number[] | null {
   }
 }
 
+function normalizeTextForMentionCheck(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+function isCompetitorDirectlyMentioned(item: RawSweepItem, competitorName: string): boolean {
+  const target = normalizeTextForMentionCheck(competitorName)
+  if (!target) return false
+  const haystacks = [
+    item.title,
+    item.summary,
+    item.fiveWH?.who ?? '',
+    item.fiveWH?.what ?? '',
+  ]
+  return haystacks.some((value) => normalizeTextForMentionCheck(value).includes(target))
+}
+
 export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ sweepId: string; itemsIngested: number }> {
   const supabase = createSupabaseAdminClient()
   const { data: ws, error: wsErr } = await supabase.from('workspace').select('*').eq('id', input.workspaceId).single()
@@ -556,7 +572,7 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       const relatedCompetitorIds: string[] = []
       for (const n of item.relatedCompetitorNames ?? []) {
         const id = nameToId[n.toLowerCase()]
-        if (id) relatedCompetitorIds.push(id)
+        if (id && isCompetitorDirectlyMentioned(item, n)) relatedCompetitorIds.push(id)
       }
 
       const relatedTopicIds: string[] = []
