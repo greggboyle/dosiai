@@ -504,19 +504,23 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
                 return rows.map((item) => {
                   const widthPercent = (item.count / maxCount) * 100
                   return (
-                  <div key={item.id} className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground w-20 truncate">
-                      {item.name}
-                    </span>
-                    <div className="flex-1 h-4 bg-muted rounded overflow-hidden">
-                      <div
-                        className="h-full bg-accent/60 rounded"
-                        style={{ width: `${widthPercent}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-mono w-6 text-right">{item.count}</span>
-                  </div>
-                )
+                    <Link
+                      key={item.id}
+                      href={`/feed?tab=week&competitor=${encodeURIComponent(item.name)}`}
+                      className="flex items-center gap-3 rounded px-1 py-1 hover:bg-muted/50 transition-colors"
+                    >
+                      <span className="text-xs text-muted-foreground w-20 truncate">
+                        {item.name}
+                      </span>
+                      <div className="flex-1 h-4 bg-muted rounded overflow-hidden">
+                        <div
+                          className="h-full bg-accent/60 rounded"
+                          style={{ width: `${widthPercent}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-mono w-6 text-right">{item.count}</span>
+                    </Link>
+                  )
                 })
               })()}
               <p className="text-[10px] text-muted-foreground pt-1">Items in last 7 days</p>

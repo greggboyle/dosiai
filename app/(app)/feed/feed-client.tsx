@@ -484,7 +484,12 @@ export function FeedClient({
   const [subject, setSubject] = React.useState<SubjectFilter>(initialSubject)
 
   React.useEffect(() => {
-    if (searchParams.get('tab') === 'review') setActiveTab('review')
+    const tabFromUrl = searchParams.get('tab')
+    if (tabFromUrl === 'today' || tabFromUrl === 'week' || tabFromUrl === 'watching' || tabFromUrl === 'review') {
+      setActiveTab(tabFromUrl)
+    } else {
+      setActiveTab('all')
+    }
     const subjectFromUrl = searchParams.get('subject') === 'our-company' ? 'our-company' : 'competitors'
     setSubject(subjectFromUrl)
   }, [searchParams])
@@ -507,6 +512,14 @@ export function FeedClient({
   const [showUnreadOnly, setShowUnreadOnly] = React.useState(false)
   const [serverFilteredItems, setServerFilteredItems] = React.useState<IntelligenceItem[] | null>(null)
   const [isFilterQueryLoading, setIsFilterQueryLoading] = React.useState(false)
+
+  React.useEffect(() => {
+    const competitorFiltersFromUrl = searchParams
+      .getAll('competitor')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    setSelectedCompetitors(competitorFiltersFromUrl)
+  }, [searchParams])
   
   // Sort
   const [sortBy, setSortBy] = React.useState<SortOption>('recent')
