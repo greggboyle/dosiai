@@ -425,13 +425,11 @@ Note: Reddit reports are unverified and may not represent the full scope of the 
 // Get unique values for filters
 
 type ViewTab = 'today' | 'week' | 'watching' | 'all' | 'review'
-type SortOption = 'score' | 'recent' | 'competitor'
+type SortOption = 'score' | 'recent' | 'competitor' | 'collected'
 type SubjectFilter = 'competitors' | 'our-company'
 
 function getEventTimestampMs(item: IntelligenceItem): number {
-  const eventMs = item.eventDate ? new Date(item.eventDate).getTime() : Number.NaN
-  if (Number.isFinite(eventMs)) return eventMs
-  return new Date(item.timestamp).getTime()
+  return item.eventDate ? new Date(item.eventDate).getTime() : Number.NaN
 }
 
 const categoryFilters: { value: Category; label: string }[] = [
@@ -683,11 +681,22 @@ export function FeedClient({
         case 'score':
           return b.mis.value - a.mis.value
         case 'recent':
-          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          {
+            const aEventMs = getEventTimestampMs(a)
+            const bEventMs = getEventTimestampMs(b)
+            const aHasEvent = Number.isFinite(aEventMs)
+            const bHasEvent = Number.isFinite(bEventMs)
+            if (aHasEvent && bHasEvent) return bEventMs - aEventMs
+            if (aHasEvent && !bHasEvent) return -1
+            if (!aHasEvent && bHasEvent) return 1
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          }
         case 'competitor':
           const nameA = a.relatedCompetitors?.[0]?.name || 'ZZZ'
           const nameB = b.relatedCompetitors?.[0]?.name || 'ZZZ'
           return nameA.localeCompare(nameB)
+        case 'collected':
+          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         default:
           return 0
       }
@@ -980,7 +989,8 @@ export function FeedClient({
               <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
                   <DropdownMenuRadioItem value="score" className="text-xs">MIS Score</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="recent" className="text-xs">Recency</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="recent" className="text-xs">Event Date</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="collected" className="text-xs">Collected</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="competitor" className="text-xs">Competitor</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>

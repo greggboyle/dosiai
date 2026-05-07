@@ -258,7 +258,18 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
     delta: 0,
   }))
 
-  const feed: DashboardFeedRow[] = feedItems.map((item) => {
+  const sortedFeedItems = [...feedItems].sort((a, b) => {
+    const aEventMs = a.eventDate ? new Date(a.eventDate).getTime() : Number.NaN
+    const bEventMs = b.eventDate ? new Date(b.eventDate).getTime() : Number.NaN
+    const aHasEvent = Number.isFinite(aEventMs)
+    const bHasEvent = Number.isFinite(bEventMs)
+    if (aHasEvent && bHasEvent) return bEventMs - aEventMs
+    if (aHasEvent && !bHasEvent) return -1
+    if (!aHasEvent && bHasEvent) return 1
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  })
+
+  const feed: DashboardFeedRow[] = sortedFeedItems.map((item) => {
     const primaryComp = item.relatedCompetitors?.[0]
     const name = primaryComp?.name ?? 'Market'
     return {
