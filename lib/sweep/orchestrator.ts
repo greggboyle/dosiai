@@ -25,6 +25,11 @@ export interface OrchestrateSweepInput {
   triggerUserId: string | null
 }
 
+function isNoEnabledRoutingRulesError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  return error.message.startsWith('No enabled routing rules for ')
+}
+
 function categoryToPurpose(cat: 'buy' | 'sell' | 'channel' | 'regulatory'): AiPurposeDb {
   if (cat === 'buy') return 'sweep_buy'
   if (cat === 'sell') return 'sweep_sell'
@@ -446,16 +451,17 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
 
   try {
     const cats = ['buy', 'sell', 'channel', 'regulatory'] as const
+    const skippedPurposes: AiPurposeDb[] = []
     const catResults = await Promise.all(
       cats.map((c) =>
-        runCategoryPrompt(
-          input.workspaceId,
-          plan,
-          sweepId,
-          c,
-          companySummary,
-          competitorLines,
-          topicLines
+        runCategoryPrompt(input.workspaceId, plan, sweepId, c, companySummary, competitorLines, topicLines).catch(
+          (error) => {
+            if (isNoEnabledRoutingRulesError(error)) {
+              skippedPurposes.push(categoryToPurpose(c))
+              return { items: [], vendorCallIds: [] }
+            }
+            throw error
+          }
         )
       )
     )
@@ -472,9 +478,26 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       })),
       companySummary,
       competitorLines
-    )
+    ).catch((error) => {
+      if (isNoEnabledRoutingRulesError(error)) {
+        skippedPurposes.push('sweep_topic')
+        return { items: [], vendorCallIds: [] }
+      }
+      throw error
+    })
 
-    const selfPassResult = await runSelfPass(input.workspaceId, plan, sweepId, profile as Record<string, unknown> | null)
+    const selfPassResult = await runSelfPass(
+      input.workspaceId,
+      plan,
+      sweepId,
+      profile as Record<string, unknown> | null
+    ).catch((error) => {
+      if (isNoEnabledRoutingRulesError(error)) {
+        skippedPurposes.push('sweep_self')
+        return { items: [], vendorCallIds: [] }
+      }
+      throw error
+    })
 
     const categoryValidations = catResults.map((r) => validateSweepItemSources(r.items))
     const selfValidation = validateSweepItemSources(selfPassResult.items)
@@ -625,6 +648,12 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
         sweepId,
         rejectedBadUrl,
         rejectedUnknownUrl,
+      })
+    }
+    if (skippedPurposes.length > 0) {
+      console.info('[sweep] skipped purposes due to disabled routing rules', {
+        sweepId,
+        skippedPurposes,
       })
     }
 
