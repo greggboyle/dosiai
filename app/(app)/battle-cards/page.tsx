@@ -33,6 +33,7 @@ export default async function BattleCardsPage() {
   }))
 
   const canAuthor = member.role === 'admin' || member.role === 'analyst'
+  const canDelete = member.role === 'admin'
 
-  return <BattleCardsListClient cards={cards} canAuthor={canAuthor} />
+  return <BattleCardsListClient cards={cards} canAuthor={canAuthor} canDelete={canDelete} />
 }

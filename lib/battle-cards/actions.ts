@@ -53,6 +53,22 @@ async function requireAnalystWorkspace(): Promise<{
   }
 }
 
+async function requireAdminWorkspace(): Promise<{
+  workspaceId: string
+  userId: string
+  plan: WorkspacePlan
+  workspaceStatus: string
+}> {
+  const ctx = await requireAnalystWorkspace()
+  if (ctx.role !== 'admin') throw new Error('Forbidden')
+  return {
+    workspaceId: ctx.workspaceId,
+    userId: ctx.userId,
+    plan: ctx.plan,
+    workspaceStatus: ctx.workspaceStatus,
+  }
+}
+
 export async function createBattleCardFromForm(formData: FormData): Promise<void> {
   const competitorId = formData.get('competitorId')
   if (typeof competitorId !== 'string' || !competitorId) throw new Error('Missing competitor')
@@ -326,4 +342,24 @@ export async function createBattleCardShareLink(battleCardId: string, expiresInD
 
   revalidatePath(`/battle-cards/${battleCardId}/edit`)
   return token
+}
+
+export async function deleteBattleCard(battleCardId: string): Promise<void> {
+  const ctx = await requireAdminWorkspace()
+  if (ctx.workspaceStatus === 'read_only') throw new Error('Workspace is read-only')
+
+  const supabase = await createSupabaseServerClient()
+  const { data: card, error } = await supabase
+    .from('battle_card')
+    .select('id, workspace_id')
+    .eq('id', battleCardId)
+    .single()
+  if (error || !card || card.workspace_id !== ctx.workspaceId) throw new Error('Not found')
+
+  const { error: deleteErr } = await supabase.from('battle_card').delete().eq('id', battleCardId)
+  if (deleteErr) throw deleteErr
+
+  revalidatePath('/battle-cards')
+  revalidatePath(`/battle-cards/${battleCardId}/edit`)
+  revalidatePath(`/battle-cards/${battleCardId}/interview`)
 }
