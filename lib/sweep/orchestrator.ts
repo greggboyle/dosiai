@@ -365,6 +365,71 @@ function normalizeTextForMentionCheck(value: string): string {
   return value.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
+/** Strip trailing punctuation models often add to names ("Acme," → "Acme"). */
+function normalizeAiCompetitorLabel(label: string): string {
+  return label.replace(/[\s,.;:]+$/g, '').trim()
+}
+
+/**
+ * Map model-provided relatedCompetitorNames entries to workspace competitor ids.
+ * Models rarely match legal names exactly; without fuzzy resolution nothing gets tagged.
+ */
+function resolveCompetitorIdFromAiLabel(
+  aiLabel: string,
+  competitors: Array<{ id: string; name: string }>
+): string | null {
+  const raw = normalizeAiCompetitorLabel(aiLabel)
+  if (!raw) return null
+  const lower = raw.toLowerCase()
+
+  for (const c of competitors) {
+    if (c.name.toLowerCase() === lower) return c.id
+  }
+
+  // AI shorthand is a substring of the official name ("Acme" → "Acme Logistics")
+  if (lower.length >= 3) {
+    let best: { id: string; nameLen: number } | null = null
+    for (const c of competitors) {
+      const cn = c.name.toLowerCase()
+      if (!cn.includes(lower)) continue
+      if (!best || c.name.length > best.nameLen) best = { id: c.id, nameLen: c.name.length }
+    }
+    if (best) return best.id
+  }
+
+  // Longer AI string contains the full official name
+  for (const c of competitors) {
+    const cn = c.name.toLowerCase()
+    if (cn.length >= 3 && lower.includes(cn)) return c.id
+  }
+
+  // Single-token AI matches first word of competitor ("Assort" → "Assort Health")
+  const tokens = lower.split(/\s+/).filter((t) => t.replace(/[^a-z0-9]/gi, '').length >= 2)
+  if (tokens.length === 1) {
+    const tok = tokens[0].replace(/[^a-z0-9]/gi, '')
+    if (tok.length >= 3) {
+      for (const c of competitors) {
+        const first = c.name
+          .toLowerCase()
+          .split(/\s+/)[0]
+          ?.replace(/[^a-z0-9]/gi, '') ?? ''
+        if (first === tok) return c.id
+      }
+    }
+  }
+
+  return null
+}
+
+function proseContainsAnyNameNeedle(proseParts: string[], needles: string[]): boolean {
+  const cleaned = [...new Set(needles.map((n) => normalizeTextForMentionCheck(n)))].filter((n) => n.length >= 3)
+  if (cleaned.length === 0) return false
+  for (const needle of cleaned) {
+    if (proseParts.some((value) => normalizeTextForMentionCheck(value).includes(needle))) return true
+  }
+  return false
+}
+
 function normalizeHostname(host: string): string {
   const h = host.trim().toLowerCase()
   if (!h) return ''
@@ -448,11 +513,16 @@ function extractUrlMatchNeedles(raw: string | null | undefined): string[] {
 function collectProseHaystackParts(item: RawSweepItem): string[] {
   const wh = item.fiveWH
   const fromEntities = (item.entitiesMentioned ?? []).map((e) => e.name).filter(Boolean)
+  const rm = item.reviewMetadata
   return [
     ...fromEntities,
     item.title,
     item.summary,
+    item.fullSummary ?? '',
     item.content ?? '',
+    item.confidenceReason ?? '',
+    rm?.excerpt ?? '',
+    rm?.platform ?? '',
     wh?.who ?? '',
     wh?.what ?? '',
     wh?.when ?? '',
@@ -473,17 +543,18 @@ function buildUrlMatchHaystack(item: RawSweepItem): string {
 
 function isCompetitorDirectlyMentioned(
   item: RawSweepItem,
-  competitorName: string,
+  canonicalCompetitorName: string,
+  aiSuggestedLabel: string | undefined,
   competitorWebsite: string | null | undefined,
   productNames: string[]
 ): boolean {
   const proseParts = collectProseHaystackParts(item)
 
-  const target = normalizeTextForMentionCheck(competitorName)
-  if (target) {
-    if (proseParts.some((value) => normalizeTextForMentionCheck(value).includes(target))) {
-      return true
-    }
+  const nameNeedles = [canonicalCompetitorName, aiSuggestedLabel].filter(
+    (x): x is string => typeof x === 'string' && normalizeAiCompetitorLabel(x).length > 0
+  )
+  if (proseContainsAnyNameNeedle(proseParts, nameNeedles)) {
+    return true
   }
 
   for (const pn of productNames) {
@@ -673,14 +744,13 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       .eq('workspace_id', input.workspaceId)
       .gte('ingested_at', since.toISOString())
 
-    const nameToId: Record<string, string> = {}
     const websiteByCompetitorId: Record<string, string | null> = {}
     const productsByCompetitorId: Record<string, string[]> = {}
     for (const c of competitors ?? []) {
-      nameToId[c.name.toLowerCase()] = c.id
       websiteByCompetitorId[c.id] = c.website ?? null
       productsByCompetitorId[c.id] = parseProductNamesFromJson(c.products)
     }
+    const competitorList = (competitors ?? []).map((c) => ({ id: c.id, name: c.name }))
 
     let itemsNew = 0
     let dedupCollapsed = 0
@@ -702,12 +772,19 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       if (skip) continue
 
       const relatedCompetitorIds: string[] = []
+      const seenCompetitorId = new Set<string>()
       for (const n of item.relatedCompetitorNames ?? []) {
-        const id = nameToId[n.toLowerCase()]
-        if (!id) continue
+        const id = resolveCompetitorIdFromAiLabel(n, competitorList)
+        if (!id || seenCompetitorId.has(id)) continue
+        const canonical = competitors?.find((c) => c.id === id)?.name ?? normalizeAiCompetitorLabel(n)
         const website = websiteByCompetitorId[id]
         const products = productsByCompetitorId[id] ?? []
-        if (isCompetitorDirectlyMentioned(item, n, website, products)) relatedCompetitorIds.push(id)
+        if (
+          isCompetitorDirectlyMentioned(item, canonical, normalizeAiCompetitorLabel(n), website, products)
+        ) {
+          seenCompetitorId.add(id)
+          relatedCompetitorIds.push(id)
+        }
       }
 
       const relatedTopicIds: string[] = []
