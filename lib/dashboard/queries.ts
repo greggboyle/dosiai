@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import type { Category, MISScore } from '@/lib/types'
+import { type Category, type MISScore, formatIntelEventDate } from '@/lib/types'
 import { listFeedItems } from '@/lib/feed/queries'
 
 export type DashboardFeedRow = {
@@ -279,7 +279,9 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
       competitorInitial: name.slice(0, 2).toUpperCase(),
       competitorName: name,
       mis: item.mis,
-      timestampLabel: formatRelativeLabel(item.timestamp),
+      timestampLabel: item.eventDate
+        ? formatIntelEventDate(item.eventDate)
+        : formatRelativeLabel(item.timestamp),
     }
   })
 

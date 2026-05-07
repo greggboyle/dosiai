@@ -61,7 +61,7 @@ import {
 } from '@/components/ui/table'
 import { MISBadge } from '@/components/mis-badge'
 import type { Competitor, IntelligenceItem, Category } from '@/lib/types'
-import { getCategoryInfo } from '@/lib/types'
+import { formatIntelEventDate, getCategoryInfo, getRelativeTime } from '@/lib/types'
 import type { CompetitorBattleCardRow, CompetitorBriefRow } from '@/lib/competitors/load-profile'
 import type { WinLossRow } from '@/lib/win-loss/queries'
 import type { WorkspacePlan } from '@/lib/types/dosi'
@@ -253,7 +253,7 @@ export function CompetitorProfileClient({
         | 'positive'
         | 'mixed'
         | 'negative',
-      date: v.eventDate ?? '',
+      date: v.eventDate ? formatIntelEventDate(v.eventDate) : getRelativeTime(v.timestamp),
     }))
   }, [voiceItems])
 
@@ -777,7 +777,9 @@ export function CompetitorProfileClient({
                             <Badge className={cn('text-[10px] h-4 px-1.5', categoryInfo.color)}>
                               {categoryInfo.label}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">{item.eventDate}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {item.eventDate ? formatIntelEventDate(item.eventDate) : getRelativeTime(item.timestamp)}
+                            </span>
                           </div>
                           <Link href={`/feed?item=${item.id}`} className="hover:underline">
                             <p className="font-medium text-sm mb-1">{item.title}</p>
@@ -876,7 +878,9 @@ export function CompetitorProfileClient({
                           <Badge variant="secondary" className="text-[10px]">
                             {item.sourceUrls?.[0]?.name ?? 'Source'}
                           </Badge>
-                          <span className="text-xs text-muted-foreground">{item.eventDate}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {item.eventDate ? formatIntelEventDate(item.eventDate) : getRelativeTime(item.timestamp)}
+                          </span>
                         </div>
                         <p className="font-medium text-sm mb-2">{item.title}</p>
                         <p className="text-sm text-muted-foreground bg-secondary/50 p-3 rounded-lg italic">

@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import type { IntelligenceItem } from '@/lib/types'
-import { getRelativeTime, getCategoryInfo } from '@/lib/types'
+import { formatIntelEventDate, getRelativeTime, getCategoryInfo } from '@/lib/types'
 
 interface FeedListProps {
   items: IntelligenceItem[]
@@ -174,8 +174,11 @@ function FeedListItem({ item, isSelected, onSelect }: FeedListItemProps) {
             <span className="text-muted-foreground/50">·</span>
             
             {/* Event date */}
-            <time dateTime={item.timestamp} className="text-muted-foreground">
-              {item.eventDate || getRelativeTime(item.timestamp)}
+            <time
+              dateTime={item.eventDate ?? item.timestamp}
+              className="text-muted-foreground"
+            >
+              {item.eventDate ? formatIntelEventDate(item.eventDate) : getRelativeTime(item.timestamp)}
             </time>
 
             <span className="text-muted-foreground/50">·</span>

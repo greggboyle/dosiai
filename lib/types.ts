@@ -549,6 +549,26 @@ export function getMISColorClass(band: MISScore['band']): string {
   return colors[band]
 }
 
+/** Long-form event label, e.g. "May 7th, 2026". Non-parseable strings are returned as-is. */
+export function formatIntelEventDate(iso: string | undefined | null): string {
+  if (iso == null || typeof iso !== 'string') return ''
+  const trimmed = iso.trim()
+  if (!trimmed) return ''
+  const d = new Date(trimmed)
+  if (Number.isNaN(d.getTime())) return trimmed
+
+  const month = d.toLocaleDateString('en-US', { month: 'long' })
+  const dayNum = d.getDate()
+  let suffix = 'th'
+  if (dayNum % 100 < 11 || dayNum % 100 > 13) {
+    if (dayNum % 10 === 1) suffix = 'st'
+    else if (dayNum % 10 === 2) suffix = 'nd'
+    else if (dayNum % 10 === 3) suffix = 'rd'
+  }
+  const year = d.getFullYear()
+  return `${month} ${dayNum}${suffix}, ${year}`
+}
+
 // Helper for relative timestamps
 export function getRelativeTime(timestamp: string): string {
   const now = new Date()
