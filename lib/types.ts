@@ -570,9 +570,9 @@ export function getRelativeTime(timestamp: string): string {
 // Helper to get category display info
 export function getCategoryInfo(category: Category): { label: string; color: string } {
   const info = {
-    'buy-side': { label: 'Buy-side', color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
-    'sell-side': { label: 'Sell-side', color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400' },
-    'channel': { label: 'Channel', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
+    'buy-side': { label: 'Customer Deployments', color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
+    'sell-side': { label: 'Vendor Updates', color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400' },
+    'channel': { label: 'Sales Channels', color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
     'regulatory': { label: 'Regulatory', color: 'bg-rose-500/15 text-rose-600 dark:text-rose-400' },
   }
   return info[category]

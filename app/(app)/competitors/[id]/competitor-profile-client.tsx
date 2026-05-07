@@ -733,9 +733,9 @@ export function CompetitorProfileClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="buy-side">Buy-side</SelectItem>
-                  <SelectItem value="sell-side">Sell-side</SelectItem>
-                  <SelectItem value="channel">Channel</SelectItem>
+                  <SelectItem value="buy-side">Customer Deployments</SelectItem>
+                  <SelectItem value="sell-side">Vendor Updates</SelectItem>
+                  <SelectItem value="channel">Sales Channels</SelectItem>
                   <SelectItem value="regulatory">Regulatory</SelectItem>
                 </SelectContent>
               </Select>

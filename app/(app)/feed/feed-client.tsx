@@ -429,9 +429,9 @@ type SortOption = 'score' | 'recent' | 'competitor'
 type SubjectFilter = 'competitors' | 'our-company'
 
 const categoryFilters: { value: Category; label: string }[] = [
-  { value: 'buy-side', label: 'Buy-side' },
-  { value: 'sell-side', label: 'Sell-side' },
-  { value: 'channel', label: 'Channel' },
+  { value: 'buy-side', label: 'Customer Deployments' },
+  { value: 'sell-side', label: 'Vendor Updates' },
+  { value: 'channel', label: 'Sales Channels' },
   { value: 'regulatory', label: 'Regulatory' },
 ]
 
