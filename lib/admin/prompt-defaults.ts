@@ -19,7 +19,12 @@ Active topics:
 {{topic_lines}}
 
 Each item must include: title, summary, confidence (low|medium|high), confidenceReason, category as exactly one of the strings "buy-side", "sell-side", "channel", or "regulatory" (no other labels), sourceUrls (array of {name,url,domain}), optional fiveWH as an object {"who","what","when","where","why","how"} strings or omit entirely (never a bare string), optional eventAt ISO string, optional sourceType, optional relatedCompetitorNames (string[]), optional entitiesMentioned ([{name}]).
-Produce 1-3 realistic items if data is thin; focus on verifiable claims.`
+
+Grounding rules (mandatory):
+- Do not fabricate events, quotes, funding, releases, partnerships, or URLs. Every concrete factual claim in title or summary must be traceable to real public information; include at least one credible sourceUrls entry with a real https URL that would plausibly support the claim.
+- If you cannot cite verifiable sources for an item, omit that item. If nothing qualifies for this purpose, return {"items":[]}.
+- Prefer fewer, well-sourced items over padding the list. Use confidence "low" and explain gaps or weak evidence in confidenceReason when appropriate.
+- Never use placeholder, example, or obviously fake domains.`
 
 export { SWEEP_SHARED_PROMPT as SWEEP_SHARED_PROMPT_TEMPLATE }
 
