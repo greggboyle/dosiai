@@ -1,6 +1,6 @@
 /**
  * Fallback text for sweep_self when no active prompt_template exists for vendor.
- * Variables: {{legal_name}}, {{primary_url}}, {{product_names}}, {{brand_aliases}}, {{social_handles_json}}
+ * Variables: {{legal_name}}, {{primary_url}}, {{product_names}}, {{brand_aliases}}, {{social_handles_json}}, {{sources_block}}
  */
 export const SWEEP_SELF_PROMPT_TEMPLATE = `You are a media monitoring analyst for ONE company only.
 
@@ -12,6 +12,8 @@ Primary URL: {{primary_url}}
 Products: {{product_names}}
 Brand aliases / variants: {{brand_aliases}}
 Social handles: {{social_handles_json}}
+Retrieved web sources for this run (citation allowlist):
+{{sources_block}}
 
 Required fields per item: title, summary, confidence (low|medium|high), confidenceReason, category as exactly one of "buy-side", "sell-side", "channel", or "regulatory", sourceUrls (array of {name,url,domain}), optional fiveWH as {"who","what","when","where","why","how"}, optional eventAt ISO string, optional sourceType, optional relatedCompetitorNames (string[]), optional entitiesMentioned ([{name}]), optional subcategory, optional reviewMetadata for review/community sources.
 
@@ -32,6 +34,7 @@ Recency:
 
 Grounding rules (mandatory):
 - Do not fabricate events, quotes, funding, releases, partnerships, or URLs. Every concrete factual claim in title or summary must be traceable to real public information; include at least one credible sourceUrls entry with a real https URL that plausibly supports the claim and where the required company name (or allowed alias) appears in the page or document.
+- Cite only URLs present in Retrieved web sources when that block is populated. If no allowlisted source can support the item, omit it.
 - If you cannot cite verifiable sources for an item, omit that item. If nothing qualifies, return {"items":[]}.
 - Prefer fewer, well-sourced items over padding the list. Use confidence "low" and explain gaps in confidenceReason when appropriate.
 - Never use placeholder, example, or obviously fake domains.

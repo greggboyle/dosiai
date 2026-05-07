@@ -407,6 +407,37 @@ export async function seedPromptTemplatesFromCode() {
     }
   }
 
+  // Keep sweep variable metadata aligned with embedded defaults (sources_block and future additions).
+  const sweepPurposes: AIPurpose[] = [
+    'sweep_buy',
+    'sweep_sell',
+    'sweep_channel',
+    'sweep_regulatory',
+    'sweep_self',
+    'sweep_topic',
+  ]
+  for (const purpose of sweepPurposes) {
+    const def = getEmbeddedPromptDefault(purpose)
+    if (!def) continue
+    const staleVarRows = (promptRes.data ?? []).filter(
+      (row) =>
+        row.purpose === purpose &&
+        !row.draft_content &&
+        JSON.stringify(row.variables ?? []) !== JSON.stringify(def.variables)
+    )
+    for (const row of staleVarRows) {
+      const { error } = await admin
+        .from('prompt_template')
+        .update({
+          variables: def.variables,
+          updated_at: now,
+          updated_by_operator_id: operator.id,
+        })
+        .eq('id', row.id)
+      if (error) throw error
+    }
+  }
+
   return { created: missingRows.length }
 }
 
