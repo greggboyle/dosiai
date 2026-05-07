@@ -511,16 +511,23 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
 
     const selfPassResult = await runSelfPass(input.workspaceId, plan, sweepId, profile as Record<string, unknown> | null)
 
-    const categoryItems = catResults.flatMap((r) => r.items)
-    const categoryValidation = validateSweepItemSources(categoryItems)
-    const selfValidation = validateSweepItemSources(selfPassResult.items)
+    const categoryValidations = catResults.map((r) =>
+      validateSweepItemSources(r.items, {
+        enforceRetrievedSourceMembership: webGroundedSweepsEnabled,
+        allowedSources: r.sources,
+      })
+    )
+    const selfValidation = validateSweepItemSources(selfPassResult.items, {
+      enforceRetrievedSourceMembership: webGroundedSweepsEnabled,
+      allowedSources: selfPassResult.sources,
+    })
     const topicValidation = validateSweepItemSources(topicPassResult.items, {
-      enforceRetrievedSourceMembership: webGroundedSweepsEnabled && topicPassResult.sources.length > 0,
+      enforceRetrievedSourceMembership: webGroundedSweepsEnabled,
       allowedSources: topicPassResult.sources,
     })
 
     let rawItems: RawSweepItem[] = [
-      ...categoryValidation.kept,
+      ...categoryValidations.flatMap((v) => v.kept),
       ...selfValidation.kept,
       ...topicValidation.kept,
     ]
@@ -652,9 +659,11 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       .eq('id', sweepId)
 
     const rejectedBadUrl =
-      categoryValidation.rejectedBadUrl + selfValidation.rejectedBadUrl + topicValidation.rejectedBadUrl
+      categoryValidations.reduce((sum, v) => sum + v.rejectedBadUrl, 0) +
+      selfValidation.rejectedBadUrl +
+      topicValidation.rejectedBadUrl
     const rejectedUnknownUrl =
-      categoryValidation.rejectedUnknownUrl +
+      categoryValidations.reduce((sum, v) => sum + v.rejectedUnknownUrl, 0) +
       selfValidation.rejectedUnknownUrl +
       topicValidation.rejectedUnknownUrl
     if (rejectedBadUrl > 0 || rejectedUnknownUrl > 0) {
