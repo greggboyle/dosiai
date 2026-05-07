@@ -19,6 +19,7 @@ import {
   Plus,
   ChevronsUpDown,
   CreditCard,
+  User,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -252,6 +253,12 @@ export function AppSidebar({ workspace, member, subscription, navBadgeCounts }: 
                   <Link href="/settings/members">
                     <Settings className="size-4" />
                     Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="gap-2 p-2">
+                  <Link href="/profile">
+                    <User className="size-4" />
+                    Profile
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="gap-2 p-2">
