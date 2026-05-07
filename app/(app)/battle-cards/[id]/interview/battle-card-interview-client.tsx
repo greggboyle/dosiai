@@ -64,13 +64,22 @@ export function BattleCardInterviewClient({
     BATTLE_SECTION_ORDER.find((t) => !completed.has(t)) ?? BATTLE_SECTION_ORDER[BATTLE_SECTION_ORDER.length - 1]
 
   const currentSection = byType.get(currentType)
-  const [answer, setAnswer] = React.useState(
-    () => interviewState.draftAnswers?.[currentType] ?? ''
-  )
+  const [answer, setAnswer] = React.useState(() => interviewState.draftAnswers?.[currentType] ?? '')
+  const [isDirty, setIsDirty] = React.useState(false)
+  const lastSectionTypeRef = React.useRef<BattleCardSectionType>(currentType)
 
   React.useEffect(() => {
-    setAnswer(interviewState.draftAnswers?.[currentType] ?? '')
-  }, [currentType, interviewState.draftAnswers])
+    const sectionChanged = lastSectionTypeRef.current !== currentType
+    if (sectionChanged) {
+      lastSectionTypeRef.current = currentType
+      setAnswer(interviewState.draftAnswers?.[currentType] ?? '')
+      setIsDirty(false)
+      return
+    }
+    if (!isDirty) {
+      setAnswer(interviewState.draftAnswers?.[currentType] ?? '')
+    }
+  }, [currentType, interviewState.draftAnswers, isDirty])
 
   const progressPct = Math.round((completed.size / BATTLE_SECTION_ORDER.length) * 100)
 
@@ -78,6 +87,7 @@ export function BattleCardInterviewClient({
 
   const persistDraft = async () => {
     await saveInterviewDraftAnswer(battleCardId, currentType, answer)
+    setIsDirty(false)
   }
 
   const handleSaveDraft = async () => {
@@ -219,7 +229,10 @@ export function BattleCardInterviewClient({
             <label className="text-sm font-medium">Your answer</label>
             <Textarea
               value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
+              onChange={(e) => {
+                setAnswer(e.target.value)
+                setIsDirty(true)
+              }}
               placeholder="Type your notes here. Be specific — this feeds AI synthesis."
               className="min-h-[220px] resize-y"
             />
