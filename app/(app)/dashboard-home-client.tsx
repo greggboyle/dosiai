@@ -255,7 +255,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
         {/* TOP OF FEED - 8 cols, 2 rows */}
         <div className="col-span-12 xl:col-span-8 row-span-2">
           <DashboardModule
-            title="What's New"
+            title="Latest Intel"
             action={
               <Link
                 href="/feed"
