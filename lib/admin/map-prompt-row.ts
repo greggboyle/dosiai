@@ -1,5 +1,6 @@
 import type { PromptTemplate, PromptVariable, AIPurpose, AIVendor } from '@/lib/admin-types'
 import type { Database } from '@/lib/supabase/types'
+import { getEmbeddedPromptDefault } from '@/lib/admin/prompt-defaults'
 
 type PromptRow = Database['public']['Tables']['prompt_template']['Row']
 
@@ -9,6 +10,13 @@ export function promptRowToUi(row: PromptRow): PromptTemplate {
     variables = row.variables as PromptVariable[]
   } else if (row.variables && typeof row.variables === 'object') {
     variables = []
+  }
+
+  // DB rows can carry legacy variable lists (e.g. sweep_self seeded with shared sweep placeholders).
+  // Runtime always injects the embedded-default set for that purpose; mirror that in admin UI + test harness.
+  const embedded = getEmbeddedPromptDefault(row.purpose as AIPurpose)
+  if (embedded?.variables?.length) {
+    variables = embedded.variables
   }
 
   const deploymentHistory = Array.isArray(row.deployment_history)

@@ -366,6 +366,9 @@ export async function seedPromptTemplatesFromCode() {
   // Own-company sweep: older seeds used the shared sweep template (wrong placeholders).
   const selfDefault = getEmbeddedPromptDefault('sweep_self')
   if (selfDefault) {
+    const varsMatch = (row: { variables?: unknown }) =>
+      JSON.stringify(row.variables ?? []) === JSON.stringify(selfDefault.variables)
+
     const staleSelfTemplates = (promptRes.data ?? []).filter(
       (row) =>
         row.purpose === 'sweep_self' &&
@@ -378,6 +381,23 @@ export async function seedPromptTemplatesFromCode() {
         .from('prompt_template')
         .update({
           content: selfDefault.content,
+          variables: selfDefault.variables,
+          updated_at: now,
+          updated_by_operator_id: operator.id,
+        })
+        .eq('id', row.id)
+      if (error) throw error
+    }
+
+    // Correct variable metadata saved on older rows whose content was already fixed manually.
+    const selfNeedVariableHeal = (promptRes.data ?? []).filter(
+      (row) =>
+        row.purpose === 'sweep_self' && !row.draft_content && !varsMatch(row)
+    )
+    for (const row of selfNeedVariableHeal) {
+      const { error } = await admin
+        .from('prompt_template')
+        .update({
           variables: selfDefault.variables,
           updated_at: now,
           updated_by_operator_id: operator.id,
