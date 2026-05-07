@@ -165,6 +165,9 @@ Resource context:
 Recent intelligence context:
 {{intel_context}}
 
+Win/loss context:
+{{win_loss_context}}
+
 Current section content:
 {{existing_sections}}
 
@@ -190,6 +193,7 @@ Rules:
       { name: 'competitor_name', type: 'string', description: 'Competitor display name.', example: 'Acme Logistics' },
       { name: 'resource_context', type: 'string', description: 'Selected resource excerpts.', example: '## Resource 1 ...' },
       { name: 'intel_context', type: 'string', description: 'Recent intelligence excerpts.', example: '## Intel 1 ...' },
+      { name: 'win_loss_context', type: 'string', description: 'Win/loss outcomes and reason trends.', example: '## Outcomes ...' },
       { name: 'existing_sections', type: 'string', description: 'Current card section JSON content.', example: '{"tldr":{"theyPosition":""}}' },
     ],
   },

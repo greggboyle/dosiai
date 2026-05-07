@@ -49,6 +49,39 @@ function formatResourceContext(rows: Array<{ file_name: string; content: string 
     .join('\n\n')
 }
 
+function formatWinLossContext(
+  rows: Array<{
+    outcome: string
+    reason_summary: string
+    reason_tags: string[] | null
+    segment: string | null
+    close_date: string
+  }>
+): string {
+  if (rows.length === 0) return '(No win/loss outcomes found for this competitor.)'
+  const tagCounts = new Map<string, number>()
+  for (const row of rows) {
+    for (const tag of row.reason_tags ?? []) {
+      const key = String(tag || '').trim()
+      if (!key) continue
+      tagCounts.set(key, (tagCounts.get(key) ?? 0) + 1)
+    }
+  }
+  const topTags = [...tagCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([tag, count]) => `${tag} (${count})`)
+  const lines = rows.map((r, i) => {
+    const seg = r.segment ? ` · ${r.segment}` : ''
+    const tags = (r.reason_tags ?? []).length > 0 ? ` · tags: ${(r.reason_tags ?? []).join(', ')}` : ''
+    return `### Outcome ${i + 1}: ${r.outcome}${seg}\n${r.reason_summary}${tags}`
+  })
+  if (topTags.length > 0) {
+    lines.unshift(`Top recurring reason tags: ${topTags.join(', ')}`)
+  }
+  return lines.join('\n\n')
+}
+
 export const draftBattleCard = inngest.createFunction(
   { id: 'draft-battle-card', retries: 1 },
   { event: 'battle-card/draft-requested' },
@@ -131,6 +164,29 @@ export const draftBattleCard = inngest.createFunction(
         : []
       const intelItemIds = intelRows.map((x) => x.id)
 
+      const [primaryOutcomeRows, additionalOutcomeRows] = await Promise.all([
+        supabase
+          .from('win_loss_outcome')
+          .select('id,outcome,reason_summary,reason_tags,segment,close_date')
+          .eq('workspace_id', workspaceId)
+          .eq('competitor_id', competitorId)
+          .order('close_date', { ascending: false })
+          .limit(10),
+        supabase
+          .from('win_loss_outcome')
+          .select('id,outcome,reason_summary,reason_tags,segment,close_date')
+          .eq('workspace_id', workspaceId)
+          .contains('additional_competitor_ids', [competitorId])
+          .order('close_date', { ascending: false })
+          .limit(10),
+      ])
+      const outcomeRowsById = new Map<string, any>()
+      for (const row of primaryOutcomeRows.data ?? []) outcomeRowsById.set(String(row.id), row)
+      for (const row of additionalOutcomeRows.data ?? []) outcomeRowsById.set(String(row.id), row)
+      const winLossRows = [...outcomeRowsById.values()]
+        .sort((a, b) => String(b.close_date ?? '').localeCompare(String(a.close_date ?? '')))
+        .slice(0, 12)
+
       const resourceChunkRows =
         selectedResourceIds.length > 0
           ? (
@@ -163,6 +219,7 @@ export const draftBattleCard = inngest.createFunction(
         competitor_name: competitorName,
         resource_context: formatResourceContext(resourceRows),
         intel_context: formatIntelContext(intelRows),
+        win_loss_context: formatWinLossContext(winLossRows),
         existing_sections: JSON.stringify(existingSections),
       })
 
@@ -257,6 +314,7 @@ export const draftBattleCard = inngest.createFunction(
           battleCardId,
           fillCount: fillUpdates.length,
           recommendationCount: recommendationInserts.length,
+          winLossCount: winLossRows.length,
         },
       })
 
