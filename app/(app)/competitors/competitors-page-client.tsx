@@ -81,6 +81,7 @@ const tierOptions: { value: CompetitorTier; label: string }[] = [
 export function CompetitorsPageClient({ initialCompetitors }: { initialCompetitors: CompetitorTableRow[] }) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = React.useState('')
+  const [statusFilter, setStatusFilter] = React.useState<'active' | 'archived'>('active')
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [name, setName] = React.useState('')
   const [website, setWebsite] = React.useState('')
@@ -92,7 +93,8 @@ export function CompetitorsPageClient({ initialCompetitors }: { initialCompetito
   const canAddCompetitor =
     canMutate({ status: workspace.status }, 'add_competitor') && memberRole !== 'viewer'
 
-  const filteredCompetitors = initialCompetitors.filter((competitor) =>
+  const statusFilteredCompetitors = initialCompetitors.filter((competitor) => competitor.status === statusFilter)
+  const filteredCompetitors = statusFilteredCompetitors.filter((competitor) =>
     competitor.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
@@ -162,14 +164,36 @@ export function CompetitorsPageClient({ initialCompetitors }: { initialCompetito
         </MutationGuard>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search competitors..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex items-center rounded-md border bg-muted/30 p-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={statusFilter === 'active' ? 'default' : 'ghost'}
+            className="h-7 px-3"
+            onClick={() => setStatusFilter('active')}
+          >
+            Active
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={statusFilter === 'archived' ? 'default' : 'ghost'}
+            className="h-7 px-3"
+            onClick={() => setStatusFilter('archived')}
+          >
+            Archived
+          </Button>
+        </div>
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search competitors..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
       </div>
 
       <Card>
@@ -187,10 +211,12 @@ export function CompetitorsPageClient({ initialCompetitors }: { initialCompetito
               </TableRow>
             </TableHeader>
             <TableBody>
-              {initialCompetitors.length === 0 ? (
+              {statusFilteredCompetitors.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-12">
-                    No competitors yet. Add your first competitor to start tracking.
+                    {statusFilter === 'active'
+                      ? 'No active competitors yet. Add your first competitor to start tracking.'
+                      : 'No archived competitors.'}
                   </TableCell>
                 </TableRow>
               ) : filteredCompetitors.length === 0 ? (

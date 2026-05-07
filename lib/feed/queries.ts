@@ -83,7 +83,10 @@ export async function listFeedItems(
     .eq('visibility', 'feed')
   query = subject === 'our-company' ? query.eq('is_about_self', true) : query.eq('is_about_self', false)
 
-  const { data: rows, error } = await query.order('ingested_at', { ascending: false }).limit(limit)
+  const { data: rows, error } = await query
+    .order('event_at', { ascending: false, nullsFirst: false })
+    .order('ingested_at', { ascending: false })
+    .limit(limit)
 
   if (error) throw error
   return mapFeedRows(supabase, (rows ?? []) as never)
@@ -108,6 +111,7 @@ export async function listFeedItemsPage(
   query = subject === 'our-company' ? query.eq('is_about_self', true) : query.eq('is_about_self', false)
 
   const { data: rows, error, count } = await query
+    .order('event_at', { ascending: false, nullsFirst: false })
     .order('ingested_at', { ascending: false })
     .range(from, to)
 
@@ -181,7 +185,10 @@ export async function listFeedItemsFiltered(
     query = query.overlaps('related_topics', topicIds)
   }
 
-  const { data: rows, error } = await query.order('ingested_at', { ascending: false }).limit(2000)
+  const { data: rows, error } = await query
+    .order('event_at', { ascending: false, nullsFirst: false })
+    .order('ingested_at', { ascending: false })
+    .limit(2000)
   if (error) throw error
   return mapFeedRows(supabase, (rows ?? []) as never)
 }
