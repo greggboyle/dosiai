@@ -287,6 +287,7 @@ export async function validatePromptTemplate(input: {
     latencyMs,
     usage: out.usage,
     preview: out.content.slice(0, 2000),
+    finalPrompt: prompt,
   }
 }
 
@@ -367,6 +368,7 @@ export async function simulateSweepBuyTemplate(input: {
 
   return {
     mode: 'sweep_buy_simulation',
+    finalPrompt: prompt,
     routing: {
       mode: routing.mode,
       primaryVendor: routing.vendor,

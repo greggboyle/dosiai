@@ -151,6 +151,7 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
   const [editedContent, setEditedContent] = React.useState('')
   const [testInputs, setTestInputs] = React.useState<Record<string, string>>({})
   const [testResult, setTestResult] = React.useState<string | null>(null)
+  const [finalPromptText, setFinalPromptText] = React.useState<string | null>(null)
   const [isRunningTest, setIsRunningTest] = React.useState(false)
   const [deployOpen, setDeployOpen] = React.useState(false)
   const [rollbackOpen, setRollbackOpen] = React.useState(false)
@@ -251,6 +252,7 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
     if (!selectedTemplate) return
     setIsRunningTest(true)
     setTestResult(null)
+    setFinalPromptText(null)
     const runner =
       selectedTemplate.purpose === 'sweep_buy'
         ? simulateSweepBuyTemplate({
@@ -266,6 +268,8 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
     void runner
       .then((res) => {
         if (selectedTemplate.purpose === 'sweep_buy') {
+          const sweepSim = res as { finalPrompt?: string }
+          setFinalPromptText(sweepSim.finalPrompt ?? null)
           setTestResult(JSON.stringify(res, null, 2))
           return
         }
@@ -275,7 +279,9 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
           latencyMs: number
           usage: unknown
           preview: string
+          finalPrompt?: string
         }
+        setFinalPromptText(standard.finalPrompt ?? null)
         setTestResult(JSON.stringify(standard, null, 2))
       })
       .catch((e) => {
@@ -768,6 +774,14 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
                         <Label className="text-[11px]">Response</Label>
                         <pre className="mt-1 p-2 bg-slate-900 text-green-400 rounded text-[11px] font-mono overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto">
                           {testResult}
+                        </pre>
+                      </div>
+                    )}
+                    {finalPromptText && (
+                      <div>
+                        <Label className="text-[11px]">Final Prompt</Label>
+                        <pre className="mt-1 p-2 bg-slate-950 text-slate-200 rounded text-[11px] font-mono overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+                          {finalPromptText}
                         </pre>
                       </div>
                     )}
