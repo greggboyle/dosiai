@@ -425,12 +425,12 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
                       })
                     }}
                   >
-                    <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-left text-[12px] font-semibold text-slate-800 hover:bg-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+                    <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-left text-[14px] font-semibold text-slate-800 hover:bg-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
                       <ChevronRight
                         className={cn('size-4 shrink-0 text-slate-500 transition-transform', isOpen && 'rotate-90')}
                       />
-                      <span className="truncate font-mono text-[11px] tracking-tight">{purpose}</span>
-                      <span className="truncate text-slate-600 font-sans font-medium">· {groupLabel}</span>
+                      <span className="truncate font-mono text-[13px] tracking-tight">{purpose}</span>
+                      <span className="truncate text-[13px] text-slate-600 font-sans font-medium">· {groupLabel}</span>
                       <Badge variant="secondary" className="ml-auto shrink-0 text-[10px] tabular-nums">
                         {groupTemplates.length}
                       </Badge>
