@@ -131,14 +131,6 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
     battleCardsCreated: snapshot.usageStats.battleCardsCreated,
   }
 
-  const battleCards = snapshot.competitorHeatmap.map((c) => ({
-    id: c.id,
-    competitor: { id: c.id, name: c.name, initial: c.initial },
-    staleSections: 0,
-    newItems: c.count,
-  }))
-
-  const staleCards = battleCards.filter((c) => c.staleSections > 0)
   const reviewQueueCount = snapshot.reviewQueueCount
 
   const recentBriefs = snapshot.recentBriefs
@@ -528,28 +520,54 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
           </DashboardModule>
         </div>
 
-        {/* BATTLE CARD FRESHNESS - 4 cols, 1 row */}
+        {/* BATTLE CARDS - 4 cols, 1 row */}
         <div className="col-span-12 sm:col-span-6 xl:col-span-4">
-          <DashboardModule title="Battle Cards">
-            {staleCards.length === 0 ? (
-              <div className="flex items-center gap-2 text-positive">
-                <CheckCircle2 className="size-4" />
-                <span className="text-sm">All {battleCards.length} battle cards current</span>
+          <DashboardModule
+            title="Battle Cards"
+            action={
+              <Link
+                href="/battle-cards"
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              >
+                View all
+                <ArrowRight className="size-3" />
+              </Link>
+            }
+          >
+            {snapshot.battleCards.length === 0 ? (
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground">No battle cards yet.</div>
+                <Button size="sm" variant="outline" asChild>
+                  <Link href="/battle-cards/new">Create your first battle card</Link>
+                </Button>
               </div>
             ) : (
               <div className="space-y-2">
-                {staleCards.slice(0, 3).map((card) => (
+                {snapshot.battleCards.slice(0, 5).map((card) => (
                   <Link
                     key={card.id}
-                    href={`/battle-cards/${card.id}`}
-                    className="flex items-center justify-between py-1.5 hover:text-accent transition-colors"
+                    href={`/battle-cards/${card.id}/edit`}
+                    className="flex items-center justify-between gap-2 rounded px-1 py-1.5 hover:bg-muted/50 transition-colors"
                   >
-                    <span className="text-sm">{card.competitor.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {card.staleSections > 0 && `${card.staleSections} stale sections`}
-                      {card.staleSections > 0 && card.newItems > 0 && ' · '}
-                      {card.newItems > 0 && `${card.newItems} new items`}
-                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm truncate">{card.competitorName}</div>
+                      <div className="text-xs text-muted-foreground">Updated {card.updatedAtLabel}</div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {card.newIntelCount > 0 ? (
+                        <Badge variant="outline" className="text-[10px]">
+                          {card.newIntelCount} new intel
+                        </Badge>
+                      ) : null}
+                      {card.needsRefresh ? (
+                        <Badge className="text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0">
+                          Needs refresh
+                        </Badge>
+                      ) : null}
+                      <Badge variant="secondary" className="text-[10px] capitalize">
+                        {card.status}
+                      </Badge>
+                    </div>
                   </Link>
                 ))}
               </div>

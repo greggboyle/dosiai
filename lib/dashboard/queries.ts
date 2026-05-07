@@ -62,6 +62,16 @@ export type DashboardSnapshot = {
     timestamp: string
   }>
   competitorHeatmap: Array<{ id: string; name: string; initial: string; count: number }>
+  battleCards: Array<{
+    id: string
+    competitorId: string
+    competitorName: string
+    status: 'draft' | 'published' | 'archived'
+    updatedAtLabel: string
+    freshnessScore: number | null
+    needsRefresh: boolean
+    newIntelCount: number
+  }>
   topicActivity: Array<{ name: string; count: number; trend: 'up' | 'down' | 'neutral'; delta: number }>
   reviewQueueCount: number
   sweep: {
@@ -121,6 +131,8 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
     suggestedRes,
     reviewQueueRes,
     heatmapRes,
+    battleCardsRes,
+    battleCardIntelRes,
     winLossRes,
   ] = await Promise.all([
     listFeedItems(workspaceId, { limit: 10 }),
@@ -172,6 +184,19 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
       .eq('workspace_id', workspaceId)
       .gte('event_at', new Date(Date.now() - 7 * 86400000).toISOString()),
     supabase
+      .from('battle_card')
+      .select('id,competitor_id,status,updated_at,freshness_score')
+      .eq('workspace_id', workspaceId)
+      .order('updated_at', { ascending: false })
+      .limit(8),
+    supabase
+      .from('intelligence_item')
+      .select('related_competitors,event_at')
+      .eq('workspace_id', workspaceId)
+      .not('event_at', 'is', null)
+      .order('event_at', { ascending: false })
+      .limit(3000),
+    supabase
       .from('win_loss_outcome')
       .select('competitor_id,outcome,close_date')
       .eq('workspace_id', workspaceId)
@@ -192,6 +217,30 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
     initial: c.name.slice(0, 2).toUpperCase(),
     count: heatmapCounts.get(c.id) ?? 0,
   }))
+
+  const battleCardRows = battleCardsRes.data ?? []
+  const intelRowsForBattleCards = battleCardIntelRes.data ?? []
+  const battleCards = battleCardRows.map((card) => {
+    const competitorName = competitors.find((c) => c.id === card.competitor_id)?.name ?? 'Competitor'
+    const updatedAt = card.updated_at
+    const updatedAtMs = new Date(updatedAt).getTime()
+    const newIntelCount = intelRowsForBattleCards.reduce((count, intel) => {
+      if (!intel.event_at || !Array.isArray(intel.related_competitors)) return count
+      if (!intel.related_competitors.includes(card.competitor_id)) return count
+      return new Date(intel.event_at).getTime() > updatedAtMs ? count + 1 : count
+    }, 0)
+    const freshnessScore = card.freshness_score ?? null
+    return {
+      id: card.id,
+      competitorId: card.competitor_id,
+      competitorName,
+      status: card.status as 'draft' | 'published' | 'archived',
+      updatedAtLabel: formatRelativeLabel(updatedAt),
+      freshnessScore,
+      needsRefresh: freshnessScore !== null && freshnessScore < 60,
+      newIntelCount,
+    }
+  })
 
   const topicRows = topicsRes.data ?? []
 
@@ -295,6 +344,7 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
       timestamp: formatRelativeLabel(b.published_at ?? b.updated_at),
     })),
     competitorHeatmap,
+    battleCards,
     topicActivity,
     reviewQueueCount: reviewQueueRes.count ?? 0,
     sweep: latestSweep
