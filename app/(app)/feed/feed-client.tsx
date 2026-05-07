@@ -762,7 +762,7 @@ export function FeedClient({
         <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-border bg-background">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">Dossier Feed</h1>
+              <h1 className="text-xl font-semibold tracking-tight">Market Intelligence Feed</h1>
               <p className="text-sm text-muted-foreground">
                 {hasServerSideFilters
                   ? `${dataSource.length} matching item${dataSource.length !== 1 ? 's' : ''}`
