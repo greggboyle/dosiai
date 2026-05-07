@@ -102,6 +102,9 @@ Query: ${query}`,
   })
   if (!res.ok) return []
   const payload = (await res.json()) as Record<string, unknown>
+  const cited = extractSourcesFromCitations(payload, query)
+  if (cited.length > 0) return dedupeSourcesByUrl(cited).slice(0, maxResults)
+
   const text = extractResponseText(payload)
   if (!text) return []
   const parsed = parseJsonFromLlmText(text) as { sources?: Array<Record<string, unknown>> }
@@ -123,6 +126,42 @@ Query: ${query}`,
       provider: 'openai-web-search',
       query,
     })
+  }
+  return out
+}
+
+function extractSourcesFromCitations(payload: Record<string, unknown>, query: string): WebSource[] {
+  const output = payload.output
+  if (!Array.isArray(output)) return []
+  const out: WebSource[] = []
+
+  for (const o of output) {
+    if (!o || typeof o !== 'object') continue
+    const content = (o as { content?: unknown }).content
+    if (!Array.isArray(content)) continue
+    for (const c of content) {
+      if (!c || typeof c !== 'object') continue
+      const annotations = (c as { annotations?: unknown }).annotations
+      if (!Array.isArray(annotations)) continue
+      for (const a of annotations) {
+        if (!a || typeof a !== 'object') continue
+        const type = (a as { type?: unknown }).type
+        if (type !== 'url_citation') continue
+        const url = typeof (a as { url?: unknown }).url === 'string' ? (a as { url: string }).url : ''
+        const title = typeof (a as { title?: unknown }).title === 'string' ? (a as { title: string }).title : ''
+        if (!url) continue
+        const domain = safeDomainFromUrl(url)
+        if (!domain) continue
+        out.push({
+          url,
+          title: title || domain,
+          domain,
+          snippet: '',
+          provider: 'openai-web-search',
+          query,
+        })
+      }
+    }
   }
   return out
 }
