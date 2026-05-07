@@ -214,6 +214,40 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
     return true
   })
 
+  const purposeOrder = React.useMemo(() => Object.keys(purposeLabels) as AIPurpose[], [])
+
+  const templatesByPurpose = React.useMemo(() => {
+    const buckets = new Map<string, PromptTemplate[]>()
+    for (const t of filteredTemplates) {
+      const list = buckets.get(t.purpose) ?? []
+      list.push(t)
+      buckets.set(t.purpose, list)
+    }
+    const keys = [...buckets.keys()]
+    keys.sort((a, b) => {
+      const ia = purposeOrder.indexOf(a as AIPurpose)
+      const ib = purposeOrder.indexOf(b as AIPurpose)
+      if (ia !== -1 && ib !== -1) return ia - ib
+      if (ia !== -1) return -1
+      if (ib !== -1) return 1
+      return a.localeCompare(b)
+    })
+    return keys.map((purpose) => ({ purpose, templates: buckets.get(purpose)! }))
+  }, [filteredTemplates, purposeOrder])
+
+  /** Purposes whose groups are collapsed in the sidebar (default: all expanded). */
+  const [collapsedPurposeGroups, setCollapsedPurposeGroups] = React.useState<Set<string>>(() => new Set())
+
+  React.useEffect(() => {
+    if (!selectedTemplate) return
+    setCollapsedPurposeGroups((prev) => {
+      if (!prev.has(selectedTemplate.purpose)) return prev
+      const next = new Set(prev)
+      next.delete(selectedTemplate.purpose)
+      return next
+    })
+  }, [selectedTemplate?.purpose, selectedTemplate?.id])
+
   const handleRunTest = () => {
     if (!selectedTemplate) return
     setIsRunningTest(true)
@@ -369,48 +403,92 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
           </div>
         </div>
 
-        {/* Template List */}
+        {/* Template List — grouped by purpose */}
         <ScrollArea className="flex-1">
-          <div className="p-2">
-            {filteredTemplates.map((template) => (
-              <button
-                key={template.id}
-                onClick={() => {
-                  setSelectedTemplate(template)
-                  setSelectedVersion(null)
-                }}
-                className={cn(
-                  'w-full text-left p-3 rounded-lg mb-1 transition-colors',
-                  selectedTemplate?.id === template.id
-                    ? 'bg-slate-100 border border-slate-300'
-                    : 'hover:bg-slate-50 border border-transparent'
-                )}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={cn(
-                    'size-2 rounded-full shrink-0',
-                    template.status === 'active' && 'bg-green-500',
-                    template.status === 'draft' && 'bg-amber-500',
-                    template.status === 'archived' && 'bg-slate-400'
-                  )} />
-                  <span className="text-[13px] font-medium text-slate-900 font-mono truncate">
-                    {template.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                  <span>v{template.version}</span>
-                  <span className="text-slate-300">•</span>
-                  <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', statusColors[template.status])}>
-                    {template.status}
-                  </Badge>
-                  <span className="text-slate-300">•</span>
-                  <span>{formatRelativeTime(template.updatedAt)}</span>
-                </div>
-                <div className="text-[11px] text-slate-400 mt-1">
-                  {template.updatedBy}
-                </div>
-              </button>
-            ))}
+          <div className="p-2 space-y-1">
+            {templatesByPurpose.length === 0 ? (
+              <p className="text-[12px] text-slate-500 px-2 py-4 text-center">No templates match filters.</p>
+            ) : (
+              templatesByPurpose.map(({ purpose, templates: groupTemplates }) => {
+                const isOpen = !collapsedPurposeGroups.has(purpose)
+                const groupLabel = purposeLabels[purpose as AIPurpose] ?? purpose
+                return (
+                  <Collapsible
+                    key={purpose}
+                    open={isOpen}
+                    onOpenChange={(open) => {
+                      setCollapsedPurposeGroups((prev) => {
+                        const next = new Set(prev)
+                        if (open) next.delete(purpose)
+                        else next.add(purpose)
+                        return next
+                      })
+                    }}
+                  >
+                    <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-left text-[12px] font-semibold text-slate-800 hover:bg-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+                      <ChevronRight
+                        className={cn('size-4 shrink-0 text-slate-500 transition-transform', isOpen && 'rotate-90')}
+                      />
+                      <span className="truncate font-mono text-[11px] tracking-tight">{purpose}</span>
+                      <span className="truncate text-slate-600 font-sans font-medium">· {groupLabel}</span>
+                      <Badge variant="secondary" className="ml-auto shrink-0 text-[10px] tabular-nums">
+                        {groupTemplates.length}
+                      </Badge>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="mt-0.5 space-y-1 pl-1">
+                        {groupTemplates.map((template) => (
+                          <button
+                            key={template.id}
+                            onClick={() => {
+                              setSelectedTemplate(template)
+                              setSelectedVersion(null)
+                            }}
+                            className={cn(
+                              'w-full text-left p-3 rounded-lg transition-colors',
+                              selectedTemplate?.id === template.id
+                                ? 'bg-slate-100 border border-slate-300'
+                                : 'hover:bg-slate-50 border border-transparent'
+                            )}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span
+                                className={cn(
+                                  'size-2 rounded-full shrink-0',
+                                  template.status === 'active' && 'bg-green-500',
+                                  template.status === 'draft' && 'bg-amber-500',
+                                  template.status === 'archived' && 'bg-slate-400'
+                                )}
+                              />
+                              <span className="text-[13px] font-medium text-slate-900 font-mono truncate">
+                                {template.name}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500">
+                              <span>v{template.version}</span>
+                              <span className="text-slate-300">•</span>
+                              <Badge
+                                variant="outline"
+                                className={cn('text-[10px] px-1.5 py-0', statusColors[template.status])}
+                              >
+                                {template.status}
+                              </Badge>
+                              <span className="text-slate-300">•</span>
+                              <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', vendorColors[template.vendor])}>
+                                {vendorLabels[template.vendor]}
+                              </Badge>
+                              <span className="text-slate-300">•</span>
+                              <span>{formatRelativeTime(template.updatedAt)}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-1">{template.updatedBy}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )
+              })
+            )}
           </div>
         </ScrollArea>
       </div>
