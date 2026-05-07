@@ -25,8 +25,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu'
 import {
   Popover,
@@ -723,6 +721,18 @@ export function FeedClient({
     }
   }
 
+  const handleSubjectToggle = React.useCallback(
+    (checked: boolean) => {
+      const next = checked ? 'our-company' : 'competitors'
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('subject', next)
+      params.set('page', '1')
+      router.replace(`${pathname}?${params.toString()}`)
+      setSubject(next)
+    },
+    [pathname, router, searchParams]
+  )
+
   return (
     <div className="flex h-[calc(100vh-4rem)] px-2 md:px-3">
       {/* Feed List Panel */}
@@ -739,33 +749,20 @@ export function FeedClient({
                 {isFilterQueryLoading ? ' · applying filters…' : ''}
               </p>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-xs">
-                  Subject: {subject === 'our-company' ? 'Our company' : 'Competitors'}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuRadioGroup
-                  value={subject}
-                  onValueChange={(v) => {
-                    const next = v === 'our-company' ? 'our-company' : 'competitors'
-                    const params = new URLSearchParams(searchParams.toString())
-                    params.set('subject', next)
-                    params.set('page', '1')
-                    router.replace(`${pathname}?${params.toString()}`)
-                    setSubject(next)
-                  }}
-                >
-                  <DropdownMenuRadioItem value="competitors" className="text-xs">
-                    Competitors
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="our-company" className="text-xs">
-                    Our company
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
+              <Label htmlFor="feed-subject-switch" className="text-xs text-muted-foreground">
+                Competitors
+              </Label>
+              <Switch
+                id="feed-subject-switch"
+                checked={subject === 'our-company'}
+                onCheckedChange={handleSubjectToggle}
+                aria-label="Toggle feed subject between competitors and our company"
+              />
+              <Label htmlFor="feed-subject-switch" className="text-xs text-muted-foreground">
+                Our Company
+              </Label>
+            </div>
           </div>
 
           {/* View Tabs */}
