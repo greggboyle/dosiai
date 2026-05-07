@@ -1,10 +1,11 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import type { MISScore } from '@/lib/types'
+import type { Category, MISScore } from '@/lib/types'
 import { listFeedItems } from '@/lib/feed/queries'
 
 export type DashboardFeedRow = {
   id: string
   title: string
+  category: Category
   competitorInitial: string
   competitorName: string
   mis: MISScore
@@ -214,6 +215,7 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
     return {
       id: item.id,
       title: item.title,
+      category: item.category,
       competitorInitial: name.slice(0, 2).toUpperCase(),
       competitorName: name,
       mis: item.mis,

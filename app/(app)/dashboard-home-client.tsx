@@ -42,6 +42,7 @@ import type { TrialUsageStats } from '@/lib/billing-types'
 import { useWorkspaceContext } from '@/components/workspace-context'
 import { formatRelativeLabel, type DashboardSnapshot } from '@/lib/dashboard/queries'
 import { getLatestSweepStatus, triggerManualSweep } from '@/app/(app)/dashboard/actions'
+import { getCategoryInfo } from '@/lib/types'
 
 
 // =============================================================================
@@ -267,24 +268,30 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
             }
           >
             <div className="space-y-1">
-              {snapshot.feed.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/feed?item=${item.id}`}
-                  className="flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors group"
-                >
-                  <MISBadge score={item.mis} size="sm" showConfidence={false} />
-                  <span className="flex-1 text-sm font-medium truncate group-hover:text-accent transition-colors">
-                    {item.title}
-                  </span>
-                  <Badge variant="secondary" className="text-xs flex-shrink-0">
-                    {item.competitorInitial}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground flex-shrink-0 w-12 text-right">
-                    {item.timestampLabel}
-                  </span>
-                </Link>
-              ))}
+              {snapshot.feed.map((item) => {
+                const categoryInfo = getCategoryInfo(item.category)
+                return (
+                  <Link
+                    key={item.id}
+                    href={`/feed?item=${item.id}`}
+                    className="flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors group"
+                  >
+                    <MISBadge score={item.mis} size="sm" showConfidence={false} />
+                    <span className="flex-1 text-sm font-medium truncate group-hover:text-accent transition-colors">
+                      {item.title}
+                    </span>
+                    <Badge variant="outline" className={cn('text-[10px] border-0', categoryInfo.color)}>
+                      {categoryInfo.label}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs flex-shrink-0">
+                      {item.competitorInitial}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground flex-shrink-0 w-12 text-right">
+                      {item.timestampLabel}
+                    </span>
+                  </Link>
+                )
+              })}
             </div>
           </DashboardModule>
         </div>
