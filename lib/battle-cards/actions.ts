@@ -134,7 +134,7 @@ export async function createBattleCardAiDraftFromForm(formData: FormData): Promi
 
   revalidatePath('/battle-cards')
   revalidatePath(`/battle-cards/${battleCardId}/edit`)
-  redirect(`/battle-cards/${battleCardId}/edit`)
+  redirect('/battle-cards')
 }
 
 export async function createBattleCard(competitorId: string): Promise<string> {

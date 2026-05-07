@@ -30,6 +30,7 @@ export default async function BattleCardsPage() {
     version: r.version,
     freshness_score: r.freshness_score,
     updated_at: r.updated_at,
+    aiDraftStatus: r.aiDraftStatus,
   }))
 
   const canAuthor = member.role === 'admin' || member.role === 'analyst'

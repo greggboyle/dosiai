@@ -19,6 +19,7 @@ export interface BattleCardListRow {
   version: number
   freshness_score: number | null
   updated_at: string
+  aiDraftStatus: 'queued' | 'processing' | 'ready' | 'failed' | null
 }
 
 interface Props {
@@ -86,9 +87,16 @@ export function BattleCardsListClient({ cards, canAuthor, canDelete }: Props) {
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-base">{card.competitorName}</CardTitle>
-                  <Badge variant={card.status === 'published' ? 'default' : 'secondary'} className="text-[10px] shrink-0">
-                    {card.status}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    {card.aiDraftStatus === 'queued' || card.aiDraftStatus === 'processing' ? (
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        AI drafting…
+                      </Badge>
+                    ) : null}
+                    <Badge variant={card.status === 'published' ? 'default' : 'secondary'} className="text-[10px] shrink-0">
+                      {card.status}
+                    </Badge>
+                  </div>
                 </div>
                 <CardDescription className="text-xs">
                   v{card.version}

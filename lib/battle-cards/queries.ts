@@ -29,13 +29,26 @@ export async function listBattleCardsWithCompetitor(workspaceId: string) {
   if (!cards?.length) return []
 
   const compIds = [...new Set(cards.map((c) => c.competitor_id))]
+  const cardIds = cards.map((c) => c.id)
   const { data: comps } = await supabase.from('competitor').select('id,name').in('id', compIds)
+  const { data: runs } = await supabase
+    .from('battle_card_generation_run')
+    .select('battle_card_id,status,created_at')
+    .in('battle_card_id', cardIds)
+    .order('created_at', { ascending: false })
 
   const nameById = Object.fromEntries((comps ?? []).map((c) => [c.id, c.name]))
+  const latestRunByCard = new Map<string, string>()
+  for (const run of runs ?? []) {
+    if (!latestRunByCard.has(run.battle_card_id)) {
+      latestRunByCard.set(run.battle_card_id, run.status)
+    }
+  }
 
   return cards.map((c) => ({
     ...c,
     competitorName: nameById[c.competitor_id] ?? 'Competitor',
+    aiDraftStatus: latestRunByCard.get(c.id) ?? null,
   }))
 }
 
