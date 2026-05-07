@@ -165,6 +165,12 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
   const [cloningDraft, setCloningDraft] = React.useState(false)
   const [rollingBack, setRollingBack] = React.useState(false)
 
+  const effectiveSelectedVersion =
+    selectedVersion ??
+    (selectedTemplate?.draftContent
+      ? (selectedTemplate.draftVersion ?? selectedTemplate.version)
+      : selectedTemplate?.version)
+
   const persistDraft = async () => {
     if (!selectedTemplate) return
     setSavingDraft(true)
@@ -197,14 +203,14 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
   // Initialize edited content when template changes
   React.useEffect(() => {
     if (selectedTemplate) {
-      const version = selectedVersion ?? selectedTemplate.version
+      const version = effectiveSelectedVersion ?? selectedTemplate.version
       if (version === selectedTemplate.draftVersion && selectedTemplate.draftContent) {
         setEditedContent(selectedTemplate.draftContent)
       } else {
         setEditedContent(selectedTemplate.content)
       }
     }
-  }, [selectedTemplate, selectedVersion])
+  }, [selectedTemplate, selectedVersion, effectiveSelectedVersion])
 
   // Filter templates
   const filteredTemplates = templates.filter((t) => {
@@ -497,7 +503,7 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
                     {selectedTemplate.name}
                   </h2>
                   <Select 
-                    value={String(selectedVersion ?? selectedTemplate.version)}
+                    value={String(effectiveSelectedVersion ?? selectedTemplate.version)}
                     onValueChange={(v) => setSelectedVersion(Number(v))}
                   >
                     <SelectTrigger className="h-7 w-[100px] text-[12px] font-mono">
