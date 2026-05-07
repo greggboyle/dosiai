@@ -170,7 +170,7 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
       .from('intelligence_item')
       .select('related_competitors')
       .eq('workspace_id', workspaceId)
-      .gte('ingested_at', new Date(Date.now() - 7 * 86400000).toISOString()),
+      .gte('event_at', new Date(Date.now() - 7 * 86400000).toISOString()),
     supabase
       .from('win_loss_outcome')
       .select('competitor_id,outcome,close_date')
