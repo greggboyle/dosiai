@@ -361,10 +361,6 @@ function parseVectorString(s: string | null): number[] | null {
   }
 }
 
-function normalizeTextForMentionCheck(value: string): string {
-  return value.toLowerCase().replace(/\s+/g, ' ').trim()
-}
-
 /** Strip trailing punctuation models often add to names ("Acme," → "Acme"). */
 function normalizeAiCompetitorLabel(label: string): string {
   return label.replace(/[\s,.;:]+$/g, '').trim()
@@ -421,161 +417,6 @@ function resolveCompetitorIdFromAiLabel(
   return null
 }
 
-function proseContainsAnyNameNeedle(proseParts: string[], needles: string[]): boolean {
-  const cleaned = [...new Set(needles.map((n) => normalizeTextForMentionCheck(n)))].filter((n) => n.length >= 3)
-  if (cleaned.length === 0) return false
-  for (const needle of cleaned) {
-    if (proseParts.some((value) => normalizeTextForMentionCheck(value).includes(needle))) return true
-  }
-  return false
-}
-
-function normalizeHostname(host: string): string {
-  const h = host.trim().toLowerCase()
-  if (!h) return ''
-  return h.startsWith('www.') ? h.slice(4) : h
-}
-
-function hostnameFromUrlString(urlStr: string): string | null {
-  try {
-    const t = urlStr.trim()
-    if (!t) return null
-    const href = /^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `https://${t}`
-    const u = new URL(href)
-    return normalizeHostname(u.hostname)
-  } catch {
-    return null
-  }
-}
-
-/** Same host or parent/child subdomain (e.g. blog.acme.com vs acme.com). */
-function hostsAlign(a: string, b: string): boolean {
-  const x = normalizeHostname(a)
-  const y = normalizeHostname(b)
-  if (!x || !y) return false
-  if (x === y) return true
-  if (x.endsWith('.' + y) || y.endsWith('.' + x)) return true
-  return false
-}
-
-function parseProductNamesFromJson(raw: unknown): string[] {
-  if (!raw || !Array.isArray(raw)) return []
-  const out: string[] = []
-  for (const x of raw) {
-    if (!x || typeof x !== 'object') continue
-    const name = (x as Record<string, unknown>).name
-    if (typeof name !== 'string') continue
-    const t = name.trim()
-    if (t.length >= 3) out.push(t)
-  }
-  return out
-}
-
-function sourceUrlsMatchCompetitorWebsite(
-  item: RawSweepItem,
-  competitorWebsite: string | null | undefined
-): boolean {
-  const compHost = competitorWebsite ? hostnameFromUrlString(competitorWebsite) : null
-  if (!compHost) return false
-  for (const s of item.sourceUrls ?? []) {
-    const urlHost = s.url ? hostnameFromUrlString(s.url) : null
-    if (urlHost && hostsAlign(compHost, urlHost)) return true
-    if (s.domain?.trim() && hostsAlign(compHost, s.domain)) return true
-  }
-  return false
-}
-
-/** Substrings to match against intel text + sources when comparing to competitor.website */
-function extractUrlMatchNeedles(raw: string | null | undefined): string[] {
-  if (raw == null) return []
-  const trimmed = String(raw).trim()
-  if (!trimmed) return []
-  const needles = new Set<string>()
-  needles.add(trimmed.toLowerCase())
-  try {
-    const href = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
-    const u = new URL(href)
-    const host = u.hostname.toLowerCase()
-    const hostNoWww = host.startsWith('www.') ? host.slice(4) : host
-    needles.add(host)
-    needles.add(hostNoWww)
-    needles.add(`${u.protocol}//${u.host}`.toLowerCase())
-    needles.add(u.href.toLowerCase())
-    if (u.pathname && u.pathname !== '/') {
-      needles.add(`${hostNoWww}${u.pathname}`.toLowerCase())
-    }
-  } catch {
-    /* keep trimmed lowercase only */
-  }
-  return [...needles].filter((n) => n.length >= 4)
-}
-
-function collectProseHaystackParts(item: RawSweepItem): string[] {
-  const wh = item.fiveWH
-  const fromEntities = (item.entitiesMentioned ?? []).map((e) => e.name).filter(Boolean)
-  const rm = item.reviewMetadata
-  return [
-    ...fromEntities,
-    item.title,
-    item.summary,
-    item.fullSummary ?? '',
-    item.content ?? '',
-    item.confidenceReason ?? '',
-    rm?.excerpt ?? '',
-    rm?.platform ?? '',
-    wh?.who ?? '',
-    wh?.what ?? '',
-    wh?.when ?? '',
-    wh?.where ?? '',
-    wh?.why ?? '',
-    wh?.how ?? '',
-  ]
-}
-
-/** Lowercased blob for URL substring checks (sources + prose; URLs not whitespace-normalized beyond lowercasing). */
-function buildUrlMatchHaystack(item: RawSweepItem): string {
-  const parts: string[] = [...collectProseHaystackParts(item)]
-  for (const s of item.sourceUrls ?? []) {
-    parts.push(s.url, s.domain, s.name)
-  }
-  return parts.join('\n').toLowerCase()
-}
-
-function isCompetitorDirectlyMentioned(
-  item: RawSweepItem,
-  canonicalCompetitorName: string,
-  aiSuggestedLabel: string | undefined,
-  competitorWebsite: string | null | undefined,
-  productNames: string[]
-): boolean {
-  const proseParts = collectProseHaystackParts(item)
-
-  const nameNeedles = [canonicalCompetitorName, aiSuggestedLabel].filter(
-    (x): x is string => typeof x === 'string' && normalizeAiCompetitorLabel(x).length > 0
-  )
-  if (proseContainsAnyNameNeedle(proseParts, nameNeedles)) {
-    return true
-  }
-
-  for (const pn of productNames) {
-    const pt = normalizeTextForMentionCheck(pn)
-    if (pt.length < 3) continue
-    if (proseParts.some((value) => normalizeTextForMentionCheck(value).includes(pt))) {
-      return true
-    }
-  }
-
-  if (sourceUrlsMatchCompetitorWebsite(item, competitorWebsite)) return true
-
-  const urlHaystack = buildUrlMatchHaystack(item)
-  if (urlHaystack.trim()) {
-    for (const needle of extractUrlMatchNeedles(competitorWebsite)) {
-      if (urlHaystack.includes(needle)) return true
-    }
-  }
-  return false
-}
-
 export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ sweepId: string; itemsIngested: number }> {
   const supabase = createSupabaseAdminClient()
   const { data: ws, error: wsErr } = await supabase.from('workspace').select('*').eq('id', input.workspaceId).single()
@@ -596,7 +437,7 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
 
   const { data: competitors } = await supabase
     .from('competitor')
-    .select('id,name,tier,website,products')
+    .select('id,name,tier')
     .eq('workspace_id', input.workspaceId)
     .eq('status', 'active')
   const { data: topicRows } = await supabase
@@ -744,12 +585,6 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       .eq('workspace_id', input.workspaceId)
       .gte('ingested_at', since.toISOString())
 
-    const websiteByCompetitorId: Record<string, string | null> = {}
-    const productsByCompetitorId: Record<string, string[]> = {}
-    for (const c of competitors ?? []) {
-      websiteByCompetitorId[c.id] = c.website ?? null
-      productsByCompetitorId[c.id] = parseProductNamesFromJson(c.products)
-    }
     const competitorList = (competitors ?? []).map((c) => ({ id: c.id, name: c.name }))
 
     let itemsNew = 0
@@ -776,15 +611,8 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       for (const n of item.relatedCompetitorNames ?? []) {
         const id = resolveCompetitorIdFromAiLabel(n, competitorList)
         if (!id || seenCompetitorId.has(id)) continue
-        const canonical = competitors?.find((c) => c.id === id)?.name ?? normalizeAiCompetitorLabel(n)
-        const website = websiteByCompetitorId[id]
-        const products = productsByCompetitorId[id] ?? []
-        if (
-          isCompetitorDirectlyMentioned(item, canonical, normalizeAiCompetitorLabel(n), website, products)
-        ) {
-          seenCompetitorId.add(id)
-          relatedCompetitorIds.push(id)
-        }
+        seenCompetitorId.add(id)
+        relatedCompetitorIds.push(id)
       }
 
       const relatedTopicIds: string[] = []
