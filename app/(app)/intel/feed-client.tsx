@@ -1129,7 +1129,7 @@ export function FeedClient({
           closeDetailPanel()
         }}
       >
-        <SheetContent side="right" className="w-full max-w-none p-0">
+        <SheetContent side="right" className="w-full sm:max-w-[40rem] p-0">
           <FeedDetail
             item={selectedItem}
             onClose={closeDetailPanel}
