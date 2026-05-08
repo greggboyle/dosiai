@@ -201,11 +201,16 @@ export function FeedDetail({ item, onMarkReviewed, competitorOptions = [], onAtt
                 </SelectContent>
               </Select>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {hasAnyCompetitorOptions
-                  ? 'No available competitors to add. This item is already tagged to all selectable competitors.'
-                  : 'No competitors are currently available to tag. Add or re-activate competitors, then try again.'}
-              </p>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  {hasAnyCompetitorOptions
+                    ? 'No available competitors to add. This item is already tagged to all selectable competitors.'
+                    : 'No competitors are currently available to tag. Add or re-activate competitors, then try again.'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Tagged: {item.relatedCompetitors?.length ?? 0} / Selectable: {competitorOptions.length}
+                </p>
+              </div>
             )}
           </div>
           <DialogFooter>

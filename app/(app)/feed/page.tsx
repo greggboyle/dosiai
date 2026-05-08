@@ -28,16 +28,17 @@ export default async function FeedPage({
     : { items: [], total: 0, page: 1, pageSize, totalPages: 1 }
   const selectedItem =
     workspaceId && itemParam ? (await getFeedItemsByIds(workspaceId, [itemParam]))[0] ?? null : null
-  const competitorOptions = workspaceId
-    ? (
-        await createSupabaseServerClient()
-      )
-        .from('competitor')
-        .select('id,name,status')
-        .eq('workspace_id', workspaceId)
-        .in('status', ['active', 'archived'])
-        .order('name', { ascending: true })
-    : { data: [] as Array<{ id: string; name: string }> }
+  let competitorOptions: Array<{ id: string; name: string }> = []
+  if (workspaceId) {
+    const supabase = await createSupabaseServerClient()
+    const { data, error } = await supabase
+      .from('competitor')
+      .select('id,name')
+      .eq('workspace_id', workspaceId)
+      .order('name', { ascending: true })
+    if (error) throw error
+    competitorOptions = data ?? []
+  }
 
   let reviewQueueThreshold = 30
   if (workspaceId) {
@@ -61,7 +62,7 @@ export default async function FeedPage({
         totalItems={paged.total}
         totalPages={paged.totalPages}
         initialSelectedItem={selectedItem}
-        competitorOptions={(competitorOptions.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
+        competitorOptions={competitorOptions}
       />
     </Suspense>
   )
