@@ -11,6 +11,7 @@ import {
   Link2, 
   Users, 
   Eye,
+  X,
   ChevronDown,
   ChevronUp,
   Send,
@@ -50,6 +51,7 @@ import { getRelativeTime, getCategoryInfo } from '@/lib/types'
 
 interface FeedDetailProps {
   item: IntelligenceItem | null
+  onClose?: () => void
   onMarkReviewed?: () => void | Promise<void>
   onToggleWatching?: () => void | Promise<void>
   competitorOptions?: Array<{ id: string; name: string }>
@@ -58,6 +60,7 @@ interface FeedDetailProps {
 
 export function FeedDetail({
   item,
+  onClose,
   onMarkReviewed,
   onToggleWatching,
   competitorOptions = [],
@@ -146,49 +149,60 @@ export function FeedDetail({
               Share
             </Button>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8">
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem
-                className="text-xs"
-                onClick={() => {
-                  void onToggleWatching?.()
-                }}
-              >
-                <Eye className="size-3.5 mr-2" />
-                {item.isWatching ? 'Stop Watching' : 'Add to Watching'}
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-xs">
-                <CheckCircle className="size-3.5 mr-2" />
-                Mark as Read
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-xs">
-                <Link2 className="size-3.5 mr-2" />
-                Link to Brief
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-xs"
-                onClick={() => {
-                  setTagDialogOpen(true)
-                }}
-              >
-                <Users className="size-3.5 mr-2" />
-                Attribute to Competitor
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-xs">
-                Override Score
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-xs text-destructive">
-                Report Issue
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-8">
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => {
+                    void onToggleWatching?.()
+                  }}
+                >
+                  <Eye className="size-3.5 mr-2" />
+                  {item.isWatching ? 'Stop Watching' : 'Add to Watching'}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-xs">
+                  <CheckCircle className="size-3.5 mr-2" />
+                  Mark as Read
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-xs">
+                  <Link2 className="size-3.5 mr-2" />
+                  Link to Brief
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-xs"
+                  onClick={() => {
+                    setTagDialogOpen(true)
+                  }}
+                >
+                  <Users className="size-3.5 mr-2" />
+                  Attribute to Competitor
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-xs">
+                  Override Score
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-xs text-destructive">
+                  Report Issue
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={onClose}
+              aria-label="Close detail panel"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
         </div>
       </div>
 

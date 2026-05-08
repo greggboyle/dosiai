@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -37,7 +37,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FeedList } from '@/components/feed/feed-list'
 import { FeedDetail } from '@/components/feed/feed-detail'
 import type { IntelligenceItem, Category } from '@/lib/types'
-import { useMediaQuery } from '@/hooks/use-media-query'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   attachCompetitorToIntelligenceItem,
@@ -484,7 +483,6 @@ export function FeedClient({
 
   const [selectedItem, setSelectedItem] = React.useState<IntelligenceItem | null>(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
-  const isDesktop = useMediaQuery('(min-width: 1280px)')
   
   // View tabs
   const searchParams = useSearchParams()
@@ -506,12 +504,19 @@ export function FeedClient({
 
   React.useEffect(() => {
     const selectedId = searchParams.get('item')
-    if (!selectedId) return
+    if (!selectedId) {
+      setSelectedItem(null)
+      setDetailOpen(false)
+      return
+    }
     const matched = items.find((i) => i.id === selectedId) ?? initialSelectedItem ?? null
-    if (!matched) return
+    if (!matched) {
+      setDetailOpen(false)
+      return
+    }
     setSelectedItem(matched)
-    if (!isDesktop) setDetailOpen(true)
-  }, [searchParams, items, initialSelectedItem, isDesktop])
+    setDetailOpen(true)
+  }, [searchParams, items, initialSelectedItem])
   
   // Filters
   const [selectedCategories, setSelectedCategories] = React.useState<Category[]>([])
@@ -787,11 +792,23 @@ export function FeedClient({
     setShowUnreadOnly(false)
   }
 
+  const closeDetailPanel = React.useCallback(() => {
+    setDetailOpen(false)
+    setSelectedItem(null)
+
+    const params = new URLSearchParams(searchParams.toString())
+    if (!params.has('item')) return
+    params.delete('item')
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname)
+  }, [pathname, router, searchParams])
+
   const handleSelectItem = (item: IntelligenceItem) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('item', item.id)
+    router.replace(`${pathname}?${params.toString()}`)
     setSelectedItem(item)
-    if (!isDesktop) {
-      setDetailOpen(true)
-    }
+    setDetailOpen(true)
   }
 
   const handleSubjectToggle = React.useCallback(
@@ -809,7 +826,7 @@ export function FeedClient({
   return (
     <div className="flex h-[calc(100vh-4rem)] px-2 md:px-3">
       {/* Feed List Panel */}
-      <div className="flex-1 xl:basis-3/5 xl:shrink-0 flex flex-col min-w-0 border-r border-border">
+      <div className="flex flex-1 min-w-0 flex-col">
         {/* Header */}
         <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-border bg-background">
           <div className="flex items-center justify-between mb-4">
@@ -1102,11 +1119,20 @@ export function FeedClient({
         </div>
       </div>
 
-      {/* Detail Panel - Desktop */}
-      {isDesktop && (
-        <div className="hidden xl:flex xl:basis-2/5 min-w-0 flex-col bg-card">
+      <Sheet
+        open={detailOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setDetailOpen(true)
+            return
+          }
+          closeDetailPanel()
+        }}
+      >
+        <SheetContent side="right" className="w-full max-w-none p-0">
           <FeedDetail
             item={selectedItem}
+            onClose={closeDetailPanel}
             onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)}
             onToggleWatching={() => (selectedItem ? handleToggleWatching(selectedItem) : Promise.resolve())}
             competitorOptions={competitorOptions}
@@ -1114,25 +1140,8 @@ export function FeedClient({
               selectedItem ? handleAttachCompetitor(selectedItem, competitorId) : Promise.resolve()
             }
           />
-        </div>
-      )}
-
-      {/* Detail Panel - Mobile/Tablet Sheet */}
-      {!isDesktop && (
-        <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
-          <SheetContent side="right" className="w-full sm:max-w-lg p-0">
-            <FeedDetail
-              item={selectedItem}
-              onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)}
-              onToggleWatching={() => (selectedItem ? handleToggleWatching(selectedItem) : Promise.resolve())}
-              competitorOptions={competitorOptions}
-              onAttachCompetitor={(competitorId) =>
-                selectedItem ? handleAttachCompetitor(selectedItem, competitorId) : Promise.resolve()
-              }
-            />
-          </SheetContent>
-        </Sheet>
-      )}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
