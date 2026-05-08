@@ -166,7 +166,7 @@ export function BriefReaderClient({ brief, linkedItems, canEdit }: BriefReaderCl
                     <MISBadge score={item.mis} size="sm" />
                     <div className="flex-1 min-w-0">
                       <Link
-                        href={`/feed?item=${item.id}`}
+                        href={`/intel?item=${item.id}`}
                         className="font-medium text-sm hover:underline line-clamp-2"
                       >
                         {item.title}

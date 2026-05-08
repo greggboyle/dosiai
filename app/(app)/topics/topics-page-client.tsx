@@ -474,7 +474,7 @@ function TopicCard({
         
         {/* View Feed Button */}
         <Button variant="outline" className="w-full" asChild>
-          <Link href={`/feed?topic=${encodeURIComponent(topic.name)}`}>
+          <Link href={`/intel?topic=${encodeURIComponent(topic.name)}`}>
             <ExternalLink className="size-4 mr-2" />
             View topic feed
           </Link>

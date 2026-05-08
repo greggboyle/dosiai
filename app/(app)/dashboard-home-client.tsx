@@ -248,7 +248,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
             title="Latest Intel"
             action={
               <Link
-                href="/feed"
+                href="/intel"
                 className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
               >
                 View all
@@ -262,7 +262,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
                 return (
                   <Link
                     key={item.id}
-                    href={`/feed?item=${item.id}`}
+                    href={`/intel?item=${item.id}`}
                     className="flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors group"
                   >
                     <MISBadge score={item.mis} size="sm" showConfidence={false} />
@@ -492,7 +492,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
                   return (
                     <Link
                       key={item.id}
-                      href={`/feed?tab=week&competitor=${encodeURIComponent(item.name)}`}
+                      href={`/intel?tab=week&competitor=${encodeURIComponent(item.name)}`}
                       className="flex items-center gap-3 rounded px-1 py-1 hover:bg-muted/50 transition-colors"
                     >
                       <span className="text-xs text-muted-foreground w-20 truncate">
@@ -576,7 +576,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
               {snapshot.topicActivity.map((topic) => (
                 <Link
                   key={topic.name}
-                  href={`/feed?topic=${encodeURIComponent(topic.name)}`}
+                  href={`/intel?topic=${encodeURIComponent(topic.name)}`}
                   className="flex items-center justify-between py-1 hover:text-accent transition-colors"
                 >
                   <span className="text-sm truncate">{topic.name}</span>
@@ -695,7 +695,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
               </div>
             ) : (
               <Link
-                href="/feed?tab=review"
+                href="/intel?tab=review"
                 className="flex items-center justify-between group"
               >
                 <div className="flex items-center gap-2">

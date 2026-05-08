@@ -184,8 +184,8 @@ This checklist translates `docs/own-company-sweep-feature-design-spec.md` into c
 - [ ] Update feed client controls.
 
 **Primary files**:
-- `app/(app)/feed/page.tsx`
-- `app/(app)/feed/feed-client.tsx`
+- `app/(app)/intel/page.tsx`
+- `app/(app)/intel/feed-client.tsx`
 - `lib/feed/queries.ts`
 
 ### 13) About Us tab

@@ -237,8 +237,8 @@ Users need to isolate own-company mentions from broader market intelligence on t
 - Apply `is_about_self` filter in server query.
 
 **Files**
-- `app/(app)/feed/feed-client.tsx`
-- `app/(app)/feed/page.tsx`
+- `app/(app)/intel/feed-client.tsx`
+- `app/(app)/intel/page.tsx`
 - `lib/feed/queries.ts`
 
 **Acceptance criteria**

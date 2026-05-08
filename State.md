@@ -13,7 +13,7 @@
 - `monthly-cost-reset` (cron 1st of month UTC)
 
 ### Routes / surfaces wired to real data
-- `/feed` — server-loaded `intelligence_item` rows (`visibility=feed`); review queue tab uses workspace `review_queue_threshold`; **Mark reviewed** persists `reviewed_at` / `reviewed_by`; detail panel shows vendor consensus ratio
+- `/intel` — server-loaded `intelligence_item` rows (`visibility=feed`); review queue tab uses workspace `review_queue_threshold`; **Mark reviewed** persists `reviewed_at` / `reviewed_by`; detail panel shows vendor consensus ratio
 - `/` dashboard — `loadDashboardSnapshot` drives feed, sweep status, competitor heatmap (7d), topic counts (7d), suggested competitors, usage counts, review queue count
 - `/admin` operator sweep — `runSweepOnBehalf` dispatches `sweep/run`
 - Operator `/admin/ai-routing`, `/admin/prompts`, `/admin/vendor-health`, `/admin/billing` — wired to server actions / queries (service role after operator check)

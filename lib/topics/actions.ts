@@ -35,7 +35,7 @@ export async function createTopic(input: {
     if (!data?.id) throw new Error('Failed to create topic')
 
     revalidatePath('/topics')
-    revalidatePath('/feed')
+    revalidatePath('/intel')
     return { id: data.id }
   })
 }
@@ -68,7 +68,7 @@ export async function updateTopic(input: {
   })
 
   revalidatePath('/topics')
-  revalidatePath('/feed')
+  revalidatePath('/intel')
 }
 
 export async function archiveTopic(input: { workspaceId: string; topicId: string }): Promise<void> {
@@ -84,5 +84,5 @@ export async function archiveTopic(input: { workspaceId: string; topicId: string
   })
 
   revalidatePath('/topics')
-  revalidatePath('/feed')
+  revalidatePath('/intel')
 }

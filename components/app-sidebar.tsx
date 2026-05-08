@@ -64,7 +64,7 @@ const coreNavItems: NavItemConfig[] = [
   { label: 'Home', href: '/', icon: LayoutDashboard },
   {
     label: 'All Intel',
-    href: '/feed',
+    href: '/intel',
     icon: Newspaper,
     badge: (c) => (c.feedReviewQueue > 0 ? c.feedReviewQueue : undefined),
   },

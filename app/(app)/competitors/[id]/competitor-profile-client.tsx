@@ -1309,7 +1309,7 @@ export function CompetitorProfileClient({
                               {item.eventDate ? formatIntelEventDate(item.eventDate) : getRelativeTime(item.timestamp)}
                             </span>
                           </div>
-                          <Link href={`/feed?item=${item.id}`} className="hover:underline">
+                          <Link href={`/intel?item=${item.id}`} className="hover:underline">
                             <p className="font-medium text-sm mb-1">{item.title}</p>
                           </Link>
                           <p className="text-sm text-muted-foreground">{item.summary}</p>
