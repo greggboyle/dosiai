@@ -6,8 +6,6 @@ export type DashboardFeedRow = {
   id: string
   title: string
   category: Category
-  competitorInitial: string
-  competitorName: string
   mis: MISScore
   timestampLabel: string
 }
@@ -269,21 +267,15 @@ export async function loadDashboardSnapshot(workspaceId: string): Promise<Dashbo
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   })
 
-  const feed: DashboardFeedRow[] = sortedFeedItems.map((item) => {
-    const primaryComp = item.relatedCompetitors?.[0]
-    const name = primaryComp?.name ?? 'Market'
-    return {
-      id: item.id,
-      title: item.title,
-      category: item.category,
-      competitorInitial: name.slice(0, 2).toUpperCase(),
-      competitorName: name,
-      mis: item.mis,
-      timestampLabel: item.eventDate
-        ? formatIntelEventDate(item.eventDate)
-        : formatRelativeLabel(item.timestamp),
-    }
-  })
+  const feed: DashboardFeedRow[] = sortedFeedItems.map((item) => ({
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    mis: item.mis,
+    timestampLabel: item.eventDate
+      ? formatIntelEventDate(item.eventDate)
+      : formatRelativeLabel(item.timestamp),
+  }))
 
   const latestSweep = latestSweepRes.data
 

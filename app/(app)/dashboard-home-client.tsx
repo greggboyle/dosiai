@@ -275,10 +275,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
                     <Badge variant="outline" className={cn('text-[10px] border-0', categoryInfo.color)}>
                       {categoryInfo.label}
                     </Badge>
-                    <Badge variant="secondary" className="text-xs flex-shrink-0">
-                      {item.competitorInitial}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground flex-shrink-0 w-12 text-right">
+                    <span className="text-xs text-muted-foreground flex-shrink-0 text-right whitespace-nowrap pl-2 min-w-[10rem] tabular-nums">
                       {item.timestampLabel}
                     </span>
                   </Link>
