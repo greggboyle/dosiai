@@ -1,4 +1,3 @@
-import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export type CreateEmptyBriefDraftResult =
@@ -63,6 +62,5 @@ export async function createEmptyBriefDraftForSession(): Promise<CreateEmptyBrie
     return { ok: false, reason: 'insert_failed', message: error?.message }
   }
 
-  revalidatePath('/briefs')
   return { ok: true, id: data.id }
 }

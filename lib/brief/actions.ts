@@ -64,6 +64,7 @@ export async function createBriefDraft(): Promise<string> {
             : result.message ?? 'Could not create brief'
     throw new Error(msg)
   }
+  revalidatePath('/briefs')
   return result.id
 }
 
