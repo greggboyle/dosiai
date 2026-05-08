@@ -43,6 +43,7 @@ import { useWorkspaceContext } from '@/components/workspace-context'
 import { formatRelativeLabel, type DashboardSnapshot } from '@/lib/dashboard/queries'
 import { getLatestSweepStatus, triggerManualSweep } from '@/app/(app)/dashboard/actions'
 import { getCategoryInfo } from '@/lib/types'
+import { useMediaQuery } from '@/hooks/use-media-query'
 
 
 // =============================================================================
@@ -91,6 +92,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
     snapshot.sweep?.status === 'running' || snapshot.sweep?.status === 'queued'
   )
   const [sweepError, setSweepError] = React.useState<string | null>(null)
+  const isMobile = useMediaQuery('(max-width: 767px)')
 
   const isSweepInProgress = sweepRunning || sweepStatus === 'running' || sweepStatus === 'queued'
 
@@ -134,6 +136,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
   const reviewQueueCount = snapshot.reviewQueueCount
 
   const recentBriefs = snapshot.recentBriefs.slice(0, 3)
+  const latestIntelItems = isMobile ? snapshot.feed.slice(0, 5) : snapshot.feed
 
   const heatRanked = [...snapshot.competitorHeatmap].sort((a, b) => b.count - a.count)
   const customerVoice = heatRanked.slice(0, 4).map((c, i) => ({
@@ -256,25 +259,49 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
               </Link>
             }
           >
-            <div className="space-y-1">
-              {snapshot.feed.map((item) => {
+            <div className={cn('space-y-1', isMobile && 'space-y-2')}>
+              {latestIntelItems.map((item) => {
                 const categoryInfo = getCategoryInfo(item.category)
                 return (
                   <Link
                     key={item.id}
                     href={`/intel?item=${item.id}`}
-                    className="flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-md hover:bg-muted/50 transition-colors group"
+                    className={cn(
+                      'group -mx-2 rounded-md px-2 transition-colors hover:bg-muted/50',
+                      isMobile
+                        ? 'py-2.5'
+                        : 'flex items-center gap-3 py-2.5'
+                    )}
                   >
-                    <MISBadge score={item.mis} size="sm" showConfidence={false} />
-                    <span className="flex-1 text-sm font-medium truncate group-hover:text-accent transition-colors">
-                      {item.title}
-                    </span>
-                    <Badge variant="outline" className={cn('text-[10px] border-0', categoryInfo.color)}>
-                      {categoryInfo.label}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground flex-shrink-0 text-right whitespace-nowrap pl-2 min-w-[10rem] tabular-nums">
-                      {item.timestampLabel}
-                    </span>
+                    {isMobile ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <MISBadge score={item.mis} size="sm" showConfidence={false} />
+                          <Badge variant="outline" className={cn('text-[10px] border-0', categoryInfo.color)}>
+                            {categoryInfo.label}
+                          </Badge>
+                          <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                            {item.timestampLabel}
+                          </span>
+                        </div>
+                        <p className="line-clamp-1 text-sm font-medium transition-colors group-hover:text-accent">
+                          {item.title}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <MISBadge score={item.mis} size="sm" showConfidence={false} />
+                        <span className="flex-1 truncate text-sm font-medium transition-colors group-hover:text-accent">
+                          {item.title}
+                        </span>
+                        <Badge variant="outline" className={cn('text-[10px] border-0', categoryInfo.color)}>
+                          {categoryInfo.label}
+                        </Badge>
+                        <span className="min-w-[10rem] flex-shrink-0 whitespace-nowrap pl-2 text-right text-xs tabular-nums text-muted-foreground">
+                          {item.timestampLabel}
+                        </span>
+                      </>
+                    )}
                   </Link>
                 )
               })}
