@@ -81,7 +81,7 @@ function FeedListItem({ item, isSelected, onSelect, onToggleWatching }: FeedList
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        'relative w-full text-left px-6 py-4 transition-colors cursor-pointer',
+        'relative w-full cursor-pointer px-4 py-3 text-left transition-colors sm:px-6 sm:py-4',
         isSelected
           ? 'bg-accent/10'
           : 'hover:bg-muted/50',
@@ -132,12 +132,12 @@ function FeedListItem({ item, isSelected, onSelect, onToggleWatching }: FeedList
           </h4>
 
           {/* Summary */}
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+          <p className="hidden text-xs text-muted-foreground line-clamp-2 leading-relaxed sm:block">
             {item.summary}
           </p>
 
           {/* Metadata Row */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+          <div className="hidden flex-wrap items-center gap-2 text-xs text-muted-foreground sm:flex">
             {/* Competitors (C1: now an array) */}
             {item.relatedCompetitors?.slice(0, 2).map((comp) => (
               <Badge 
@@ -194,7 +194,7 @@ function FeedListItem({ item, isSelected, onSelect, onToggleWatching }: FeedList
         {/* Quick Actions - Show on Hover */}
         <div 
           className={cn(
-            'flex items-center gap-0.5 flex-shrink-0 transition-opacity',
+            'hidden flex-shrink-0 items-center gap-0.5 transition-opacity sm:flex',
             isHovered ? 'opacity-100' : 'opacity-0'
           )}
           onClick={(e) => e.stopPropagation()}

@@ -38,6 +38,7 @@ import { FeedList } from '@/components/feed/feed-list'
 import { FeedDetail } from '@/components/feed/feed-detail'
 import type { IntelligenceItem, Category } from '@/lib/types'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useMediaQuery } from '@/hooks/use-media-query'
 import {
   attachCompetitorToIntelligenceItem,
   detachCompetitorFromIntelligenceItem,
@@ -484,6 +485,8 @@ export function FeedClient({
 
   const [selectedItem, setSelectedItem] = React.useState<IntelligenceItem | null>(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
+  const [filtersOpen, setFiltersOpen] = React.useState(false)
+  const isMobile = useMediaQuery('(max-width: 767px)')
   
   // View tabs
   const searchParams = useSearchParams()
@@ -799,6 +802,13 @@ export function FeedClient({
     minScore > 0 || 
     showCustomerVoiceOnly || 
     showUnreadOnly
+  const activeFilterCount =
+    selectedCategories.length +
+    selectedCompetitors.length +
+    selectedTopics.length +
+    (minScore > 0 ? 1 : 0) +
+    (showCustomerVoiceOnly ? 1 : 0) +
+    (showUnreadOnly ? 1 : 0)
 
   const clearFilters = () => {
     setSelectedCategories([])
@@ -901,12 +911,12 @@ export function FeedClient({
   )
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] px-2 md:px-3">
+    <div className="flex h-[calc(100vh-4rem)] px-2 pb-[env(safe-area-inset-bottom)] md:px-3">
       {/* Feed List Panel */}
       <div className="flex flex-1 min-w-0 flex-col">
         {/* Header */}
         <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-border bg-background">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-xl font-semibold tracking-tight">Market Intelligence</h1>
               <p className="text-sm text-muted-foreground">
@@ -916,7 +926,7 @@ export function FeedClient({
                 {isFilterQueryLoading ? ' · applying filters…' : ''}
               </p>
             </div>
-            <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
+            <div className="flex w-full items-center justify-center gap-2 rounded-md border px-3 py-1.5 md:w-auto">
               <Label htmlFor="feed-subject-switch" className="text-xs text-muted-foreground">
                 Competitors
               </Label>
@@ -934,7 +944,7 @@ export function FeedClient({
 
           {/* View Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ViewTab)} className="mb-4">
-            <TabsList className="h-9">
+            <TabsList className="h-9 w-full justify-start overflow-x-auto [&>*]:shrink-0">
               <TabsTrigger value="today" className="text-xs">
                 Today
                 {mounted && todayCount > 0 && <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{todayCount}</Badge>}
@@ -956,8 +966,141 @@ export function FeedClient({
             </TabsList>
           </Tabs>
 
-          {/* Filters Row */}
-          <div className="flex flex-wrap items-center gap-2">
+          {isMobile ? (
+            <div className="flex items-center gap-2">
+              <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setFiltersOpen(true)}>
+                  <Filter className="size-3" />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+                <SheetContent side="bottom" className="h-[82vh] rounded-t-xl p-0">
+                  <div className="border-b px-4 py-3">
+                    <h3 className="text-sm font-medium">Filters</h3>
+                  </div>
+                  <div className="space-y-4 overflow-y-auto px-4 py-4">
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Category</p>
+                      <div className="flex flex-wrap gap-2">
+                        {categoryFilters.map((cat) => (
+                          <Button
+                            key={cat.value}
+                            variant={selectedCategories.includes(cat.value) ? 'secondary' : 'outline'}
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() =>
+                              setSelectedCategories(
+                                selectedCategories.includes(cat.value)
+                                  ? selectedCategories.filter((c) => c !== cat.value)
+                                  : [...selectedCategories, cat.value]
+                              )
+                            }
+                          >
+                            {cat.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Competitor</p>
+                      <div className="flex flex-wrap gap-2">
+                        {allCompetitors.map((comp) => (
+                          <Button
+                            key={comp}
+                            variant={selectedCompetitors.includes(comp) ? 'secondary' : 'outline'}
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() =>
+                              setSelectedCompetitors(
+                                selectedCompetitors.includes(comp)
+                                  ? selectedCompetitors.filter((c) => c !== comp)
+                                  : [...selectedCompetitors, comp]
+                              )
+                            }
+                          >
+                            {comp}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Topic</p>
+                      <div className="flex flex-wrap gap-2">
+                        {allTopics.map((topic) => (
+                          <Button
+                            key={topic}
+                            variant={selectedTopics.includes(topic) ? 'secondary' : 'outline'}
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() =>
+                              setSelectedTopics(
+                                selectedTopics.includes(topic)
+                                  ? selectedTopics.filter((t) => t !== topic)
+                                  : [...selectedTopics, topic]
+                              )
+                            }
+                          >
+                            {topic}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-medium text-muted-foreground">Minimum MIS Score</Label>
+                        <span className="font-mono text-xs text-muted-foreground">{minScore}</span>
+                      </div>
+                      <Slider value={[minScore]} onValueChange={([v]) => setMinScore(v)} max={100} step={5} />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant={showCustomerVoiceOnly ? 'secondary' : 'outline'}
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setShowCustomerVoiceOnly(!showCustomerVoiceOnly)}
+                      >
+                        Customer Voice
+                      </Button>
+                      <Button
+                        variant={showUnreadOnly ? 'secondary' : 'outline'}
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+                      >
+                        Unread Only
+                      </Button>
+                    </div>
+                    {hasActiveFilters && (
+                      <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs text-muted-foreground">
+                        Clear all filters
+                      </Button>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                    <ArrowDownUp className="size-3" />
+                    Sort
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                    <DropdownMenuRadioItem value="score" className="text-xs">MIS Score</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="recent" className="text-xs">Event Date</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="collected" className="text-xs">Collected</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="competitor" className="text-xs">Competitor</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : (
+          <div className="hidden flex-wrap items-center gap-2 md:flex">
             {/* Category Filter */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1146,6 +1289,7 @@ export function FeedClient({
               </Button>
             )}
           </div>
+          )}
         </div>
 
         {/* Feed List */}
