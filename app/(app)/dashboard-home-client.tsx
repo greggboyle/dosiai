@@ -164,9 +164,6 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
           <h1 className="text-2xl font-semibold tracking-tight">
             {greeting}, {firstName}
           </h1>
-          <p className="text-muted-foreground mt-1">
-            {snapshot.feed.length} high-signal items in your feed
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
