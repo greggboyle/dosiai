@@ -74,6 +74,7 @@ interface FeedDetailProps {
   onToggleWatching?: () => void | Promise<void>
   competitorOptions?: Array<{ id: string; name: string }>
   onAttachCompetitor?: (competitorId: string) => void | Promise<void>
+  onDetachCompetitor?: (competitorId: string) => void | Promise<void>
 }
 
 export function FeedDetail({
@@ -82,6 +83,7 @@ export function FeedDetail({
   onToggleWatching,
   competitorOptions = [],
   onAttachCompetitor,
+  onDetachCompetitor,
 }: FeedDetailProps) {
   const [scoreExpanded, setScoreExpanded] = React.useState(false)
   const [commentText, setCommentText] = React.useState('')
@@ -316,7 +318,20 @@ export function FeedDetail({
               </Badge>
               {item.relatedCompetitors?.map((comp) => (
                 <Badge key={comp.id} variant="secondary" className="text-xs font-medium">
-                  {comp.name}
+                  <span>{comp.name}</span>
+                  {onDetachCompetitor && (
+                    <button
+                      type="button"
+                      className="ml-1 inline-flex items-center text-muted-foreground hover:text-foreground"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void onDetachCompetitor(comp.id)
+                      }}
+                      aria-label={`Remove ${comp.name} from this item`}
+                    >
+                      <XCircle className="size-3" />
+                    </button>
+                  )}
                 </Badge>
               ))}
               {item.relatedTopics?.map((topic) => (

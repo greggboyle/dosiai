@@ -40,6 +40,7 @@ import type { IntelligenceItem, Category } from '@/lib/types'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   attachCompetitorToIntelligenceItem,
+  detachCompetitorFromIntelligenceItem,
   markIntelligenceItemReviewed,
   setIntelligenceItemWatching,
 } from '@/lib/intelligence/actions'
@@ -775,6 +776,22 @@ export function FeedClient({
     setSelectedItem((prev) => (prev ? applyWatching(prev) : prev))
   }, [])
 
+  const handleDetachCompetitor = React.useCallback(async (item: IntelligenceItem, competitorId: string) => {
+    await detachCompetitorFromIntelligenceItem(item.id, competitorId)
+
+    const removeCompetitor = (entry: IntelligenceItem): IntelligenceItem =>
+      entry.id === item.id
+        ? {
+            ...entry,
+            relatedCompetitors: (entry.relatedCompetitors ?? []).filter((c) => c.id !== competitorId),
+          }
+        : entry
+
+    setItems((prev) => prev.map(removeCompetitor))
+    setServerFilteredItems((prev) => (prev ? prev.map(removeCompetitor) : prev))
+    setSelectedItem((prev) => (prev ? removeCompetitor(prev) : prev))
+  }, [])
+
   const hasActiveFilters = 
     selectedCategories.length > 0 || 
     selectedCompetitors.length > 0 || 
@@ -1197,6 +1214,9 @@ export function FeedClient({
             competitorOptions={competitorOptions}
             onAttachCompetitor={(competitorId) =>
               selectedItem ? handleAttachCompetitor(selectedItem, competitorId) : Promise.resolve()
+            }
+            onDetachCompetitor={(competitorId) =>
+              selectedItem ? handleDetachCompetitor(selectedItem, competitorId) : Promise.resolve()
             }
           />
         </SheetContent>
