@@ -49,6 +49,25 @@ import ReactMarkdown from 'react-markdown'
 import type { IntelligenceItem } from '@/lib/types'
 import { getRelativeTime, getCategoryInfo } from '@/lib/types'
 
+const commentaryRoleLabelMap: Record<string, string> = {
+  chief_growth_officer: 'Strategy',
+  product_marketing: 'Positioning',
+  chief_risk_officer: 'Risk',
+}
+
+function getMarkdownNodeText(children: React.ReactNode): string {
+  return React.Children.toArray(children)
+    .map((child) => {
+      if (typeof child === 'string' || typeof child === 'number') return String(child)
+      if (React.isValidElement<{ children?: React.ReactNode }>(child) && child.props.children) {
+        return getMarkdownNodeText(child.props.children)
+      }
+      return ''
+    })
+    .join('')
+    .trim()
+}
+
 interface FeedDetailProps {
   item: IntelligenceItem | null
   onMarkReviewed?: () => void | Promise<void>
@@ -379,7 +398,96 @@ export function FeedDetail({
               <div className="space-y-3">
                 <h3 className="text-sm font-medium">Competitive Commentary</h3>
                 <div className="prose prose-zinc dark:prose-invert max-w-none text-sm [&_p]:leading-relaxed [&_li]:leading-relaxed [&_ul]:my-3 [&_ol]:my-3 [&_a]:text-accent [&_a]:underline-offset-2">
-                  <ReactMarkdown>{item.content}</ReactMarkdown>
+                  <ReactMarkdown
+                    components={{
+                      h1: ({ children }) => {
+                        const key = getMarkdownNodeText(children).toLowerCase()
+                        const label = commentaryRoleLabelMap[key]
+                        if (label) {
+                          return (
+                            <div className="my-4">
+                              <Badge variant="secondary" className="text-xs font-medium">
+                                {label}
+                              </Badge>
+                            </div>
+                          )
+                        }
+                        return <h1>{children}</h1>
+                      },
+                      h2: ({ children }) => {
+                        const key = getMarkdownNodeText(children).toLowerCase()
+                        const label = commentaryRoleLabelMap[key]
+                        if (label) {
+                          return (
+                            <div className="my-4">
+                              <Badge variant="secondary" className="text-xs font-medium">
+                                {label}
+                              </Badge>
+                            </div>
+                          )
+                        }
+                        return <h2>{children}</h2>
+                      },
+                      h3: ({ children }) => {
+                        const key = getMarkdownNodeText(children).toLowerCase()
+                        const label = commentaryRoleLabelMap[key]
+                        if (label) {
+                          return (
+                            <div className="my-4">
+                              <Badge variant="secondary" className="text-xs font-medium">
+                                {label}
+                              </Badge>
+                            </div>
+                          )
+                        }
+                        return <h3>{children}</h3>
+                      },
+                      h4: ({ children }) => {
+                        const key = getMarkdownNodeText(children).toLowerCase()
+                        const label = commentaryRoleLabelMap[key]
+                        if (label) {
+                          return (
+                            <div className="my-4">
+                              <Badge variant="secondary" className="text-xs font-medium">
+                                {label}
+                              </Badge>
+                            </div>
+                          )
+                        }
+                        return <h4>{children}</h4>
+                      },
+                      h5: ({ children }) => {
+                        const key = getMarkdownNodeText(children).toLowerCase()
+                        const label = commentaryRoleLabelMap[key]
+                        if (label) {
+                          return (
+                            <div className="my-4">
+                              <Badge variant="secondary" className="text-xs font-medium">
+                                {label}
+                              </Badge>
+                            </div>
+                          )
+                        }
+                        return <h5>{children}</h5>
+                      },
+                      h6: ({ children }) => {
+                        const key = getMarkdownNodeText(children).toLowerCase()
+                        const label = commentaryRoleLabelMap[key]
+                        if (label) {
+                          return (
+                            <div className="my-4">
+                              <Badge variant="secondary" className="text-xs font-medium">
+                                {label}
+                              </Badge>
+                            </div>
+                          )
+                        }
+                        return <h6>{children}</h6>
+                      },
+                    }}
+                  >
+                    {item.content}
+                  </ReactMarkdown>
                 </div>
               </div>
 
