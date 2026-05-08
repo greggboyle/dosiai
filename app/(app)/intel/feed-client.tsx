@@ -832,12 +832,22 @@ export function FeedClient({
     openItemById(nextItem.id)
   }, [filteredItems, openItemById, selectedItem])
 
+  const goToPreviousVisibleItem = React.useCallback(() => {
+    if (!selectedItem) return
+    const currentIndex = filteredItems.findIndex((item) => item.id === selectedItem.id)
+    if (currentIndex <= 0) return
+    const previousItem = filteredItems[currentIndex - 1]
+    if (!previousItem) return
+    openItemById(previousItem.id)
+  }, [filteredItems, openItemById, selectedItem])
+
   React.useEffect(() => {
     if (!detailOpen) return
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return
-      if (event.key.toLowerCase() !== 'n') return
+      const key = event.key.toLowerCase()
+      if (key !== 'n' && key !== 'j') return
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
 
       const target = event.target as HTMLElement | null
@@ -850,12 +860,16 @@ export function FeedClient({
       }
 
       event.preventDefault()
-      goToNextVisibleItem()
+      if (key === 'n') {
+        goToNextVisibleItem()
+        return
+      }
+      goToPreviousVisibleItem()
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [detailOpen, goToNextVisibleItem])
+  }, [detailOpen, goToNextVisibleItem, goToPreviousVisibleItem])
 
   const handleSubjectToggle = React.useCallback(
     (checked: boolean) => {
