@@ -133,7 +133,7 @@ export function DashboardHomeClient({ snapshot, firstName }: DashboardHomeClient
 
   const reviewQueueCount = snapshot.reviewQueueCount
 
-  const recentBriefs = snapshot.recentBriefs
+  const recentBriefs = snapshot.recentBriefs.slice(0, 2)
 
   const heatRanked = [...snapshot.competitorHeatmap].sort((a, b) => b.count - a.count)
   const customerVoice = heatRanked.slice(0, 4).map((c, i) => ({
