@@ -94,6 +94,7 @@ export function FeedDetail({ item, onMarkReviewed, competitorOptions = [], onAtt
   const availableOptions = competitorOptions.filter(
     (c) => !item.relatedCompetitors?.some((rc) => rc.id === c.id)
   )
+  const hasAnyCompetitorOptions = competitorOptions.length > 0
 
   const handleSaveCompetitorTag = async () => {
     if (!selectedCompetitorId || !onAttachCompetitor) return
@@ -201,7 +202,9 @@ export function FeedDetail({ item, onMarkReviewed, competitorOptions = [], onAtt
               </Select>
             ) : (
               <p className="text-sm text-muted-foreground">
-                No available competitors to add. This item is already tagged to all competitors you can select.
+                {hasAnyCompetitorOptions
+                  ? 'No available competitors to add. This item is already tagged to all selectable competitors.'
+                  : 'No competitors are currently available to tag. Add or re-activate competitors, then try again.'}
               </p>
             )}
           </div>

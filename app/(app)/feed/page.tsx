@@ -33,9 +33,9 @@ export default async function FeedPage({
         await createSupabaseServerClient()
       )
         .from('competitor')
-        .select('id,name')
+        .select('id,name,status')
         .eq('workspace_id', workspaceId)
-        .eq('status', 'active')
+        .in('status', ['active', 'archived'])
         .order('name', { ascending: true })
     : { data: [] as Array<{ id: string; name: string }> }
 
@@ -61,7 +61,7 @@ export default async function FeedPage({
         totalItems={paged.total}
         totalPages={paged.totalPages}
         initialSelectedItem={selectedItem}
-        competitorOptions={competitorOptions.data ?? []}
+        competitorOptions={(competitorOptions.data ?? []).map((c) => ({ id: c.id, name: c.name }))}
       />
     </Suspense>
   )
