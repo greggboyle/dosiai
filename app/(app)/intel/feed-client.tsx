@@ -1132,7 +1132,6 @@ export function FeedClient({
         <SheetContent side="right" className="w-full sm:max-w-[40rem] p-0">
           <FeedDetail
             item={selectedItem}
-            onClose={closeDetailPanel}
             onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)}
             onToggleWatching={() => (selectedItem ? handleToggleWatching(selectedItem) : Promise.resolve())}
             competitorOptions={competitorOptions}
