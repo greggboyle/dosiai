@@ -811,6 +811,52 @@ export function FeedClient({
     setDetailOpen(true)
   }
 
+  const openItemById = React.useCallback(
+    (itemId: string) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('item', itemId)
+      router.replace(`${pathname}?${params.toString()}`)
+      const matched = filteredItems.find((item) => item.id === itemId) ?? null
+      setSelectedItem(matched)
+      setDetailOpen(true)
+    },
+    [filteredItems, pathname, router, searchParams]
+  )
+
+  const goToNextVisibleItem = React.useCallback(() => {
+    if (!selectedItem) return
+    const currentIndex = filteredItems.findIndex((item) => item.id === selectedItem.id)
+    if (currentIndex < 0) return
+    const nextItem = filteredItems[currentIndex + 1]
+    if (!nextItem) return
+    openItemById(nextItem.id)
+  }, [filteredItems, openItemById, selectedItem])
+
+  React.useEffect(() => {
+    if (!detailOpen) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return
+      if (event.key.toLowerCase() !== 'n') return
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return
+
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.closest('input, textarea, select, [contenteditable="true"]') ||
+          target.getAttribute('role') === 'textbox')
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      goToNextVisibleItem()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [detailOpen, goToNextVisibleItem])
+
   const handleSubjectToggle = React.useCallback(
     (checked: boolean) => {
       const next = checked ? 'our-company' : 'competitors'
