@@ -45,6 +45,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import ReactMarkdown from 'react-markdown'
 import type { IntelligenceItem } from '@/lib/types'
 import { getRelativeTime, getCategoryInfo } from '@/lib/types'
 
@@ -372,6 +373,19 @@ export function FeedDetail({
           </div>
 
           <Separator />
+
+          {item.content?.trim() && (
+            <>
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium">Competitive Commentary</h3>
+                <div className="prose prose-zinc dark:prose-invert max-w-none text-sm [&_p]:leading-relaxed [&_li]:leading-relaxed [&_ul]:my-3 [&_ol]:my-3 [&_a]:text-accent [&_a]:underline-offset-2">
+                  <ReactMarkdown>{item.content}</ReactMarkdown>
+                </div>
+              </div>
+
+              <Separator />
+            </>
+          )}
 
           {/* Sources (C1: now single sourceUrls array) */}
           <div className="space-y-3">
