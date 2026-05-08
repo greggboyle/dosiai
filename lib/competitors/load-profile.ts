@@ -75,6 +75,7 @@ function mapPricingModel(s: string | null): Competitor['pricingModel'] {
 
 export type CompetitorProfilePayload = {
   workspacePlan: WorkspacePlan
+  workspaceId: string
   competitor: Competitor
   activityItems: IntelligenceItem[]
   voiceItems: IntelligenceItem[]
@@ -184,6 +185,7 @@ export async function loadCompetitorProfile(
 
   return {
     workspacePlan: (ws?.plan ?? 'starter') as WorkspacePlan,
+    workspaceId,
     competitor,
     activityItems,
     voiceItems: voiceCandidates,

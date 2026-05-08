@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   ExternalLink,
   RefreshCw,
@@ -39,6 +40,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import {
   Tooltip,
   TooltipContent,
@@ -66,7 +68,15 @@ import type { CompetitorBattleCardRow, CompetitorBriefRow } from '@/lib/competit
 import type { WinLossRow } from '@/lib/win-loss/queries'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 import { getCompetitorProfileRefreshPolicy } from '@/lib/competitors/profile-refresh'
-import { requestCompetitorProfileRefresh } from '@/lib/competitors/actions'
+import {
+  requestCompetitorProfileRefresh,
+  updateCompetitorCompanySummary,
+  updateCompetitorIdentity,
+  updateCompetitorLeadership,
+  updateCompetitorProducts,
+  updateCompetitorSegments,
+  updateCompetitorStrengthsWeaknesses,
+} from '@/lib/competitors/actions'
 import { toast } from 'sonner'
 
 const tierLabels: Record<string, string> = {
@@ -87,6 +97,7 @@ const tierColors: Record<string, string> = {
 
 export interface CompetitorProfileClientProps {
   workspacePlan: WorkspacePlan
+  workspaceId: string
   competitor: Competitor
   activityItems: IntelligenceItem[]
   voiceItems: IntelligenceItem[]
@@ -147,6 +158,7 @@ function SentimentBar({ positive, mixed, negative }: { positive: number; mixed: 
 
 export function CompetitorProfileClient({
   workspacePlan,
+  workspaceId,
   competitor,
   activityItems,
   voiceItems,
@@ -160,6 +172,95 @@ export function CompetitorProfileClient({
   const [activityFilter, setActivityFilter] = React.useState<Category | 'all'>('all')
   const [voiceSentimentFilter, setVoiceSentimentFilter] = React.useState<'all' | 'positive' | 'mixed' | 'negative'>('all')
   const [notesContent, setNotesContent] = React.useState('## Analyst Notes\n\n- Key observation: Their Series D gives them significant runway\n- Watch for: European expansion announcement expected Q3\n- Action item: Update battle card with new pricing intelligence')
+
+  // ---- Editable Overview (Name/URL, Summary, Strengths/Weaknesses, Products, Leadership, Segments) ----
+  const [identityEditing, setIdentityEditing] = React.useState(false)
+  const [identityDraftName, setIdentityDraftName] = React.useState(competitor.name)
+  const [identityDraftWebsite, setIdentityDraftWebsite] = React.useState(competitor.website ?? '')
+
+  const [summaryEditing, setSummaryEditing] = React.useState(false)
+  const [draftPositioning, setDraftPositioning] = React.useState(competitor.positioning ?? '')
+  const [draftIcp, setDraftIcp] = React.useState(competitor.icp ?? '')
+  const [draftPricingModel, setDraftPricingModel] = React.useState(competitor.pricingModel ?? 'unknown')
+  const [draftPricingNotes, setDraftPricingNotes] = React.useState(competitor.pricingNotes ?? '')
+  const [draftFounded, setDraftFounded] = React.useState(competitor.founded ? String(competitor.founded) : '')
+  const [draftHq, setDraftHq] = React.useState(competitor.hq ?? '')
+  const [draftEmployeeEstimate, setDraftEmployeeEstimate] = React.useState(
+    competitor.employeeEstimate ? String(competitor.employeeEstimate) : ''
+  )
+  const [draftFundingStatus, setDraftFundingStatus] = React.useState(competitor.fundingStatus ?? '')
+
+  const [strengthsEditing, setStrengthsEditing] = React.useState(false)
+  const [draftStrengthsText, setDraftStrengthsText] = React.useState((competitor.strengths ?? []).join('\n'))
+  const [draftWeaknessesText, setDraftWeaknessesText] = React.useState((competitor.weaknesses ?? []).join('\n'))
+
+  const [productsEditing, setProductsEditing] = React.useState(false)
+  const [draftProducts, setDraftProducts] = React.useState(competitor.products ?? [])
+
+  const [leadershipEditing, setLeadershipEditing] = React.useState(false)
+  const [draftLeadership, setDraftLeadership] = React.useState(competitor.leadership ?? [])
+
+  const [segmentsEditing, setSegmentsEditing] = React.useState(false)
+  const [draftSegmentsText, setDraftSegmentsText] = React.useState((competitor.segments ?? []).join(', '))
+
+  // Keep drafts in sync when the underlying competitor changes (e.g. after Save redirects).
+  React.useEffect(() => {
+    if (!identityEditing) {
+      setIdentityDraftName(competitor.name)
+      setIdentityDraftWebsite(competitor.website ?? '')
+    }
+    if (!summaryEditing) {
+      setDraftPositioning(competitor.positioning ?? '')
+      setDraftIcp(competitor.icp ?? '')
+      setDraftPricingModel(competitor.pricingModel ?? 'unknown')
+      setDraftPricingNotes(competitor.pricingNotes ?? '')
+      setDraftFounded(competitor.founded ? String(competitor.founded) : '')
+      setDraftHq(competitor.hq ?? '')
+      setDraftEmployeeEstimate(competitor.employeeEstimate ? String(competitor.employeeEstimate) : '')
+      setDraftFundingStatus(competitor.fundingStatus ?? '')
+    }
+    if (!strengthsEditing) {
+      setDraftStrengthsText((competitor.strengths ?? []).join('\n'))
+      setDraftWeaknessesText((competitor.weaknesses ?? []).join('\n'))
+    }
+    if (!productsEditing) setDraftProducts(competitor.products ?? [])
+    if (!leadershipEditing) setDraftLeadership(competitor.leadership ?? [])
+    if (!segmentsEditing) setDraftSegmentsText((competitor.segments ?? []).join(', '))
+  }, [
+    competitor,
+    identityEditing,
+    summaryEditing,
+    strengthsEditing,
+    productsEditing,
+    leadershipEditing,
+    segmentsEditing,
+  ])
+
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
+
+  React.useEffect(() => {
+    const saved = searchParams.get('saved')
+    if (!saved) return
+
+    const messages: Record<string, string> = {
+      identity: 'Identity saved',
+      summary: 'Company summary saved',
+      strengths: 'Strengths & weaknesses saved',
+      products: 'Products saved',
+      leadership: 'Leadership saved',
+      segments: 'Segments saved',
+    }
+
+    toast.success(messages[saved] ?? 'Saved')
+
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete('saved')
+    const nextUrl = next.toString() ? `${pathname}?${next.toString()}` : pathname
+    router.replace(nextUrl, { scroll: false })
+  }, [searchParams, pathname, router])
+
   const refreshPolicy = React.useMemo(
     () =>
       getCompetitorProfileRefreshPolicy({
@@ -297,19 +398,72 @@ export function CompetitorProfileClient({
                 {competitor.name.charAt(0)}
               </div>
               <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-semibold tracking-tight">{competitor.name}</h1>
-                  <MISBadge score={competitor.overallMIS} size="lg" />
-                </div>
-                <a
-                  href={`https://${competitor.website}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 mt-0.5"
-                >
-                  {competitor.website}
-                  <ExternalLink className="size-3" />
-                </a>
+                {!identityEditing ? (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <h1 className="text-2xl font-semibold tracking-tight">{competitor.name}</h1>
+                      <MISBadge score={competitor.overallMIS} size="lg" />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => setIdentityEditing(true)}
+                      >
+                        <Edit2 className="size-3 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+
+                    {competitor.website ? (
+                      <a
+                        href={`https://${competitor.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 mt-0.5"
+                      >
+                        {competitor.website}
+                        <ExternalLink className="size-3" />
+                      </a>
+                    ) : null}
+                  </>
+                ) : (
+                  <form action={updateCompetitorIdentity} className="space-y-2">
+                    <input type="hidden" name="workspaceId" value={workspaceId} />
+                    <input type="hidden" name="competitorId" value={competitor.id} />
+
+                    <div className="flex items-center gap-3">
+                      <Input
+                        name="name"
+                        value={identityDraftName}
+                        onChange={(e) => setIdentityDraftName(e.target.value)}
+                        className="h-9"
+                      />
+                      <MISBadge score={competitor.overallMIS} size="lg" />
+                    </div>
+
+                    <Input
+                      name="website"
+                      value={identityDraftWebsite}
+                      onChange={(e) => setIdentityDraftWebsite(e.target.value)}
+                      placeholder="example.com"
+                    />
+
+                    <div className="flex gap-2">
+                      <Button type="submit" size="sm">
+                        Save
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIdentityEditing(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                )}
               </div>
             </div>
             
@@ -340,11 +494,49 @@ export function CompetitorProfileClient({
                 {tierLabels[competitor.tier]}
               </Badge>
             )}
-            {competitor.segments?.map(segment => (
-              <Badge key={segment} variant="secondary" className="font-normal">
-                {segment}
-              </Badge>
-            ))}
+            {!segmentsEditing ? (
+              <>
+                {competitor.segments?.map((segment) => (
+                  <Badge key={segment} variant="secondary" className="font-normal">
+                    {segment}
+                  </Badge>
+                ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => setSegmentsEditing(true)}
+                >
+                  <Edit2 className="size-3 mr-1" />
+                  Edit segments
+                </Button>
+              </>
+            ) : (
+              <form action={updateCompetitorSegments} className="flex items-center gap-2">
+                <input type="hidden" name="workspaceId" value={workspaceId} />
+                <input type="hidden" name="competitorId" value={competitor.id} />
+                <Textarea
+                  name="segmentsText"
+                  value={draftSegmentsText}
+                  onChange={(e) => setDraftSegmentsText(e.target.value)}
+                  className="h-9 min-h-0 w-64 py-1 text-xs"
+                />
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm">
+                    Save
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSegmentsEditing(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
           
           {/* Tab Navigation */}
@@ -401,182 +593,518 @@ export function CompetitorProfileClient({
           <div className="grid grid-cols-12 gap-6">
             {/* Summary Card - 8 cols */}
             <Card className="col-span-8">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Company Summary</CardTitle>
+                {!summaryEditing ? (
+                  <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => setSummaryEditing(true)}>
+                    <Edit2 className="size-3 mr-1" />
+                    Edit
+                  </Button>
+                ) : null}
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Positioning */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Positioning</p>
-                    <p className="text-sm">{competitor.positioning}</p>
+
+              {!summaryEditing ? (
+                <CardContent className="space-y-4">
+                  {/* Positioning */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Positioning</p>
+                      <p className="text-sm">{competitor.positioning}</p>
+                    </div>
+                    <AIDraftedIndicator
+                      confirmed={confirmedFields.has('positioning')}
+                      onConfirm={() => confirmField('positioning')}
+                    />
                   </div>
-                  <AIDraftedIndicator 
-                    confirmed={confirmedFields.has('positioning')} 
-                    onConfirm={() => confirmField('positioning')} 
-                  />
-                </div>
-                <Separator />
-                
-                {/* ICP */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Ideal Customer Profile</p>
-                    <p className="text-sm">{competitor.icp}</p>
+                  <Separator />
+
+                  {/* ICP */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Ideal Customer Profile</p>
+                      <p className="text-sm">{competitor.icp}</p>
+                    </div>
+                    <AIDraftedIndicator confirmed={confirmedFields.has('icp')} onConfirm={() => confirmField('icp')} />
                   </div>
-                  <AIDraftedIndicator 
-                    confirmed={confirmedFields.has('icp')} 
-                    onConfirm={() => confirmField('icp')} 
-                  />
-                </div>
-                <Separator />
-                
-                {/* Pricing */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Pricing</p>
-                    <p className="text-sm">
-                      <Badge variant="outline" className="mr-2 capitalize">{competitor.pricingModel}</Badge>
-                      {competitor.pricingNotes}
-                    </p>
+                  <Separator />
+
+                  {/* Pricing */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Pricing</p>
+                      <p className="text-sm">
+                        <Badge variant="outline" className="mr-2 capitalize">
+                          {competitor.pricingModel}
+                        </Badge>
+                        {competitor.pricingNotes}
+                      </p>
+                    </div>
+                    <AIDraftedIndicator confirmed={confirmedFields.has('pricing')} onConfirm={() => confirmField('pricing')} />
                   </div>
-                  <AIDraftedIndicator 
-                    confirmed={confirmedFields.has('pricing')} 
-                    onConfirm={() => confirmField('pricing')} 
-                  />
-                </div>
-                <Separator />
-                
-                {/* Company Info Grid */}
-                <div className="grid grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                      <Calendar className="size-3" /> Founded
-                    </p>
-                    <p className="text-sm font-medium">{competitor.founded}</p>
+                  <Separator />
+
+                  {/* Company Info Grid */}
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                        <Calendar className="size-3" /> Founded
+                      </p>
+                      <p className="text-sm font-medium">{competitor.founded}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                        <MapPin className="size-3" /> HQ
+                      </p>
+                      <p className="text-sm font-medium">{competitor.hq}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                        <Users className="size-3" /> Employees
+                      </p>
+                      <p className="text-sm font-medium">~{competitor.employeeEstimate}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                        <DollarSign className="size-3" /> Funding
+                      </p>
+                      <p className="text-sm font-medium">{competitor.fundingStatus}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                      <MapPin className="size-3" /> HQ
-                    </p>
-                    <p className="text-sm font-medium">{competitor.hq}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                      <Users className="size-3" /> Employees
-                    </p>
-                    <p className="text-sm font-medium">~{competitor.employeeEstimate}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                      <DollarSign className="size-3" /> Funding
-                    </p>
-                    <p className="text-sm font-medium">{competitor.fundingStatus}</p>
-                  </div>
-                </div>
-              </CardContent>
+                </CardContent>
+              ) : (
+                <CardContent className="space-y-4">
+                  <form action={updateCompetitorCompanySummary} className="space-y-4">
+                    <input type="hidden" name="workspaceId" value={workspaceId} />
+                    <input type="hidden" name="competitorId" value={competitor.id} />
+
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground mb-1">Positioning</p>
+                      <Textarea
+                        name="positioning"
+                        value={draftPositioning}
+                        onChange={(e) => setDraftPositioning(e.target.value)}
+                        className="min-h-24"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground mb-1">Ideal Customer Profile</p>
+                      <Textarea name="icp" value={draftIcp} onChange={(e) => setDraftIcp(e.target.value)} className="min-h-24" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground mb-1">Pricing model</p>
+                      <Select value={draftPricingModel} onValueChange={(v) => setDraftPricingModel(v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select pricing model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="subscription">Subscription</SelectItem>
+                          <SelectItem value="usage">Usage</SelectItem>
+                          <SelectItem value="freemium">Freemium</SelectItem>
+                          <SelectItem value="enterprise_contract">Enterprise contract</SelectItem>
+                          <SelectItem value="hybrid">Hybrid</SelectItem>
+                          <SelectItem value="unknown">Unknown</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <input type="hidden" name="pricingModel" value={draftPricingModel} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground mb-1">Pricing notes</p>
+                      <Textarea
+                        name="pricingNotes"
+                        value={draftPricingNotes}
+                        onChange={(e) => setDraftPricingNotes(e.target.value)}
+                        className="min-h-20"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <Calendar className="size-3" /> Founded
+                        </p>
+                        <Input name="founded" value={draftFounded} onChange={(e) => setDraftFounded(e.target.value)} type="number" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <MapPin className="size-3" /> HQ
+                        </p>
+                        <Input name="hq" value={draftHq} onChange={(e) => setDraftHq(e.target.value)} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <Users className="size-3" /> Employees
+                        </p>
+                        <Input
+                          name="employeeEstimate"
+                          value={draftEmployeeEstimate}
+                          onChange={(e) => setDraftEmployeeEstimate(e.target.value)}
+                          type="number"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <DollarSign className="size-3" /> Funding
+                        </p>
+                        <Input
+                          name="fundingStatus"
+                          value={draftFundingStatus}
+                          onChange={(e) => setDraftFundingStatus(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <Button type="submit" size="sm">
+                        Save summary
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setSummaryEditing(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              )}
             </Card>
 
             {/* Leadership Card - 4 cols */}
             <Card className="col-span-4">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Leadership</CardTitle>
+                {!leadershipEditing ? (
+                  <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => setLeadershipEditing(true)}>
+                    <Edit2 className="size-3 mr-1" />
+                    Edit
+                  </Button>
+                ) : null}
               </CardHeader>
-              <CardContent className="space-y-3">
-                {competitor.leadership?.map((leader, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">{leader.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {leader.role} &middot; Since {leader.since}
-                      </p>
+
+              {!leadershipEditing ? (
+                <CardContent className="space-y-3">
+                  {competitor.leadership?.map((leader, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">{leader.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {leader.role} &middot; Since {leader.since}
+                        </p>
+                      </div>
+                      {leader.linkedIn && (
+                        <a
+                          href={leader.linkedIn}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <Linkedin className="size-4" />
+                        </a>
+                      )}
                     </div>
-                    {leader.linkedIn && (
-                      <a
-                        href={leader.linkedIn}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <Linkedin className="size-4" />
-                      </a>
+                  ))}
+                </CardContent>
+              ) : (
+                <CardContent>
+                  <form action={updateCompetitorLeadership} className="space-y-3">
+                    <input type="hidden" name="workspaceId" value={workspaceId} />
+                    <input type="hidden" name="competitorId" value={competitor.id} />
+
+                    <input
+                      type="hidden"
+                      name="leadershipJson"
+                      value={JSON.stringify(
+                        (draftLeadership ?? [])
+                          .filter((l) => Boolean(l.name?.trim()) && Boolean(l.role?.trim()))
+                          .map((l) => ({
+                            name: l.name.trim(),
+                            role: l.role.trim(),
+                            since: l.since?.trim() ? l.since.trim() : null,
+                            linkedIn: l.linkedIn?.trim() ? l.linkedIn.trim() : null,
+                          }))
+                      )}
+                    />
+
+                    {(draftLeadership ?? []).length ? (
+                      <div className="space-y-2">
+                        {draftLeadership.map((leader, idx) => (
+                          <div key={idx} className="grid grid-cols-2 gap-2">
+                            <Input
+                              value={leader.name ?? ''}
+                              onChange={(e) => {
+                                const next = [...draftLeadership]
+                                next[idx] = { ...next[idx], name: e.target.value }
+                                setDraftLeadership(next)
+                              }}
+                              placeholder="Name"
+                            />
+                            <Input
+                              value={leader.role ?? ''}
+                              onChange={(e) => {
+                                const next = [...draftLeadership]
+                                next[idx] = { ...next[idx], role: e.target.value }
+                                setDraftLeadership(next)
+                              }}
+                              placeholder="Role"
+                            />
+                            <Input
+                              value={leader.since ?? ''}
+                              onChange={(e) => {
+                                const next = [...draftLeadership]
+                                next[idx] = { ...next[idx], since: e.target.value }
+                                setDraftLeadership(next)
+                              }}
+                              placeholder="Since (optional)"
+                            />
+                            <Input
+                              value={leader.linkedIn ?? ''}
+                              onChange={(e) => {
+                                const next = [...draftLeadership]
+                                next[idx] = { ...next[idx], linkedIn: e.target.value }
+                                setDraftLeadership(next)
+                              }}
+                              placeholder="LinkedIn URL (optional)"
+                            />
+                            <div className="col-span-2 flex justify-end">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDraftLeadership((prev) => prev.filter((_, i) => i !== idx))}
+                              >
+                                <Minus className="size-3 mr-1" />
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No leadership entries yet.</p>
                     )}
-                  </div>
-                ))}
-              </CardContent>
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDraftLeadership((prev) => [...prev, { name: '', role: '', since: '', linkedIn: '' }])}
+                      >
+                        Add leader
+                      </Button>
+                      <Button type="submit" size="sm">
+                        Save leadership
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setLeadershipEditing(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              )}
             </Card>
 
             {/* Products Card - 4 cols */}
             <Card className="col-span-4">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Products</CardTitle>
+                {!productsEditing ? (
+                  <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => setProductsEditing(true)}>
+                    <Edit2 className="size-3 mr-1" />
+                    Edit
+                  </Button>
+                ) : null}
               </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {competitor.products?.map((product, idx) => (
-                    <li key={idx}>
-                      <p className="text-sm font-medium">{product.name}</p>
-                      {product.description && (
-                        <p className="text-xs text-muted-foreground">{product.description}</p>
+
+              {!productsEditing ? (
+                <CardContent>
+                  <ul className="space-y-2">
+                    {competitor.products?.map((product, idx) => (
+                      <li key={idx}>
+                        <p className="text-sm font-medium">{product.name}</p>
+                        {product.description && <p className="text-xs text-muted-foreground">{product.description}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              ) : (
+                <CardContent>
+                  <form action={updateCompetitorProducts} className="space-y-3">
+                    <input type="hidden" name="workspaceId" value={workspaceId} />
+                    <input type="hidden" name="competitorId" value={competitor.id} />
+
+                    <input
+                      type="hidden"
+                      name="productsJson"
+                      value={JSON.stringify(
+                        (draftProducts ?? [])
+                          .filter((p) => Boolean(p.name?.trim()))
+                          .map((p) => ({
+                            name: p.name.trim(),
+                            description: p.description?.trim() ? p.description.trim() : null,
+                          }))
                       )}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
+                    />
+
+                    {(draftProducts ?? []).length ? (
+                      <div className="space-y-2">
+                        {draftProducts.map((product, idx) => (
+                          <div key={idx} className="grid grid-cols-2 gap-2">
+                            <Input
+                              value={product.name ?? ''}
+                              onChange={(e) => {
+                                const next = [...draftProducts]
+                                next[idx] = { ...next[idx], name: e.target.value }
+                                setDraftProducts(next)
+                              }}
+                              placeholder="Product name"
+                            />
+                            <div className="col-span-2">
+                              <Textarea
+                                value={product.description ?? ''}
+                                onChange={(e) => {
+                                  const next = [...draftProducts]
+                                  next[idx] = { ...next[idx], description: e.target.value }
+                                  setDraftProducts(next)
+                                }}
+                                placeholder="Description (optional)"
+                                className="min-h-[72px]"
+                              />
+                            </div>
+                            <div className="col-span-2 flex justify-end">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDraftProducts((prev) => prev.filter((_, i) => i !== idx))}
+                              >
+                                <Minus className="size-3 mr-1" />
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No products yet.</p>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDraftProducts((prev) => [...prev, { name: '', description: '' }])}
+                      >
+                        Add product
+                      </Button>
+                      <Button type="submit" size="sm">
+                        Save products
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setProductsEditing(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              )}
             </Card>
 
             {/* Strengths & Weaknesses - 8 cols */}
             <Card className="col-span-8">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Strengths & Weaknesses</CardTitle>
-                <Button variant="ghost" size="sm">
+                {!strengthsEditing ? (
+                  <Button variant="ghost" size="sm" onClick={() => setStrengthsEditing(true)}>
                   <Edit2 className="size-3 mr-1" />
                   Edit
-                </Button>
+                  </Button>
+                ) : null}
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-6">
-                  {/* Strengths */}
-                  <div>
-                    <h4 className="text-sm font-medium text-positive mb-2">Strengths</h4>
-                    {competitor.strengths && competitor.strengths.length > 0 ? (
-                      <ul className="space-y-1.5">
-                        {competitor.strengths.map((strength, idx) => (
-                          <li key={idx} className="text-sm flex items-start gap-2">
-                            <span className="text-positive mt-1">+</span>
-                            {strength}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">
-                        No strengths added yet.{' '}
-                        <button className="text-accent hover:underline">Add first item</button>
-                      </p>
-                    )}
+              {!strengthsEditing ? (
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Strengths */}
+                    <div>
+                      <h4 className="text-sm font-medium text-positive mb-2">Strengths</h4>
+                      {competitor.strengths && competitor.strengths.length > 0 ? (
+                        <ul className="space-y-1.5">
+                          {competitor.strengths.map((strength, idx) => (
+                            <li key={idx} className="text-sm flex items-start gap-2">
+                              <span className="text-positive mt-1">+</span>
+                              {strength}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">
+                          No strengths added yet. <button className="text-accent hover:underline">Add first item</button>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Weaknesses */}
+                    <div>
+                      <h4 className="text-sm font-medium text-negative mb-2">Weaknesses</h4>
+                      {competitor.weaknesses && competitor.weaknesses.length > 0 ? (
+                        <ul className="space-y-1.5">
+                          {competitor.weaknesses.map((weakness, idx) => (
+                            <li key={idx} className="text-sm flex items-start gap-2">
+                              <span className="text-negative mt-1">-</span>
+                              {weakness}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">
+                          No weaknesses added yet.{' '}
+                          <button className="text-accent hover:underline">Add first item</button>
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  
-                  {/* Weaknesses */}
-                  <div>
-                    <h4 className="text-sm font-medium text-negative mb-2">Weaknesses</h4>
-                    {competitor.weaknesses && competitor.weaknesses.length > 0 ? (
-                      <ul className="space-y-1.5">
-                        {competitor.weaknesses.map((weakness, idx) => (
-                          <li key={idx} className="text-sm flex items-start gap-2">
-                            <span className="text-negative mt-1">-</span>
-                            {weakness}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">
-                        No weaknesses added yet.{' '}
-                        <button className="text-accent hover:underline">Add first item</button>
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
+                </CardContent>
+              ) : (
+                <CardContent>
+                  <form action={updateCompetitorStrengthsWeaknesses} className="space-y-4">
+                    <input type="hidden" name="workspaceId" value={workspaceId} />
+                    <input type="hidden" name="competitorId" value={competitor.id} />
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="text-sm font-medium text-positive mb-2">Strengths</h4>
+                        <Textarea
+                          name="strengthsText"
+                          value={draftStrengthsText}
+                          onChange={(e) => setDraftStrengthsText(e.target.value)}
+                          className="min-h-[120px]"
+                        />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-negative mb-2">Weaknesses</h4>
+                        <Textarea
+                          name="weaknessesText"
+                          value={draftWeaknessesText}
+                          onChange={(e) => setDraftWeaknessesText(e.target.value)}
+                          className="min-h-[120px]"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button type="submit" size="sm">
+                        Save strengths
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setStrengthsEditing(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              )}
             </Card>
 
             {/* Customer Voice Panel (Compact) - 6 cols */}
