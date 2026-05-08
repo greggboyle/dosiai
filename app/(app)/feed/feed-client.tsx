@@ -39,7 +39,7 @@ import { FeedDetail } from '@/components/feed/feed-detail'
 import type { IntelligenceItem, Category } from '@/lib/types'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { markIntelligenceItemReviewed } from '@/lib/intelligence/actions'
+import { attachCompetitorToIntelligenceItem, markIntelligenceItemReviewed } from '@/lib/intelligence/actions'
 import { fetchFeedItemsForFilters } from './actions'
 
 // Helper to create mock dates relative to "now" - using fixed offsets in hours
@@ -441,6 +441,7 @@ const categoryFilters: { value: Category; label: string }[] = [
 
 export function FeedClient({
   initialItems,
+  competitorOptions,
   reviewQueueThreshold = 30,
   initialSubject = 'competitors',
   currentPage,
@@ -450,6 +451,7 @@ export function FeedClient({
   initialSelectedItem,
 }: {
   initialItems: IntelligenceItem[]
+  competitorOptions: Array<{ id: string; name: string }>
   reviewQueueThreshold?: number
   initialSubject?: SubjectFilter
   currentPage: number
@@ -725,6 +727,31 @@ export function FeedClient({
       setSelectedItem((cur) => (cur?.id === item.id ? { ...cur, reviewedAt: ts } : cur))
     },
     []
+  )
+
+  const handleAttachCompetitor = React.useCallback(
+    async (item: IntelligenceItem, competitorId: string) => {
+      await attachCompetitorToIntelligenceItem(item.id, competitorId)
+      const selectedCompetitor = competitorOptions.find((c) => c.id === competitorId)
+      if (!selectedCompetitor) return
+
+      const addCompetitor = (entry: IntelligenceItem): IntelligenceItem => {
+        if (entry.id !== item.id) return entry
+        if (entry.relatedCompetitors?.some((c) => c.id === competitorId)) return entry
+        return {
+          ...entry,
+          relatedCompetitors: [
+            ...(entry.relatedCompetitors ?? []),
+            { id: selectedCompetitor.id, name: selectedCompetitor.name },
+          ],
+        }
+      }
+
+      setItems((prev) => prev.map(addCompetitor))
+      setServerFilteredItems((prev) => (prev ? prev.map(addCompetitor) : prev))
+      setSelectedItem((prev) => (prev ? addCompetitor(prev) : prev))
+    },
+    [competitorOptions]
   )
 
   const hasActiveFilters = 
@@ -1061,7 +1088,14 @@ export function FeedClient({
       {/* Detail Panel - Desktop */}
       {isDesktop && (
         <div className="hidden xl:flex xl:basis-2/5 min-w-0 flex-col bg-card">
-          <FeedDetail item={selectedItem} onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)} />
+          <FeedDetail
+            item={selectedItem}
+            onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)}
+            competitorOptions={competitorOptions}
+            onAttachCompetitor={(competitorId) =>
+              selectedItem ? handleAttachCompetitor(selectedItem, competitorId) : Promise.resolve()
+            }
+          />
         </div>
       )}
 
@@ -1069,7 +1103,14 @@ export function FeedClient({
       {!isDesktop && (
         <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
           <SheetContent side="right" className="w-full sm:max-w-lg p-0">
-            <FeedDetail item={selectedItem} onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)} />
+            <FeedDetail
+              item={selectedItem}
+              onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)}
+              competitorOptions={competitorOptions}
+              onAttachCompetitor={(competitorId) =>
+                selectedItem ? handleAttachCompetitor(selectedItem, competitorId) : Promise.resolve()
+              }
+            />
           </SheetContent>
         </Sheet>
       )}

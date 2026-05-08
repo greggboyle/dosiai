@@ -32,6 +32,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Collapsible,
   CollapsibleContent,
@@ -43,11 +51,16 @@ import { getRelativeTime, getCategoryInfo } from '@/lib/types'
 interface FeedDetailProps {
   item: IntelligenceItem | null
   onMarkReviewed?: () => void | Promise<void>
+  competitorOptions?: Array<{ id: string; name: string }>
+  onAttachCompetitor?: (competitorId: string) => void | Promise<void>
 }
 
-export function FeedDetail({ item, onMarkReviewed }: FeedDetailProps) {
+export function FeedDetail({ item, onMarkReviewed, competitorOptions = [], onAttachCompetitor }: FeedDetailProps) {
   const [scoreExpanded, setScoreExpanded] = React.useState(false)
   const [commentText, setCommentText] = React.useState('')
+  const [tagDialogOpen, setTagDialogOpen] = React.useState(false)
+  const [selectedCompetitorId, setSelectedCompetitorId] = React.useState<string>('')
+  const [isSavingCompetitor, setIsSavingCompetitor] = React.useState(false)
 
   if (!item) {
     return (
@@ -78,6 +91,21 @@ export function FeedDetail({ item, onMarkReviewed }: FeedDetailProps) {
   }
 
   const categoryInfo = getCategoryInfo(item.category)
+  const availableOptions = competitorOptions.filter(
+    (c) => !item.relatedCompetitors?.some((rc) => rc.id === c.id)
+  )
+
+  const handleSaveCompetitorTag = async () => {
+    if (!selectedCompetitorId || !onAttachCompetitor) return
+    setIsSavingCompetitor(true)
+    try {
+      await onAttachCompetitor(selectedCompetitorId)
+      setTagDialogOpen(false)
+      setSelectedCompetitorId('')
+    } finally {
+      setIsSavingCompetitor(false)
+    }
+  }
 
   return (
     <div className="h-full flex flex-col">
@@ -130,7 +158,12 @@ export function FeedDetail({ item, onMarkReviewed }: FeedDetailProps) {
                 <Link2 className="size-3.5 mr-2" />
                 Link to Brief
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-xs">
+              <DropdownMenuItem
+                className="text-xs"
+                onClick={() => {
+                  setTagDialogOpen(true)
+                }}
+              >
                 <Users className="size-3.5 mr-2" />
                 Attribute to Competitor
               </DropdownMenuItem>
@@ -145,6 +178,52 @@ export function FeedDetail({ item, onMarkReviewed }: FeedDetailProps) {
           </DropdownMenu>
         </div>
       </div>
+
+      <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Attribute to competitor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Choose a competitor to tag this intel item with.</p>
+            {availableOptions.length > 0 ? (
+              <Select value={selectedCompetitorId} onValueChange={setSelectedCompetitorId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select competitor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableOptions.map((comp) => (
+                    <SelectItem key={comp.id} value={comp.id}>
+                      {comp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No available competitors to add. This item is already tagged to all competitors you can select.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTagDialogOpen(false)
+                setSelectedCompetitorId('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleSaveCompetitorTag()}
+              disabled={!selectedCompetitorId || isSavingCompetitor || !onAttachCompetitor}
+            >
+              {isSavingCompetitor ? 'Saving…' : 'Save tag'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Scrollable Content */}
       <ScrollArea className="flex-1">
