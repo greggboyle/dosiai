@@ -146,3 +146,27 @@ export async function setIntelligenceItemWatching(itemId: string, isWatching: bo
   revalidatePath('/intel')
   revalidatePath('/')
 }
+
+export async function updateIntelligenceItemEventDate(itemId: string, eventDate: string): Promise<void> {
+  const workspaceId = await getWorkspaceIdForUser()
+  if (!workspaceId) throw new Error('Unauthorized')
+  if (!itemId) throw new Error('Missing item id')
+  if (!eventDate || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    throw new Error('Invalid event date')
+  }
+
+  await withWorkspace(workspaceId, ['admin', 'analyst'], async () => {
+    const supabase = await createSupabaseServerClient()
+
+    const normalizedEventAt = `${eventDate}T12:00:00.000Z`
+    const { error } = await supabase
+      .from('intelligence_item')
+      .update({ event_at: normalizedEventAt })
+      .eq('id', itemId)
+      .eq('workspace_id', workspaceId)
+    if (error) throw error
+  })
+
+  revalidatePath('/intel')
+  revalidatePath('/')
+}

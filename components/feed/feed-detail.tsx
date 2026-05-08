@@ -68,6 +68,16 @@ function getMarkdownNodeText(children: React.ReactNode): string {
     .trim()
 }
 
+function toDateInputValue(value: string | undefined): string {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const y = parsed.getFullYear()
+  const m = String(parsed.getMonth() + 1).padStart(2, '0')
+  const d = String(parsed.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 interface FeedDetailProps {
   item: IntelligenceItem | null
   onMarkReviewed?: () => void | Promise<void>
@@ -75,6 +85,7 @@ interface FeedDetailProps {
   competitorOptions?: Array<{ id: string; name: string }>
   onAttachCompetitor?: (competitorId: string) => void | Promise<void>
   onDetachCompetitor?: (competitorId: string) => void | Promise<void>
+  onUpdateEventDate?: (eventDate: string) => void | Promise<void>
 }
 
 export function FeedDetail({
@@ -84,12 +95,19 @@ export function FeedDetail({
   competitorOptions = [],
   onAttachCompetitor,
   onDetachCompetitor,
+  onUpdateEventDate,
 }: FeedDetailProps) {
   const [scoreExpanded, setScoreExpanded] = React.useState(false)
   const [commentText, setCommentText] = React.useState('')
   const [tagDialogOpen, setTagDialogOpen] = React.useState(false)
   const [selectedCompetitorId, setSelectedCompetitorId] = React.useState<string>('')
   const [isSavingCompetitor, setIsSavingCompetitor] = React.useState(false)
+  const [eventDateInput, setEventDateInput] = React.useState('')
+  const [isSavingEventDate, setIsSavingEventDate] = React.useState(false)
+
+  React.useEffect(() => {
+    setEventDateInput(toDateInputValue(item?.eventDate))
+  }, [item?.id, item?.eventDate])
 
   if (!item) {
     return (
@@ -134,6 +152,16 @@ export function FeedDetail({
       setSelectedCompetitorId('')
     } finally {
       setIsSavingCompetitor(false)
+    }
+  }
+
+  const handleSaveEventDate = async () => {
+    if (!eventDateInput || !onUpdateEventDate) return
+    setIsSavingEventDate(true)
+    try {
+      await onUpdateEventDate(eventDateInput)
+    } finally {
+      setIsSavingEventDate(false)
     }
   }
 
@@ -306,6 +334,29 @@ export function FeedDetail({
                   </div>
                 </CollapsibleContent>
               </Collapsible>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 px-3 py-2">
+              <div className="min-w-[170px] flex-1">
+                <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Event Date
+                </p>
+                <input
+                  type="date"
+                  value={eventDateInput}
+                  onChange={(event) => setEventDateInput(event.target.value)}
+                  className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={() => void handleSaveEventDate()}
+                disabled={!eventDateInput || !onUpdateEventDate || isSavingEventDate}
+              >
+                {isSavingEventDate ? 'Saving…' : 'Save date'}
+              </Button>
             </div>
 
             {/* Metadata (C1: updated for relatedCompetitors/relatedTopics arrays) */}

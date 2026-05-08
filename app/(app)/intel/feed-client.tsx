@@ -44,6 +44,7 @@ import {
   detachCompetitorFromIntelligenceItem,
   markIntelligenceItemReviewed,
   setIntelligenceItemWatching,
+  updateIntelligenceItemEventDate,
 } from '@/lib/intelligence/actions'
 import { fetchFeedItemsForFilters } from './actions'
 
@@ -795,6 +796,18 @@ export function FeedClient({
     setSelectedItem((prev) => (prev ? removeCompetitor(prev) : prev))
   }, [])
 
+  const handleUpdateEventDate = React.useCallback(async (item: IntelligenceItem, eventDate: string) => {
+    await updateIntelligenceItemEventDate(item.id, eventDate)
+
+    const normalizedEventAt = `${eventDate}T12:00:00.000Z`
+    const applyEventDate = (entry: IntelligenceItem): IntelligenceItem =>
+      entry.id === item.id ? { ...entry, eventDate: normalizedEventAt } : entry
+
+    setItems((prev) => prev.map(applyEventDate))
+    setServerFilteredItems((prev) => (prev ? prev.map(applyEventDate) : prev))
+    setSelectedItem((prev) => (prev ? applyEventDate(prev) : prev))
+  }, [])
+
   const hasActiveFilters = 
     selectedCategories.length > 0 || 
     selectedCompetitors.length > 0 || 
@@ -1361,6 +1374,9 @@ export function FeedClient({
             }
             onDetachCompetitor={(competitorId) =>
               selectedItem ? handleDetachCompetitor(selectedItem, competitorId) : Promise.resolve()
+            }
+            onUpdateEventDate={(eventDate) =>
+              selectedItem ? handleUpdateEventDate(selectedItem, eventDate) : Promise.resolve()
             }
           />
         </SheetContent>
