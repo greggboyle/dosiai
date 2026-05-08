@@ -19,9 +19,10 @@ interface FeedListProps {
   items: IntelligenceItem[]
   selectedId?: string
   onSelect: (item: IntelligenceItem) => void
+  onToggleWatching?: (item: IntelligenceItem) => void | Promise<void>
 }
 
-export function FeedList({ items, selectedId, onSelect }: FeedListProps) {
+export function FeedList({ items, selectedId, onSelect, onToggleWatching }: FeedListProps) {
   if (items.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -47,6 +48,7 @@ export function FeedList({ items, selectedId, onSelect }: FeedListProps) {
             item={item}
             isSelected={selectedId === item.id}
             onSelect={() => onSelect(item)}
+            onToggleWatching={() => onToggleWatching?.(item)}
           />
         ))}
       </div>
@@ -58,9 +60,10 @@ interface FeedListItemProps {
   item: IntelligenceItem
   isSelected: boolean
   onSelect: () => void
+  onToggleWatching: () => void | Promise<void>
 }
 
-function FeedListItem({ item, isSelected, onSelect }: FeedListItemProps) {
+function FeedListItem({ item, isSelected, onSelect, onToggleWatching }: FeedListItemProps) {
   const [isHovered, setIsHovered] = React.useState(false)
   const categoryInfo = getCategoryInfo(item.category)
 
@@ -242,6 +245,10 @@ function FeedListItem({ item, isSelected, onSelect }: FeedListItemProps) {
                 variant="ghost" 
                 size="icon" 
                 className={cn('size-7', item.isWatching && 'text-accent')}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void onToggleWatching()
+                }}
               >
                 <Eye className={cn('size-3.5', item.isWatching && 'fill-current')} />
               </Button>

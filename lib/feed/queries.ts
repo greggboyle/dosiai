@@ -37,9 +37,34 @@ async function mapFeedRows(
 
   const compById = Object.fromEntries((comps ?? []).map((c) => [c.id, c]))
   const topById = Object.fromEntries((tops ?? []).map((t) => [t.id, t]))
+  const itemIds = rows
+    .map((row) => row.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+
+  let userStatesByItemId: Record<string, { status: 'new' | 'read' | 'bookmarked'; is_watching: boolean }> = {}
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (user && itemIds.length > 0) {
+    const { data: states } = await supabase
+      .from('item_user_state')
+      .select('item_id,status,is_watching')
+      .eq('user_id', user.id)
+      .in('item_id', itemIds)
+    userStatesByItemId = Object.fromEntries(
+      (states ?? []).map((state) => [
+        state.item_id,
+        { status: state.status, is_watching: state.is_watching },
+      ])
+    )
+  }
 
   return rows.map((row) => {
     const item = intelligenceItemFromDb(row as never)
+    const state = userStatesByItemId[item.id]
+    item.isRead = state?.status === 'read'
+    item.isBookmarked = state?.status === 'bookmarked'
+    item.isWatching = state?.is_watching ?? false
     item.relatedCompetitors = ((row.related_competitors as string[] | null) ?? []).map((id) => ({
       id,
       name: compById[id]?.name ?? 'Competitor',

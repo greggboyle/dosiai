@@ -51,11 +51,18 @@ import { getRelativeTime, getCategoryInfo } from '@/lib/types'
 interface FeedDetailProps {
   item: IntelligenceItem | null
   onMarkReviewed?: () => void | Promise<void>
+  onToggleWatching?: () => void | Promise<void>
   competitorOptions?: Array<{ id: string; name: string }>
   onAttachCompetitor?: (competitorId: string) => void | Promise<void>
 }
 
-export function FeedDetail({ item, onMarkReviewed, competitorOptions = [], onAttachCompetitor }: FeedDetailProps) {
+export function FeedDetail({
+  item,
+  onMarkReviewed,
+  onToggleWatching,
+  competitorOptions = [],
+  onAttachCompetitor,
+}: FeedDetailProps) {
   const [scoreExpanded, setScoreExpanded] = React.useState(false)
   const [commentText, setCommentText] = React.useState('')
   const [tagDialogOpen, setTagDialogOpen] = React.useState(false)
@@ -146,7 +153,12 @@ export function FeedDetail({ item, onMarkReviewed, competitorOptions = [], onAtt
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem className="text-xs">
+              <DropdownMenuItem
+                className="text-xs"
+                onClick={() => {
+                  void onToggleWatching?.()
+                }}
+              >
                 <Eye className="size-3.5 mr-2" />
                 {item.isWatching ? 'Stop Watching' : 'Add to Watching'}
               </DropdownMenuItem>

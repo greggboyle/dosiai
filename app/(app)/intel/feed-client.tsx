@@ -39,7 +39,11 @@ import { FeedDetail } from '@/components/feed/feed-detail'
 import type { IntelligenceItem, Category } from '@/lib/types'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { attachCompetitorToIntelligenceItem, markIntelligenceItemReviewed } from '@/lib/intelligence/actions'
+import {
+  attachCompetitorToIntelligenceItem,
+  markIntelligenceItemReviewed,
+  setIntelligenceItemWatching,
+} from '@/lib/intelligence/actions'
 import { fetchFeedItemsForFilters } from './actions'
 
 // Helper to create mock dates relative to "now" - using fixed offsets in hours
@@ -754,6 +758,18 @@ export function FeedClient({
     [competitorOptions]
   )
 
+  const handleToggleWatching = React.useCallback(async (item: IntelligenceItem) => {
+    const nextWatching = !item.isWatching
+    await setIntelligenceItemWatching(item.id, nextWatching)
+
+    const applyWatching = (entry: IntelligenceItem): IntelligenceItem =>
+      entry.id === item.id ? { ...entry, isWatching: nextWatching } : entry
+
+    setItems((prev) => prev.map(applyWatching))
+    setServerFilteredItems((prev) => (prev ? prev.map(applyWatching) : prev))
+    setSelectedItem((prev) => (prev ? applyWatching(prev) : prev))
+  }, [])
+
   const hasActiveFilters = 
     selectedCategories.length > 0 || 
     selectedCompetitors.length > 0 || 
@@ -798,7 +814,7 @@ export function FeedClient({
         <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-border bg-background">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">Market Intelligence Feed</h1>
+              <h1 className="text-xl font-semibold tracking-tight">Market Intelligence</h1>
               <p className="text-sm text-muted-foreground">
                 {hasServerSideFilters
                   ? `${dataSource.length} matching item${dataSource.length !== 1 ? 's' : ''}`
@@ -1043,6 +1059,7 @@ export function FeedClient({
           items={filteredItems}
           selectedId={selectedItem?.id}
           onSelect={handleSelectItem}
+          onToggleWatching={handleToggleWatching}
         />
         <div className="flex items-center justify-between border-t border-border px-6 py-3">
           <div className="text-xs text-muted-foreground">
@@ -1091,6 +1108,7 @@ export function FeedClient({
           <FeedDetail
             item={selectedItem}
             onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)}
+            onToggleWatching={() => (selectedItem ? handleToggleWatching(selectedItem) : Promise.resolve())}
             competitorOptions={competitorOptions}
             onAttachCompetitor={(competitorId) =>
               selectedItem ? handleAttachCompetitor(selectedItem, competitorId) : Promise.resolve()
@@ -1106,6 +1124,7 @@ export function FeedClient({
             <FeedDetail
               item={selectedItem}
               onMarkReviewed={() => selectedItem && handleMarkReviewed(selectedItem)}
+              onToggleWatching={() => (selectedItem ? handleToggleWatching(selectedItem) : Promise.resolve())}
               competitorOptions={competitorOptions}
               onAttachCompetitor={(competitorId) =>
                 selectedItem ? handleAttachCompetitor(selectedItem, competitorId) : Promise.resolve()

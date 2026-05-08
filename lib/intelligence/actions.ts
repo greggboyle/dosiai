@@ -23,7 +23,7 @@ export async function markIntelligenceItemReviewed(itemId: string): Promise<void
     if (error) throw error
   })
 
-  revalidatePath('/feed')
+  revalidatePath('/intel')
   revalidatePath('/')
 }
 
@@ -58,6 +58,56 @@ export async function attachCompetitorToIntelligenceItem(
     if (error) throw error
   })
 
-  revalidatePath('/feed')
+  revalidatePath('/intel')
+  revalidatePath('/')
+}
+
+export async function setIntelligenceItemWatching(itemId: string, isWatching: boolean): Promise<void> {
+  const workspaceId = await getWorkspaceIdForUser()
+  if (!workspaceId) throw new Error('Unauthorized')
+  if (!itemId) throw new Error('Missing item id')
+
+  await withWorkspace(workspaceId, ['admin', 'analyst'], async ({ user }) => {
+    const supabase = await createSupabaseServerClient()
+
+    const { data: item, error: itemErr } = await supabase
+      .from('intelligence_item')
+      .select('id')
+      .eq('id', itemId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle()
+    if (itemErr) throw itemErr
+    if (!item) throw new Error('Item not found')
+
+    const { data: existing, error: stateErr } = await supabase
+      .from('item_user_state')
+      .select('item_id')
+      .eq('item_id', itemId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (stateErr) throw stateErr
+
+    if (existing) {
+      const { error } = await supabase
+        .from('item_user_state')
+        .update({
+          is_watching: isWatching,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('item_id', itemId)
+        .eq('user_id', user.id)
+      if (error) throw error
+    } else {
+      const { error } = await supabase.from('item_user_state').insert({
+        item_id: itemId,
+        user_id: user.id,
+        status: 'new',
+        is_watching: isWatching,
+      })
+      if (error) throw error
+    }
+  })
+
+  revalidatePath('/intel')
   revalidatePath('/')
 }
