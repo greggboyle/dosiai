@@ -3,10 +3,13 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { ExternalLink, Play, UserCheck } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { startImpersonation } from '@/app/admin/impersonation/actions'
-import { runSweepOnBehalf } from '@/app/admin/workspaces/actions'
+import { runSweepOnBehalf, updateWorkspacePlan } from '@/app/admin/workspaces/actions'
+import type { WorkspacePlan } from '@/lib/types/dosi'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
@@ -94,7 +97,14 @@ function formatRelativeTime(date: string | null) {
 }
 
 export function WorkspaceDetailClient({ data }: { data: WorkspaceDetailData }) {
+  const router = useRouter()
   const [busy, setBusy] = React.useState(false)
+  const [planChoice, setPlanChoice] = React.useState<WorkspacePlan>(data.workspace.plan as WorkspacePlan)
+  const [planMessage, setPlanMessage] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    setPlanChoice(data.workspace.plan as WorkspacePlan)
+  }, [data.workspace.plan])
 
   async function onRunSweep() {
     const reason = window.prompt('Reason for manual sweep (required):')
@@ -114,6 +124,23 @@ export function WorkspaceDetailClient({ data }: { data: WorkspaceDetailData }) {
     setBusy(true)
     try {
       await startImpersonation(data.workspace.id, 'read_only', reason)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const planDirty = planChoice !== data.workspace.plan
+
+  async function onUpdatePlan() {
+    const reason = window.prompt('Reason for plan change (required):')
+    if (!reason?.trim()) return
+    setBusy(true)
+    setPlanMessage(null)
+    try {
+      await updateWorkspacePlan(data.workspace.id, planChoice, reason)
+      router.refresh()
+    } catch (e) {
+      setPlanMessage(e instanceof Error ? e.message : 'Could not update plan.')
     } finally {
       setBusy(false)
     }
@@ -140,11 +167,39 @@ export function WorkspaceDetailClient({ data }: { data: WorkspaceDetailData }) {
               Workspaces
             </Link>
           </div>
-          <div className="mt-1 flex items-center gap-2">
+          <div className="mt-1 flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold">{data.workspace.name}</h1>
-            <Badge variant="outline">{data.workspace.plan}</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={planChoice}
+                onValueChange={(v) => setPlanChoice(v as WorkspacePlan)}
+                disabled={busy}
+              >
+                <SelectTrigger className="h-8 w-[150px] text-xs capitalize">
+                  <SelectValue placeholder="Plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="trial">Trial</SelectItem>
+                  <SelectItem value="starter">Starter</SelectItem>
+                  <SelectItem value="team">Team</SelectItem>
+                  <SelectItem value="business">Business</SelectItem>
+                  <SelectItem value="enterprise">Enterprise</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8"
+                disabled={busy || !planDirty}
+                onClick={onUpdatePlan}
+              >
+                Update plan
+              </Button>
+            </div>
             <Badge variant="outline">{data.workspace.status}</Badge>
           </div>
+          {planMessage ? <div className="text-sm text-red-600">{planMessage}</div> : null}
           <div className="text-sm text-slate-500">
             {data.workspace.domain || 'No domain'} · last active {formatRelativeTime(data.workspace.lastActiveAt)}
           </div>
