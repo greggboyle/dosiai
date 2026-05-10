@@ -358,6 +358,8 @@ export function CompetitorProfileClient({
     }))
   }, [voiceItems])
 
+  const latestLinkedBrief = React.useMemo(() => linkedBriefs[0] ?? null, [linkedBriefs])
+
   const handleRefreshProfile = async () => {
     try {
       setRefreshingProfile(true)
@@ -767,6 +769,36 @@ export function CompetitorProfileClient({
                   </form>
                 </CardContent>
               )}
+            </Card>
+
+            {/* Competitor Briefing Card - 4 cols */}
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle className="text-base">Competitor Briefing</CardTitle>
+                <CardDescription>
+                  {latestLinkedBrief
+                    ? 'Latest briefing linked to this competitor.'
+                    : `No briefing linked to ${competitor.name} yet.`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {latestLinkedBrief ? (
+                  <div className="rounded-lg border p-3">
+                    <p className="text-sm font-medium">{latestLinkedBrief.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{latestLinkedBrief.summary}</p>
+                    <p className="text-xs text-muted-foreground mt-2">{latestLinkedBrief.createdAtLabel}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Create a briefing to capture key insights and share them with your team.
+                  </p>
+                )}
+                <Button asChild className="w-full">
+                  <Link href={latestLinkedBrief ? `/briefs/${latestLinkedBrief.id}` : '/briefs/new'}>
+                    {latestLinkedBrief ? 'View Briefing' : 'Request Briefing'}
+                  </Link>
+                </Button>
+              </CardContent>
             </Card>
 
             {/* Leadership Card - 4 cols */}
