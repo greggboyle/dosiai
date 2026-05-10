@@ -10,17 +10,18 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createSupabaseServerClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
 
-  if (!session?.user) {
+  if (authError || !user) {
     redirect('/sign-in')
   }
 
   const { data: memberRow } = await supabase
     .from('workspace_member')
     .select('*')
-    .eq('user_id', session.user.id)
+    .eq('user_id', user.id)
     .eq('status', 'active')
     .order('joined_at', { ascending: true })
     .limit(1)
@@ -70,7 +71,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     workspaceRow.plan as PlanId
   )
 
-  const userId = session.user.id
+  const userId = user.id
   const [sidebarNavBadgeCounts, notificationBootstrap] = await Promise.all([
     loadSidebarNavBadgeCounts(workspaceRow.id, userId),
     loadNotificationBootstrap(userId),
@@ -90,9 +91,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       }}
       member={{
         name:
-          (session.user.user_metadata?.full_name as string | undefined) ??
-          (session.user.email?.split('@')[0] ?? 'Member'),
-        email: session.user.email ?? '',
+          (user.user_metadata?.full_name as string | undefined) ??
+          (user.email?.split('@')[0] ?? 'Member'),
+        email: user.email ?? '',
         role: memberRow.role,
       }}
       subscription={subscription}
