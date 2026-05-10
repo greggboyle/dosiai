@@ -52,8 +52,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
-// Simplified navigation for Tier 1 & 2 personas (mid-market PMMs)
-// Core items are always visible, advanced items hidden in "More" for Tier 3
+// Core nav: primary workflows. "More" holds secondary destinations.
 type NavItemConfig = {
   label: string
   href: string
@@ -63,6 +62,12 @@ type NavItemConfig = {
 
 const coreNavItems: NavItemConfig[] = [
   { label: 'Home', href: '/', icon: LayoutDashboard },
+  {
+    label: 'My Market Briefs',
+    href: '/my-briefs',
+    icon: Sparkles,
+    badge: (c) => (c.myMarketBriefsUnread > 0 ? c.myMarketBriefsUnread : undefined),
+  },
   {
     label: 'All Intel',
     href: '/intel',
@@ -75,21 +80,15 @@ const coreNavItems: NavItemConfig[] = [
 
 const moreNavItems: NavItemConfig[] = [
   { label: 'Topics', href: '/topics', icon: Hash },
-  { label: 'Resources', href: '/resources', icon: FolderOpen },
   {
-    label: 'Briefs',
+    label: 'All Briefs',
     href: '/briefs',
     icon: FileText,
     badge: (c) => (c.briefCount > 0 ? c.briefCount : undefined),
   },
-  {
-    label: 'My Market Briefs',
-    href: '/my-briefs',
-    icon: Sparkles,
-    badge: (c) => (c.myMarketBriefsUnread > 0 ? c.myMarketBriefsUnread : undefined),
-  },
   { label: 'Win/Loss', href: '/win-loss', icon: TrendingUp },
   { label: 'Reviews', href: '/customer-voice', icon: MessageSquare },
+  { label: 'Resources', href: '/resources', icon: FolderOpen },
 ]
 
 interface AppSidebarProps {
@@ -165,7 +164,7 @@ export function AppSidebar({ workspace, member, subscription, navBadgeCounts }: 
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Core Navigation - Always visible, friendly for Tier 1 & 2 */}
+        {/* Primary navigation */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -191,7 +190,7 @@ export function AppSidebar({ workspace, member, subscription, navBadgeCounts }: 
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* More - Expandable for advanced features (Tier 2 & 3) */}
+        {/* Secondary navigation */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs">More</SidebarGroupLabel>
           <SidebarGroupContent>
