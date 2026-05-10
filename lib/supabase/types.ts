@@ -12,6 +12,12 @@ export type AiPurposeDb =
   | 'scoring'
   | 'embedding'
   | 'brief_drafting'
+  | 'brief_drafting_manual'
+  | 'brief_drafting_sweep_summary'
+  | 'brief_drafting_daily_summary'
+  | 'brief_drafting_weekly_intelligence'
+  | 'brief_drafting_regulatory_summary'
+  | 'brief_drafting_competitor'
   | 'battle_card_interview'
   | 'battle_card_draft'
 

@@ -424,15 +424,21 @@ export async function seedPromptTemplatesFromCode() {
     if (error) throw error
   }
 
-  // Keep seeded brief_drafting templates aligned with runtime fallback prompt.
-  const briefDefault = getEmbeddedPromptDefault('brief_drafting')
-  if (briefDefault) {
+  // Keep seeded brief drafting templates aligned with runtime fallback prompts.
+  const briefPurposes: AIPurpose[] = [
+    'brief_drafting',
+    'brief_drafting_manual',
+    'brief_drafting_sweep_summary',
+    'brief_drafting_daily_summary',
+    'brief_drafting_weekly_intelligence',
+    'brief_drafting_regulatory_summary',
+    'brief_drafting_competitor',
+  ]
+  for (const purpose of briefPurposes) {
+    const briefDefault = getEmbeddedPromptDefault(purpose)
+    if (!briefDefault) continue
     const staleBriefTemplates = (promptRes.data ?? []).filter(
-      (row) =>
-        row.purpose === 'brief_drafting' &&
-        row.version === 1 &&
-        !row.draft_content &&
-        row.content !== briefDefault.content
+      (row) => row.purpose === purpose && row.version === 1 && !row.draft_content && row.content !== briefDefault.content
     )
     for (const row of staleBriefTemplates) {
       const { error } = await admin

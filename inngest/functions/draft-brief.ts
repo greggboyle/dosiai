@@ -6,11 +6,12 @@ import { getRoutingFor } from '@/lib/ai/router'
 import { getVendorClient } from '@/lib/ai/factory'
 import { getActivePromptTemplateFor, renderPromptTemplate } from '@/lib/ai/prompt-template'
 import { briefDraftResponseSchema } from '@/lib/brief/schema'
-import { BRIEF_DRAFT_PROMPT_TEMPLATE, buildBriefDraftPromptVariables } from '@/lib/brief/draft-prompt'
+import { buildBriefDraftPromptVariables, getBriefDraftPromptTemplateForKind } from '@/lib/brief/draft-prompt'
 import { countWords } from '@/lib/brief/queries'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 import { notifyBriefSubscribersOfPublish } from '@/lib/notifications/brief-published'
 import { filterItemIdsToSweepRegulatoryOnly } from '@/lib/brief/regulatory-items'
+import { briefKindToPromptPurpose } from '@/lib/brief/prompt-purpose'
 
 export const draftBrief = inngest.createFunction(
   { id: 'draft-brief', retries: 2 },
@@ -67,9 +68,10 @@ export const draftBrief = inngest.createFunction(
       if (iErr) throw iErr
       if (!items?.length) throw new Error('No intelligence items found for draft')
 
-      const routing = await getRoutingFor('brief_drafting')
+      const promptPurpose = briefKindToPromptPurpose(brief.brief_kind)
+      const routing = await getRoutingFor(promptPurpose)
       const vendorClient = getVendorClient(routing.vendor, routing.model)
-      const template = await getActivePromptTemplateFor('brief_drafting', routing.vendor)
+      const template = await getActivePromptTemplateFor(promptPurpose, routing.vendor)
       const promptVars = buildBriefDraftPromptVariables({
         audience: brief.audience,
         audienceHint,
@@ -79,7 +81,10 @@ export const draftBrief = inngest.createFunction(
           content: it.content ?? '',
         })),
       })
-      const prompt = renderPromptTemplate(template?.content ?? BRIEF_DRAFT_PROMPT_TEMPLATE, promptVars)
+      const prompt = renderPromptTemplate(
+        template?.content ?? getBriefDraftPromptTemplateForKind(brief.brief_kind),
+        promptVars
+      )
 
       const started = Date.now()
       const result = await vendorClient.complete({
@@ -105,7 +110,7 @@ export const draftBrief = inngest.createFunction(
       )
 
       await recordVendorCall(workspaceId, plan, {
-        purpose: 'brief_drafting',
+        purpose: promptPurpose,
         vendor: routing.vendor,
         model: routing.model,
         promptTemplateId: template?.id ?? null,

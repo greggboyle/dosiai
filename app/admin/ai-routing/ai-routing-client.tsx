@@ -95,6 +95,27 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
   scoring: { name: 'scoring', description: 'MIS scoring (LLM-assisted explanation generation)' },
   embedding: { name: 'embedding', description: 'Embedding model (proximity, dedup, competitor matching)' },
   brief_drafting: { name: 'brief_drafting', description: 'AI-drafted brief generation' },
+  brief_drafting_manual: { name: 'brief_drafting_manual', description: 'Prompt for manual team brief drafting' },
+  brief_drafting_sweep_summary: {
+    name: 'brief_drafting_sweep_summary',
+    description: 'Prompt for sweep summary brief drafting',
+  },
+  brief_drafting_daily_summary: {
+    name: 'brief_drafting_daily_summary',
+    description: 'Prompt for daily summary brief drafting',
+  },
+  brief_drafting_weekly_intelligence: {
+    name: 'brief_drafting_weekly_intelligence',
+    description: 'Prompt for weekly intelligence brief drafting',
+  },
+  brief_drafting_regulatory_summary: {
+    name: 'brief_drafting_regulatory_summary',
+    description: 'Prompt for regulatory summary brief drafting',
+  },
+  brief_drafting_competitor: {
+    name: 'brief_drafting_competitor',
+    description: 'Prompt for competitor brief drafting',
+  },
   battle_card_interview: { name: 'battle_card_interview', description: 'Battle card interview-driven build' },
   battle_card_draft: { name: 'battle_card_draft', description: 'AI draft generation for full battle cards' },
 }

@@ -96,6 +96,39 @@ const SWEEP_SELF_VARIABLES: PromptVariable[] = [
   },
 ]
 
+const BRIEF_DRAFTING_VARIABLES: PromptVariable[] = [
+  { name: 'audience', type: 'string', description: 'Brief audience enum.', example: 'exec' },
+  {
+    name: 'audience_hint_line',
+    type: 'string',
+    description: 'Optional guidance line including newline prefix when provided.',
+    example: '\nAdditional guidance from the author: Focus on renewal risk in EMEA.',
+  },
+  {
+    name: 'items_block',
+    type: 'string',
+    description: 'Formatted intelligence items block from linked feed items.',
+    example: '### Item 1: ...',
+  },
+]
+
+function buildBriefDraftingTemplate(kindGuidance: string): string {
+  return `You are a competitive intelligence analyst for a B2B SaaS company. Produce an executive intelligence brief.
+
+Primary audience for tone and framing: {{audience}}.{{audience_hint_line}}
+
+Below are intelligence items from our workspace feed. Ground every factual claim in these sources. If the sources conflict, say so briefly.
+{{items_block}}
+
+Return ONLY valid JSON with this exact shape (no markdown code fences):
+{"title":"string","summary":"string — 2-4 sentences","body":"string — markdown body with ## headings where helpful"}
+
+The body must be valid markdown suitable for publishing after human review.
+
+Brief-kind guidance:
+${kindGuidance}`
+}
+
 const EMBEDDED_PROMPTS: EmbeddedPromptDefault[] = [
   { purpose: 'sweep_umbrella', content: SWEEP_UMBRELLA_PROMPT, variables: SWEEP_VARIABLES },
   { purpose: 'sweep_buy', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
@@ -122,32 +155,52 @@ Item title: {{item_title}}.`,
   },
   {
     purpose: 'brief_drafting',
-    content: `You are a competitive intelligence analyst for a B2B SaaS company. Produce an executive intelligence brief.
-
-Primary audience for tone and framing: {{audience}}.{{audience_hint_line}}
-
-Below are intelligence items from our workspace feed. Ground every factual claim in these sources. If the sources conflict, say so briefly.
-{{items_block}}
-
-Return ONLY valid JSON with this exact shape (no markdown code fences):
-{"title":"string","summary":"string — 2-4 sentences","body":"string — markdown body with ## headings where helpful"}
-
-The body must be valid markdown suitable for publishing after human review.`,
-    variables: [
-      { name: 'audience', type: 'string', description: 'Brief audience enum.', example: 'exec' },
-      {
-        name: 'audience_hint_line',
-        type: 'string',
-        description: 'Optional guidance line including newline prefix when provided.',
-        example: '\nAdditional guidance from the author: Focus on renewal risk in EMEA.',
-      },
-      {
-        name: 'items_block',
-        type: 'string',
-        description: 'Formatted intelligence items block from linked feed items.',
-        example: '### Item 1: ...',
-      },
-    ],
+    content: buildBriefDraftingTemplate(
+      'General fallback brief. Keep tone neutral, executive-friendly, and grounded in source evidence.'
+    ),
+    variables: BRIEF_DRAFTING_VARIABLES,
+  },
+  {
+    purpose: 'brief_drafting_manual',
+    content: buildBriefDraftingTemplate(
+      'Manual team brief. Preserve author intent and emphasize clarity for internal collaboration.'
+    ),
+    variables: BRIEF_DRAFTING_VARIABLES,
+  },
+  {
+    purpose: 'brief_drafting_sweep_summary',
+    content: buildBriefDraftingTemplate(
+      'Sweep summary brief. Highlight the most material market shifts and business implications.'
+    ),
+    variables: BRIEF_DRAFTING_VARIABLES,
+  },
+  {
+    purpose: 'brief_drafting_daily_summary',
+    content: buildBriefDraftingTemplate(
+      'Daily summary brief. Prioritize developments from the latest cycle and immediate follow-up actions.'
+    ),
+    variables: BRIEF_DRAFTING_VARIABLES,
+  },
+  {
+    purpose: 'brief_drafting_weekly_intelligence',
+    content: buildBriefDraftingTemplate(
+      'Weekly intelligence brief. Synthesize recurring themes, directional changes, and strategic takeaways.'
+    ),
+    variables: BRIEF_DRAFTING_VARIABLES,
+  },
+  {
+    purpose: 'brief_drafting_regulatory_summary',
+    content: buildBriefDraftingTemplate(
+      'Regulatory summary brief. Focus on policy/compliance changes, legal risk, and operational impact.'
+    ),
+    variables: BRIEF_DRAFTING_VARIABLES,
+  },
+  {
+    purpose: 'brief_drafting_competitor',
+    content: buildBriefDraftingTemplate(
+      'Competitor brief. Focus on competitor actions, likely deal impact, and recommended response posture.'
+    ),
+    variables: BRIEF_DRAFTING_VARIABLES,
   },
   {
     purpose: 'battle_card_interview',

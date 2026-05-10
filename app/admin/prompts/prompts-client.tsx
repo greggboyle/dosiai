@@ -89,6 +89,12 @@ const purposeLabels: Record<AIPurpose, string> = {
   scoring: 'MIS Scoring',
   embedding: 'Embedding',
   brief_drafting: 'Brief Drafting',
+  brief_drafting_manual: 'Brief Drafting: Manual',
+  brief_drafting_sweep_summary: 'Brief Drafting: Sweep Summary',
+  brief_drafting_daily_summary: 'Brief Drafting: Daily Summary',
+  brief_drafting_weekly_intelligence: 'Brief Drafting: Weekly Intelligence',
+  brief_drafting_regulatory_summary: 'Brief Drafting: Regulatory Summary',
+  brief_drafting_competitor: 'Brief Drafting: Competitor',
   battle_card_interview: 'Battle Card Interview',
   battle_card_draft: 'Battle Card Draft',
 }
