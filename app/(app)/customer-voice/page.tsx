@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { listCustomerVoiceItems } from '@/lib/customer-voice/queries'
 import type { SubjectOption } from './customer-voice-client'
@@ -6,9 +7,7 @@ import { CustomerVoiceClient } from './customer-voice-client'
 
 export default async function CustomerVoicePage() {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session?.user) redirect('/sign-in')
 
   const { data: member } = await supabase

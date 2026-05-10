@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
   aggregateByCompetitor,
@@ -10,9 +11,7 @@ import { WinLossHubClient } from './win-loss-hub-client'
 
 export default async function WinLossPage() {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session?.user) redirect('/sign-in')
 
   const { data: member } = await supabase

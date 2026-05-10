@@ -1,14 +1,13 @@
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth/session'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { briefRowToBrief, listBriefsForWorkspace } from '@/lib/brief/queries'
 import { BriefsListClient } from './briefs-list-client'
 import { getRelativeTime } from '@/lib/types'
 
 export default async function BriefsPage() {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session?.user) redirect('/sign-in')
 
   const { data: member } = await supabase

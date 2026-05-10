@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { listSections } from '@/lib/battle-cards/queries'
 import { buildRepBattleCardView } from '@/lib/battle-cards/rep-mapper'
@@ -7,9 +8,7 @@ import { RepBattleCardView } from '@/components/rep/rep-battle-card-view'
 export default async function RepBattleCardPage({ params }: { params: Promise<{ competitorId: string }> }) {
   const { competitorId } = await params
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session?.user) notFound()
 
   const { data: member } = await supabase

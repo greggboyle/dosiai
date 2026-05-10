@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,9 +10,7 @@ import { listWorkspaceResourceDocuments } from '@/lib/resources/storage'
 
 export default async function NewBattleCardPage() {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session?.user) redirect('/sign-in')
 
   const { data: member } = await supabase

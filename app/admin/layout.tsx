@@ -229,10 +229,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     let mounted = true
     async function loadOperator() {
       const {
-        data: { session },
-      } = await supabase.auth.getSession()
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser()
 
-      if (!session?.user?.email) {
+      if (authError || !user?.email) {
         if (mounted) {
           setCurrentOperator(null)
           setAuthLoading(false)

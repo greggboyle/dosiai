@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getFeedItemsByIds } from '@/lib/feed/queries'
 import { briefRowToBrief, getBriefById } from '@/lib/brief/queries'
@@ -7,9 +8,7 @@ import { BriefReaderClient } from './brief-reader-client'
 export default async function BriefReaderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session?.user) notFound()
 
   const { data: member } = await supabase

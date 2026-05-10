@@ -1,3 +1,4 @@
+import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { intelligenceItemFromDb } from '@/lib/intelligence/map-row'
 import type { IntelligenceItem } from '@/lib/types'
@@ -78,11 +79,9 @@ async function mapFeedRows(
 }
 
 export async function getWorkspaceIdForUser(): Promise<string | null> {
-  const supabase = await createSupabaseServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session?.user) return null
+  const supabase = await createSupabaseServerClient()
   const { data: member } = await supabase
     .from('workspace_member')
     .select('workspace_id')

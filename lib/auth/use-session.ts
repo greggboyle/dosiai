@@ -20,16 +20,18 @@ export function useSession() {
   React.useEffect(() => {
     let mounted = true
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getUser().then(({ data, error }) => {
       if (!mounted) return
-      setUser(data.session?.user ?? null)
+      setUser(error ? null : (data.user ?? null))
       setIsLoading(false)
     })
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+    } = supabase.auth.onAuthStateChange(async () => {
+      const { data, error } = await supabase.auth.getUser()
+      if (!mounted) return
+      setUser(error ? null : (data.user ?? null))
       setIsLoading(false)
     })
 

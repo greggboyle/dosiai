@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth/session'
 import { getWorkspaceIdForUser } from '@/lib/feed/queries'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,9 +23,7 @@ export default async function ResourcesPage() {
   const workspaceId = await getWorkspaceIdForUser()
   if (!workspaceId) redirect('/sign-in')
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session?.user) redirect('/sign-in')
   const { data: member } = await supabase
     .from('workspace_member')

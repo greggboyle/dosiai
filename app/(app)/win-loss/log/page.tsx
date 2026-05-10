@@ -1,13 +1,12 @@
 import { redirect, notFound } from 'next/navigation'
+import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { listWorkspaceBattleCards } from '@/lib/win-loss/queries'
 import { WinLossLogClient } from './win-loss-log-client'
 
 export default async function WinLossLogPage() {
   const supabase = await createSupabaseServerClient()
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const session = await getSession()
   if (!session?.user) redirect('/sign-in')
 
   const { data: member } = await supabase
