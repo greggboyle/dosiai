@@ -594,7 +594,7 @@ export function CompetitorProfileClient({
         {activeTab === 'overview' && (
           <div className="grid grid-cols-12 gap-6">
             {/* Summary Card - 8 cols */}
-            <Card className="col-span-8">
+            <Card className="col-span-12 md:col-span-8">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Company Summary</CardTitle>
                 {!summaryEditing ? (
@@ -771,29 +771,31 @@ export function CompetitorProfileClient({
               )}
             </Card>
 
-            {/* Competitor Briefing Card - 4 cols */}
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle className="text-base">Competitor Briefing</CardTitle>
-                <CardDescription>
+            {/* Briefing + Leadership: stacked sidebar beside Company Summary */}
+            <div className="col-span-12 md:col-span-4 flex flex-col gap-3 min-w-0">
+            {/* Competitor Briefing Card */}
+            <Card className="shrink-0">
+              <CardHeader className="py-2.5 px-4 space-y-0">
+                <CardTitle className="text-sm font-semibold">Competitor Briefing</CardTitle>
+                <CardDescription className="text-[11px] leading-snug line-clamp-1">
                   {latestLinkedBrief
-                    ? 'Latest briefing linked to this competitor.'
-                    : `No briefing linked to ${competitor.name} yet.`}
+                    ? 'Latest linked briefing'
+                    : 'No briefing linked yet'}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2 px-4 pb-3 pt-0">
                 {latestLinkedBrief ? (
-                  <div className="rounded-lg border p-3">
-                    <p className="text-sm font-medium">{latestLinkedBrief.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{latestLinkedBrief.summary}</p>
-                    <p className="text-xs text-muted-foreground mt-2">{latestLinkedBrief.createdAtLabel}</p>
+                  <div className="rounded-md border px-2.5 py-2">
+                    <p className="text-xs font-medium line-clamp-1">{latestLinkedBrief.title}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{latestLinkedBrief.summary}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">{latestLinkedBrief.createdAtLabel}</p>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Create a briefing to capture key insights and share them with your team.
+                  <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+                    Link a briefing to track intel for this competitor.
                   </p>
                 )}
-                <Button asChild className="w-full">
+                <Button asChild size="sm" className="w-full h-8 text-xs">
                   <Link href={latestLinkedBrief ? `/briefs/${latestLinkedBrief.id}` : '/briefs/new'}>
                     {latestLinkedBrief ? 'View Briefing' : 'Request Briefing'}
                   </Link>
@@ -801,12 +803,12 @@ export function CompetitorProfileClient({
               </CardContent>
             </Card>
 
-            {/* Leadership Card - 4 cols */}
-            <Card className="col-span-4">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Leadership</CardTitle>
+            {/* Leadership Card */}
+            <Card className="shrink-0 flex flex-col min-h-0">
+              <CardHeader className="flex flex-row items-center justify-between py-2.5 px-4 space-y-0">
+                <CardTitle className="text-sm font-semibold">Leadership</CardTitle>
                 {!leadershipEditing ? (
-                  <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => setLeadershipEditing(true)}>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setLeadershipEditing(true)}>
                     <Edit2 className="size-3 mr-1" />
                     Edit
                   </Button>
@@ -814,13 +816,14 @@ export function CompetitorProfileClient({
               </CardHeader>
 
               {!leadershipEditing ? (
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-2 px-4 pb-3 pt-0 max-h-[140px] overflow-y-auto">
                   {competitor.leadership?.map((leader, idx) => (
-                    <div key={idx} className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{leader.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {leader.role} &middot; Since {leader.since}
+                    <div key={idx} className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{leader.name}</p>
+                        <p className="text-[11px] text-muted-foreground line-clamp-1">
+                          {leader.role}
+                          {leader.since ? ` · ${leader.since}` : ''}
                         </p>
                       </div>
                       {leader.linkedIn && (
@@ -828,9 +831,9 @@ export function CompetitorProfileClient({
                           href={leader.linkedIn}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground"
+                          className="text-muted-foreground hover:text-foreground shrink-0"
                         >
-                          <Linkedin className="size-4" />
+                          <Linkedin className="size-3.5" />
                         </a>
                       )}
                     </div>
@@ -935,6 +938,7 @@ export function CompetitorProfileClient({
                 </CardContent>
               )}
             </Card>
+            </div>
 
             {/* Products Card - 4 cols */}
             <Card className="col-span-4">
