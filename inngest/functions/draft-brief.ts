@@ -9,6 +9,8 @@ import { briefDraftResponseSchema } from '@/lib/brief/schema'
 import { BRIEF_DRAFT_PROMPT_TEMPLATE, buildBriefDraftPromptVariables } from '@/lib/brief/draft-prompt'
 import { countWords } from '@/lib/brief/queries'
 import type { WorkspacePlan } from '@/lib/types/dosi'
+import { notifyBriefSubscribersOfPublish } from '@/lib/notifications/brief-published'
+import { filterItemIdsToSweepRegulatoryOnly } from '@/lib/brief/regulatory-items'
 
 export const draftBrief = inngest.createFunction(
   { id: 'draft-brief', retries: 2 },
@@ -47,11 +49,21 @@ export const draftBrief = inngest.createFunction(
       const { data: brief, error: bErr } = await supabase.from('brief').select('*').eq('id', briefId).single()
       if (bErr || !brief) throw new Error('Brief not found')
 
+      let draftItemIds = itemIds
+      if (brief.brief_kind === 'regulatory_summary') {
+        draftItemIds = await filterItemIdsToSweepRegulatoryOnly(workspaceId, itemIds)
+        if (draftItemIds.length === 0) {
+          throw new Error(
+            'Regulatory summary briefs require intelligence items from the regulatory sweep pass (ingestion sweep_regulatory).'
+          )
+        }
+      }
+
       const { data: items, error: iErr } = await supabase
         .from('intelligence_item')
         .select('id,title,summary,content')
         .eq('workspace_id', workspaceId)
-        .in('id', itemIds)
+        .in('id', draftItemIds)
       if (iErr) throw iErr
       if (!items?.length) throw new Error('No intelligence items found for draft')
 
@@ -103,8 +115,8 @@ export const draftBrief = inngest.createFunction(
         costCents,
         latencyMs,
         success: true,
-        citationCount: itemIds.length,
-        responsePayload: { briefId, itemIds },
+        citationCount: draftItemIds.length,
+        responsePayload: { briefId, itemIds: draftItemIds },
       })
 
       const wordCount = countWords(safe.data.body)
@@ -118,7 +130,7 @@ export const draftBrief = inngest.createFunction(
           word_count: wordCount,
           ai_drafted: true,
           human_reviewed: false,
-          linked_item_ids: itemIds,
+          linked_item_ids: draftItemIds,
           ...(autoPublish
             ? {
                 status: 'published' as const,
@@ -129,6 +141,14 @@ export const draftBrief = inngest.createFunction(
         .eq('id', briefId)
 
       if (upErr) throw upErr
+
+      if (autoPublish) {
+        try {
+          await notifyBriefSubscribersOfPublish(briefId)
+        } catch {
+          // Brief is published; notification delivery is best-effort
+        }
+      }
 
       return { ok: true as const, briefId }
     })

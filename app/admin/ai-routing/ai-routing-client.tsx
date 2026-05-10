@@ -82,6 +82,10 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
   sweep_sell: { name: 'sweep_sell', description: 'Sell-side intelligence sweeps' },
   sweep_channel: { name: 'sweep_channel', description: 'Channel intelligence sweeps' },
   sweep_regulatory: { name: 'sweep_regulatory', description: 'Regulatory intelligence sweeps' },
+  sweep_umbrella: {
+    name: 'sweep_umbrella',
+    description: 'Umbrella market sweep (buy/sell/channel/regulatory in one pass — default for scheduled & manual runs)',
+  },
   sweep_self: { name: 'sweep_self', description: 'Own-company intelligence sweeps' },
   sweep_topic: { name: 'sweep_topic', description: 'Topic-focused sweep pass' },
   competitor_profile_refresh: {

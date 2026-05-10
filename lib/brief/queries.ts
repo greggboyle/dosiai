@@ -12,6 +12,7 @@ export function briefRowToBrief(row: BriefRow, authorLabel: string): Brief {
   return {
     id: row.id,
     title: row.title,
+    briefKind: row.brief_kind,
     audience: row.audience,
     priority: row.priority,
     summary: row.summary,

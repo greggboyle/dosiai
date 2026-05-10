@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Search, Bell, Moon, Sun } from 'lucide-react'
+import { Search, Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 import { cn } from '@/lib/utils'
@@ -19,6 +19,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { NotificationsBell } from '@/components/notifications-bell'
+import type { NotificationListItem } from '@/lib/notifications/queries'
 
 interface SweepStatus {
   status: 'healthy' | 'degraded' | 'running'
@@ -28,6 +30,8 @@ interface SweepStatus {
 interface TopBarProps {
   sweepStatus?: SweepStatus
   className?: string
+  notificationBootstrap: { unreadCount: number; recent: NotificationListItem[] }
+  userId: string
 }
 
 const statusColors = {
@@ -42,7 +46,12 @@ const statusLabels = {
   running: 'Sweep in progress',
 }
 
-export function TopBar({ sweepStatus = { status: 'healthy' }, className }: TopBarProps) {
+export function TopBar({
+  sweepStatus = { status: 'healthy' },
+  className,
+  notificationBootstrap,
+  userId,
+}: TopBarProps) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
@@ -101,19 +110,11 @@ export function TopBar({ sweepStatus = { status: 'healthy' }, className }: TopBa
           </TooltipContent>
         </Tooltip>
 
-        {/* Notifications */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-9 relative">
-              <Bell className="size-4" />
-              <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-accent" />
-              <span className="sr-only">Notifications</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p className="text-xs">3 new notifications</p>
-          </TooltipContent>
-        </Tooltip>
+        <NotificationsBell
+          userId={userId}
+          initialUnread={notificationBootstrap.unreadCount}
+          initialRecent={notificationBootstrap.recent}
+        />
 
         {/* Theme Toggle */}
         <DropdownMenu>

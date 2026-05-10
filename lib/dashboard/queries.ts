@@ -15,9 +15,14 @@ export type SidebarNavBadgeCounts = {
   feedReviewQueue: number
   /** Non-archived briefs in the workspace (archived are hidden from the count). */
   briefCount: number
+  /** Published My Market briefs the user has not marked read (0 when userId omitted). */
+  myMarketBriefsUnread: number
 }
 
-export async function loadSidebarNavBadgeCounts(workspaceId: string): Promise<SidebarNavBadgeCounts> {
+export async function loadSidebarNavBadgeCounts(
+  workspaceId: string,
+  userId?: string
+): Promise<SidebarNavBadgeCounts> {
   const supabase = await createSupabaseServerClient()
 
   const { data: ws } = await supabase
@@ -28,7 +33,9 @@ export async function loadSidebarNavBadgeCounts(workspaceId: string): Promise<Si
 
   const threshold = ws?.review_queue_threshold ?? 30
 
-  const [reviewQueueRes, briefCountRes] = await Promise.all([
+  const { countMyMarketUnread } = await import('@/lib/brief/my-market-queries')
+
+  const [reviewQueueRes, briefCountRes, myMarketUnread] = await Promise.all([
     supabase
       .from('intelligence_item')
       .select('*', { count: 'exact', head: true })
@@ -41,11 +48,13 @@ export async function loadSidebarNavBadgeCounts(workspaceId: string): Promise<Si
       .select('*', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .neq('status', 'archived'),
+    userId ? countMyMarketUnread(workspaceId, userId) : Promise.resolve(0),
   ])
 
   return {
     feedReviewQueue: reviewQueueRes.count ?? 0,
     briefCount: briefCountRes.count ?? 0,
+    myMarketBriefsUnread: myMarketUnread,
   }
 }
 

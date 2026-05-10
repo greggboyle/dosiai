@@ -3,7 +3,11 @@ import { checkCostBudget, recordVendorCall } from '@/lib/ai/cost'
 import { estimateCallCostCents } from '@/lib/ai/pricing'
 import { getVendorClient } from '@/lib/ai/factory'
 import { getRoutingFor } from '@/lib/ai/router'
-import { sweepAiResponseSchema, type ParsedSweepItem } from '@/lib/sweep/schemas'
+import {
+  normalizeSweepCategory,
+  sweepAiResponseSchema,
+  type ParsedSweepItem,
+} from '@/lib/sweep/schemas'
 import { SweepRejectedError } from '@/lib/sweep/errors'
 import { computeMis, embedText, loadProfileVectors, type SweepContext } from '@/lib/mis/score'
 import { determineVisibility } from '@/lib/feed/visibility'
@@ -15,7 +19,10 @@ import type { WorkspacePlan } from '@/lib/types/dosi'
 import { inngest } from '@/inngest/client'
 import { shouldAutoRefreshTrialOnFirstSweep } from '@/lib/competitors/profile-refresh'
 import { getActivePromptTemplateFor, renderPromptTemplate } from '@/lib/ai/prompt-template'
-import { SWEEP_SHARED_PROMPT_TEMPLATE } from '@/lib/admin/prompt-defaults'
+import {
+  SWEEP_SHARED_PROMPT_TEMPLATE,
+  SWEEP_UMBRELLA_PROMPT_TEMPLATE,
+} from '@/lib/admin/prompt-defaults'
 import { SWEEP_SELF_PROMPT_TEMPLATE } from '@/lib/sweep/self-prompt-template'
 import { validateSweepItemSources } from '@/lib/sweep/validate-sources'
 
@@ -28,13 +35,6 @@ export interface OrchestrateSweepInput {
 function isNoEnabledRoutingRulesError(error: unknown): boolean {
   if (!(error instanceof Error)) return false
   return error.message.startsWith('No enabled routing rules for ')
-}
-
-function categoryToPurpose(cat: 'buy' | 'sell' | 'channel' | 'regulatory'): AiPurposeDb {
-  if (cat === 'buy') return 'sweep_buy'
-  if (cat === 'sell') return 'sweep_sell'
-  if (cat === 'channel') return 'sweep_channel'
-  return 'sweep_regulatory'
 }
 
 type RawSweepItem = ParsedSweepItem & { isAboutSelf?: boolean }
@@ -58,16 +58,104 @@ async function renderSweepAiPrompt(opts: {
   }
 }
 
-async function runCategoryPrompt(
+/** Umbrella pass: buy-side, sell-side, and channel only — regulatory items come from sweep_regulatory pass. */
+async function runUmbrellaPass(
   workspaceId: string,
   plan: WorkspacePlan,
   sweepId: string,
-  cat: 'buy' | 'sell' | 'channel' | 'regulatory',
   companySummary: string,
   competitorLines: string,
   topicLines: string
 ): Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[] }> {
-  const purpose = categoryToPurpose(cat)
+  const purpose: AiPurposeDb = 'sweep_umbrella'
+  const routing = await getRoutingFor(purpose)
+
+  const vendorCallIds: string[] = []
+  const merged: ParsedSweepItem[] = []
+
+  for (const rule of routing.activeRules) {
+    const { prompt, promptTemplateId, promptTemplateVersion } = await renderSweepAiPrompt({
+      purpose,
+      vendor: rule.vendor as AiVendorDb,
+      fallbackTemplate: SWEEP_UMBRELLA_PROMPT_TEMPLATE,
+      variables: {
+        purpose,
+        company_summary: companySummary,
+        competitor_lines: competitorLines,
+        topic_lines: topicLines,
+      },
+    })
+    const client = getVendorClient(rule.vendor, rule.model)
+    const started = Date.now()
+    try {
+      const res = await client.complete({
+        prompt,
+        responseSchema: sweepAiResponseSchema,
+        webSearch: true,
+        maxTokens: 4096,
+      })
+      const usage = res.usage
+      const cost = estimateCallCostCents(rule.model, usage.inputTokens, usage.outputTokens)
+      const vc = await recordVendorCall(workspaceId, plan, {
+        purpose,
+        vendor: rule.vendor,
+        model: rule.model,
+        requestTokens: usage.inputTokens,
+        responseTokens: usage.outputTokens,
+        costCents: cost,
+        latencyMs: Date.now() - started,
+        success: true,
+        citationCount: 0,
+        responsePayload: res.rawResponse,
+        sweepId,
+        promptTemplateId,
+        promptTemplateVersion,
+      })
+      if (vc?.id) vendorCallIds.push(vc.id)
+
+      const parsed = res.parsed ? sweepAiResponseSchema.safeParse(res.parsed) : null
+      if (parsed?.success) {
+        for (const it of parsed.data.items) {
+          const cat = normalizeSweepCategory(it.category)
+          // Never emit regulatory from umbrella — those rows must trace to sweep_regulatory only.
+          if (cat === 'regulatory') {
+            merged.push({ ...it, category: 'buy-side' })
+          } else {
+            merged.push(it)
+          }
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      await recordVendorCall(workspaceId, plan, {
+        purpose,
+        vendor: rule.vendor,
+        model: rule.model,
+        requestTokens: 0,
+        responseTokens: 0,
+        costCents: 0,
+        latencyMs: Date.now() - started,
+        success: false,
+        errorMessage: msg,
+        sweepId,
+      })
+      throw e
+    }
+  }
+
+  return { items: merged, vendorCallIds }
+}
+
+/** Regulatory-only pass — vendor_call purpose sweep_regulatory; rows tagged for regulatory summary briefs. */
+async function runSweepRegulatoryPass(
+  workspaceId: string,
+  plan: WorkspacePlan,
+  sweepId: string,
+  companySummary: string,
+  competitorLines: string,
+  topicLines: string
+): Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[] }> {
+  const purpose: AiPurposeDb = 'sweep_regulatory'
   const routing = await getRoutingFor(purpose)
 
   const vendorCallIds: string[] = []
@@ -116,7 +204,7 @@ async function runCategoryPrompt(
       const parsed = res.parsed ? sweepAiResponseSchema.safeParse(res.parsed) : null
       if (parsed?.success) {
         for (const it of parsed.data.items) {
-          merged.push({ ...it, category: enforceCategory(it.category, cat) })
+          merged.push({ ...it, category: 'regulatory' })
         }
       }
     } catch (e) {
@@ -138,20 +226,6 @@ async function runCategoryPrompt(
   }
 
   return { items: merged, vendorCallIds }
-}
-
-function enforceCategory(
-  c: ParsedSweepItem['category'] | undefined,
-  fallbackCat: 'buy' | 'sell' | 'channel' | 'regulatory'
-): ParsedSweepItem['category'] {
-  if (c) return c
-  const map = {
-    buy: 'buy-side',
-    sell: 'sell-side',
-    channel: 'channel',
-    regulatory: 'regulatory',
-  } as const
-  return map[fallbackCat]
 }
 
 function normalizeSearchSeeds(raw: unknown): string[] {
@@ -506,21 +580,37 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
   }
 
   try {
-    const cats = ['buy', 'sell', 'channel', 'regulatory'] as const
     const skippedPurposes: AiPurposeDb[] = []
-    const catResults = await Promise.all(
-      cats.map((c) =>
-        runCategoryPrompt(input.workspaceId, plan, sweepId, c, companySummary, competitorLines, topicLines).catch(
-          (error) => {
-            if (isNoEnabledRoutingRulesError(error)) {
-              skippedPurposes.push(categoryToPurpose(c))
-              return { items: [], vendorCallIds: [] }
-            }
-            throw error
-          }
-        )
-      )
-    )
+    const [umbrellaResult, regulatoryResult] = await Promise.all([
+      runUmbrellaPass(
+        input.workspaceId,
+        plan,
+        sweepId,
+        companySummary,
+        competitorLines,
+        topicLines
+      ).catch((error) => {
+        if (isNoEnabledRoutingRulesError(error)) {
+          skippedPurposes.push('sweep_umbrella')
+          return { items: [], vendorCallIds: [] }
+        }
+        throw error
+      }),
+      runSweepRegulatoryPass(
+        input.workspaceId,
+        plan,
+        sweepId,
+        companySummary,
+        competitorLines,
+        topicLines
+      ).catch((error) => {
+        if (isNoEnabledRoutingRulesError(error)) {
+          skippedPurposes.push('sweep_regulatory')
+          return { items: [], vendorCallIds: [] }
+        }
+        throw error
+      }),
+    ])
 
     const topicPassResult = await runTopicsPass(
       input.workspaceId,
@@ -555,22 +645,39 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       throw error
     })
 
-    const categoryValidations = catResults.map((r) => validateSweepItemSources(r.items))
+    const umbrellaValidation = validateSweepItemSources(umbrellaResult.items)
+    const regulatoryValidation = validateSweepItemSources(regulatoryResult.items)
     const selfValidation = validateSweepItemSources(selfPassResult.items)
     const topicValidation = validateSweepItemSources(topicPassResult.items)
 
-    let rawItems: RawSweepItem[] = [
-      ...categoryValidations.flatMap((v) => v.kept),
-      ...selfValidation.kept,
-      ...topicValidation.kept,
+    let taggedIngest: Array<{ item: RawSweepItem; ingestionPurpose: AiPurposeDb }> = [
+      ...umbrellaValidation.kept.map((i) => ({
+        item: i as RawSweepItem,
+        ingestionPurpose: 'sweep_umbrella' as AiPurposeDb,
+      })),
+      ...regulatoryValidation.kept.map((i) => ({
+        item: i as RawSweepItem,
+        ingestionPurpose: 'sweep_regulatory',
+      })),
+      ...selfValidation.kept.map((i) => ({
+        item: i as RawSweepItem,
+        ingestionPurpose: 'sweep_self',
+      })),
+      ...topicValidation.kept.map((i) => ({
+        item: i as RawSweepItem,
+        ingestionPurpose: 'sweep_topic',
+      })),
     ]
 
-    rawItems = applyBrandAliasMatching(rawItems, profile as Record<string, unknown> | null)
+    const aliasedItems = applyBrandAliasMatching(
+      taggedIngest.map((t) => t.item),
+      profile as Record<string, unknown> | null
+    )
+    taggedIngest = taggedIngest.map((t, i) => ({ ...t, item: aliasedItems[i] }))
 
-    // Deduplicate within sweep by title slug + category
     const seen = new Set<string>()
-    rawItems = rawItems.filter((it) => {
-      const key = `${it.category}::${it.title.trim().toLowerCase()}`
+    taggedIngest = taggedIngest.filter((t) => {
+      const key = `${t.item.category}::${t.item.title.trim().toLowerCase()}`
       if (seen.has(key)) return false
       seen.add(key)
       return true
@@ -590,7 +697,7 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
     let itemsNew = 0
     let dedupCollapsed = 0
 
-    for (const item of rawItems) {
+    for (const { item, ingestionPurpose } of taggedIngest) {
       const textForEmbed = `${item.title}\n${item.summary}`.slice(0, 8000)
       const emb = await embedText(input.workspaceId, plan, textForEmbed)
       let skip = false
@@ -661,6 +768,7 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
         event_at: item.eventAt ?? new Date().toISOString(),
         ingested_at: new Date().toISOString(),
         is_about_self: Boolean(item.isAboutSelf),
+        ingestion_purpose: ingestionPurpose,
       }
 
       const { data: inserted, error: insErr } = await supabase
@@ -685,18 +793,20 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       .update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        items_found: rawItems.length,
+        items_found: taggedIngest.length,
         items_new: itemsNew,
         items_dedup_collapsed: dedupCollapsed,
       })
       .eq('id', sweepId)
 
     const rejectedBadUrl =
-      categoryValidations.reduce((sum, v) => sum + v.rejectedBadUrl, 0) +
+      umbrellaValidation.rejectedBadUrl +
+      regulatoryValidation.rejectedBadUrl +
       selfValidation.rejectedBadUrl +
       topicValidation.rejectedBadUrl
     const rejectedUnknownUrl =
-      categoryValidations.reduce((sum, v) => sum + v.rejectedUnknownUrl, 0) +
+      umbrellaValidation.rejectedUnknownUrl +
+      regulatoryValidation.rejectedUnknownUrl +
       selfValidation.rejectedUnknownUrl +
       topicValidation.rejectedUnknownUrl
     if (rejectedBadUrl > 0 || rejectedUnknownUrl > 0) {

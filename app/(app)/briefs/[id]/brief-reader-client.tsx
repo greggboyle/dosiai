@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { MISBadge } from '@/components/mis-badge'
 import type { Brief, IntelligenceItem } from '@/lib/types'
 import { getRelativeTime } from '@/lib/types'
+import { markMyBriefRead } from '@/lib/brief/my-market-actions'
 
 /** Turn "Item N" in markdown into anchor links when N matches a linked feed item index (1-based). */
 function linkifyItemAnchors(body: string, linkedCount: number): string {
@@ -60,6 +61,11 @@ export interface BriefReaderClientProps {
 
 export function BriefReaderClient({ brief, linkedItems, canEdit }: BriefReaderClientProps) {
   const [copied, setCopied] = React.useState(false)
+
+  React.useEffect(() => {
+    if (brief.status !== 'published') return
+    void markMyBriefRead(brief.id)
+  }, [brief.id, brief.status])
 
   const bodyWithItemAnchors = React.useMemo(
     () => linkifyItemAnchors(brief.body, linkedItems.length),

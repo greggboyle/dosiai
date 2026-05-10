@@ -6,6 +6,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { inngest } from '@/inngest/client'
 import { assertAiBriefDraftAllowed } from '@/lib/brief/limits'
 import { countWords } from '@/lib/brief/queries'
+import { notifyBriefSubscribersOfPublish } from '@/lib/notifications/brief-published'
+import { filterItemIdsToSweepRegulatoryOnly } from '@/lib/brief/regulatory-items'
 import type { Brief } from '@/lib/types'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 
@@ -85,7 +87,7 @@ export async function saveBrief(input: {
 
   const { data: existing, error: fetchErr } = await supabase
     .from('brief')
-    .select('author_id, workspace_id, ai_drafted, human_reviewed, body')
+    .select('author_id, workspace_id, ai_drafted, human_reviewed, body, brief_kind, status')
     .eq('id', input.briefId)
     .single()
 
@@ -119,6 +121,23 @@ export async function saveBrief(input: {
     .eq('id', input.briefId)
 
   if (error) throw error
+
+  const { data: afterSave } = await supabase
+    .from('brief')
+    .select('brief_kind, status')
+    .eq('id', input.briefId)
+    .maybeSingle()
+
+  if (afterSave?.brief_kind === 'competitor' && afterSave.status === 'published') {
+    try {
+      await notifyBriefSubscribersOfPublish(input.briefId)
+    } catch {
+      // Non-blocking
+    }
+    revalidatePath('/my-briefs')
+    revalidatePath('/', 'layout')
+  }
+
   revalidatePath('/briefs')
   revalidatePath(`/briefs/${input.briefId}`)
   revalidatePath(`/briefs/${input.briefId}/edit`)
@@ -153,8 +172,17 @@ export async function publishBrief(briefId: string): Promise<void> {
     .eq('id', briefId)
 
   if (error) throw error
+
+  try {
+    await notifyBriefSubscribersOfPublish(briefId)
+  } catch {
+    // Non-blocking: publishing succeeded even if notifications fail
+  }
+
   revalidatePath('/briefs')
   revalidatePath(`/briefs/${briefId}`)
+  revalidatePath('/my-briefs')
+  revalidatePath('/', 'layout')
 }
 
 export async function enqueueBriefDraft(input: {
@@ -168,7 +196,7 @@ export async function enqueueBriefDraft(input: {
   const supabase = await createSupabaseServerClient()
   const { data: existing, error: fetchErr } = await supabase
     .from('brief')
-    .select('author_id, workspace_id')
+    .select('author_id, workspace_id, brief_kind')
     .eq('id', input.briefId)
     .single()
 
@@ -176,7 +204,17 @@ export async function enqueueBriefDraft(input: {
   if (existing.workspace_id !== ctx.workspaceId) throw new Error('Forbidden')
   if (existing.author_id !== ctx.userId && ctx.role !== 'admin') throw new Error('Forbidden')
 
-  if (input.itemIds.length < 1) throw new Error('Select at least one intelligence item')
+  let itemIds = input.itemIds
+  if (existing.brief_kind === 'regulatory_summary') {
+    itemIds = await filterItemIdsToSweepRegulatoryOnly(ctx.workspaceId, input.itemIds)
+    if (itemIds.length < 1) {
+      throw new Error(
+        'Regulatory summary briefs can only use intelligence items from the regulatory sweep pass (ingestion sweep_regulatory).'
+      )
+    }
+  }
+
+  if (itemIds.length < 1) throw new Error('Select at least one intelligence item')
 
   await assertAiBriefDraftAllowed(ctx.workspaceId, ctx.plan)
 
@@ -185,7 +223,7 @@ export async function enqueueBriefDraft(input: {
     data: {
       briefId: input.briefId,
       workspaceId: ctx.workspaceId,
-      itemIds: input.itemIds,
+      itemIds,
       audienceHint: input.audienceHint,
     },
   })

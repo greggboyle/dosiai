@@ -41,6 +41,7 @@ export async function createAutomatedBriefForSweep(params: {
     .insert({
       workspace_id: params.workspaceId,
       author_id: author.user_id,
+      brief_kind: 'sweep_summary',
       title: `${titlePrefix} — ${now.toISOString().slice(0, 10)}`,
       summary: '',
       body: '',

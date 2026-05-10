@@ -82,6 +82,7 @@ const purposeLabels: Record<AIPurpose, string> = {
   sweep_sell: 'Sweep: Sell-side',
   sweep_channel: 'Sweep: Channel',
   sweep_regulatory: 'Sweep: Regulatory',
+  sweep_umbrella: 'Sweep: Umbrella (market)',
   sweep_self: 'Sweep: Own Company',
   sweep_topic: 'Sweep: Topic',
   competitor_profile_refresh: 'Competitor Profile Refresh',

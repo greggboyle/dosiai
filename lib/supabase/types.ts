@@ -5,6 +5,7 @@ export type AiPurposeDb =
   | 'sweep_sell'
   | 'sweep_channel'
   | 'sweep_regulatory'
+  | 'sweep_umbrella'
   | 'sweep_self'
   | 'sweep_topic'
   | 'competitor_profile_refresh'
@@ -555,6 +556,7 @@ export interface Database {
           user_notes: string | null
           dedup_of_item_id: string | null
           is_about_self: boolean
+          ingestion_purpose: AiPurposeDb | null
         }
         Insert: {
           id?: string
@@ -589,6 +591,7 @@ export interface Database {
           user_notes?: string | null
           dedup_of_item_id?: string | null
           is_about_self?: boolean
+          ingestion_purpose?: AiPurposeDb | null
         }
         Update: Partial<Database['public']['Tables']['intelligence_item']['Insert']>
       }
@@ -654,6 +657,13 @@ export interface Database {
           summary: string
           body: string
           word_count: number
+          brief_kind:
+            | 'manual'
+            | 'sweep_summary'
+            | 'daily_summary'
+            | 'weekly_intelligence'
+            | 'regulatory_summary'
+            | 'competitor'
           audience: 'leadership' | 'sales' | 'product' | 'general'
           priority: 'critical' | 'high' | 'medium'
           status: 'draft' | 'published' | 'archived'
@@ -674,6 +684,13 @@ export interface Database {
           summary?: string
           body?: string
           word_count?: number
+          brief_kind?:
+            | 'manual'
+            | 'sweep_summary'
+            | 'daily_summary'
+            | 'weekly_intelligence'
+            | 'regulatory_summary'
+            | 'competitor'
           audience?: 'leadership' | 'sales' | 'product' | 'general'
           priority?: 'critical' | 'high' | 'medium'
           status?: 'draft' | 'published' | 'archived'
@@ -687,6 +704,76 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['brief']['Insert']>
+      }
+      workspace_member_brief_subscription: {
+        Row: {
+          user_id: string
+          workspace_id: string
+          brief_kind:
+            | 'manual'
+            | 'sweep_summary'
+            | 'daily_summary'
+            | 'weekly_intelligence'
+            | 'regulatory_summary'
+            | 'competitor'
+          subscribed: boolean
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          workspace_id: string
+          brief_kind:
+            | 'manual'
+            | 'sweep_summary'
+            | 'daily_summary'
+            | 'weekly_intelligence'
+            | 'regulatory_summary'
+            | 'competitor'
+          subscribed?: boolean
+          updated_at?: string
+        }
+        Update: Partial<{
+          subscribed: boolean
+          updated_at: string
+        }>
+      }
+      brief_user_read: {
+        Row: {
+          user_id: string
+          brief_id: string
+          read_at: string
+        }
+        Insert: {
+          user_id: string
+          brief_id: string
+          read_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['brief_user_read']['Insert']>
+      }
+      user_notification: {
+        Row: {
+          id: string
+          user_id: string
+          workspace_id: string
+          type: 'brief_ready'
+          title: string
+          body: string | null
+          brief_id: string | null
+          read_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          workspace_id: string
+          type?: 'brief_ready'
+          title: string
+          body?: string | null
+          brief_id?: string | null
+          read_at?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['user_notification']['Insert']>
       }
       brief_comment: {
         Row: {

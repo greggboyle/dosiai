@@ -247,9 +247,18 @@ export interface Competitor {
   lastSignificantChangeAt?: string // Drives staleness banner
 }
 
+export type BriefKind =
+  | 'manual'
+  | 'sweep_summary'
+  | 'daily_summary'
+  | 'weekly_intelligence'
+  | 'regulatory_summary'
+  | 'competitor'
+
 export interface Brief {
   id: string
   title: string
+  briefKind: BriefKind
   audience: 'leadership' | 'sales' | 'product' | 'general'
   priority: 'critical' | 'high' | 'medium'
   summary: string

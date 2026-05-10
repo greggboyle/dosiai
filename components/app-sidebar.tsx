@@ -20,6 +20,7 @@ import {
   ChevronsUpDown,
   CreditCard,
   User,
+  Sparkles,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -80,6 +81,12 @@ const moreNavItems: NavItemConfig[] = [
     href: '/briefs',
     icon: FileText,
     badge: (c) => (c.briefCount > 0 ? c.briefCount : undefined),
+  },
+  {
+    label: 'My Market Briefs',
+    href: '/my-briefs',
+    icon: Sparkles,
+    badge: (c) => (c.myMarketBriefsUnread > 0 ? c.myMarketBriefsUnread : undefined),
   },
   { label: 'Win/Loss', href: '/win-loss', icon: TrendingUp },
   { label: 'Reviews', href: '/customer-voice', icon: MessageSquare },

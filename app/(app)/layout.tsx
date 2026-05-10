@@ -4,6 +4,7 @@ import type { PlanId, WorkspaceSubscription } from '@/lib/billing-types'
 import { getTrialDaysRemaining, getTrialStatus, PLAN_CONFIG } from '@/lib/billing-types'
 import { loadTrialWarningBootstrap } from '@/lib/billing/trial-warning-data'
 import { loadSidebarNavBadgeCounts } from '@/lib/dashboard/queries'
+import { loadNotificationBootstrap } from '@/lib/notifications/queries'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -69,12 +70,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     workspaceRow.plan as PlanId
   )
 
-  const sidebarNavBadgeCounts = await loadSidebarNavBadgeCounts(workspaceRow.id)
+  const userId = session.user.id
+  const [sidebarNavBadgeCounts, notificationBootstrap] = await Promise.all([
+    loadSidebarNavBadgeCounts(workspaceRow.id, userId),
+    loadNotificationBootstrap(userId),
+  ])
 
   return (
     <AppShellClient
       trialWarning={trialWarning}
       sidebarNavBadgeCounts={sidebarNavBadgeCounts}
+      userId={userId}
+      notificationBootstrap={notificationBootstrap}
       workspace={{
         id: workspaceRow.id,
         name: workspaceRow.name,

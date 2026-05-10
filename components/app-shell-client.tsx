@@ -12,6 +12,7 @@ import { CostCeilingBanner } from '@/components/billing/cost-ceiling-banner'
 import { WorkspaceProvider } from '@/components/workspace-context'
 import type { TrialUsageStats, WorkspaceSubscription } from '@/lib/billing-types'
 import type { SidebarNavBadgeCounts } from '@/lib/dashboard/queries'
+import type { NotificationListItem } from '@/lib/notifications/queries'
 import type { TrialThreshold } from '@/lib/billing/trial-warning-data'
 
 interface AppShellClientProps {
@@ -21,6 +22,8 @@ interface AppShellClientProps {
   subscription: WorkspaceSubscription
   trialWarning: { usage: TrialUsageStats; pending: TrialThreshold[] } | null
   sidebarNavBadgeCounts: SidebarNavBadgeCounts
+  userId: string
+  notificationBootstrap: { unreadCount: number; recent: NotificationListItem[] }
 }
 
 export function AppShellClient({
@@ -30,6 +33,8 @@ export function AppShellClient({
   subscription,
   trialWarning,
   sidebarNavBadgeCounts,
+  userId,
+  notificationBootstrap,
 }: AppShellClientProps) {
   return (
     <WorkspaceProvider value={{ workspace, subscription, memberRole: member.role }}>
@@ -53,7 +58,7 @@ export function AppShellClient({
           <SidebarInset>
             <CostCeilingBanner subscription={subscription} />
             {subscription.status === 'read_only' ? <ReadOnlyBanner subscription={subscription} /> : <TrialBanner subscription={subscription} />}
-            <TopBar />
+            <TopBar userId={userId} notificationBootstrap={notificationBootstrap} />
             <main className="flex-1 overflow-auto">
               <div className="mx-auto max-w-7xl p-6">{children}</div>
             </main>
