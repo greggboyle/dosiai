@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
+import { BRIEF_DRAFT_LIMIT_PURPOSES } from '@/lib/brief/brief-draft-vendor-purposes'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 import { PLAN_CONFIG, type PlanId } from '@/lib/billing-types'
 
@@ -9,14 +10,14 @@ function startOfUtcMonthIso(): string {
   return d.toISOString()
 }
 
-/** Counts completed vendor calls this calendar month for AI brief drafting (plan limit enforcement). */
+/** Counts completed vendor calls this calendar month for AI brief drafting (plan limit enforcement). Uses `brief_drafting_all` and legacy per-kind purposes. */
 export async function countAiBriefDraftsThisMonth(workspaceId: string): Promise<number> {
   const supabase = createSupabaseAdminClient()
   const { count, error } = await supabase
     .from('vendor_call')
     .select('*', { count: 'exact', head: true })
     .eq('workspace_id', workspaceId)
-    .eq('purpose', 'brief_drafting')
+    .in('purpose', [...BRIEF_DRAFT_LIMIT_PURPOSES])
     .eq('success', true)
     .gte('called_at', startOfUtcMonthIso())
 

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-/** Structured response from brief_drafting vendor call. */
+/** Structured response from brief drafting vendor calls (per-kind `brief_drafting_*`). */
 export const briefDraftResponseSchema = z.object({
   title: z.string(),
   summary: z.string(),

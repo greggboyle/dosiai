@@ -8,7 +8,8 @@ import { assertAiBriefDraftAllowed } from '@/lib/brief/limits'
 import { countWords } from '@/lib/brief/queries'
 import { notifyBriefSubscribersOfPublish } from '@/lib/notifications/brief-published'
 import { filterItemIdsToSweepRegulatoryOnly } from '@/lib/brief/regulatory-items'
-import type { Brief } from '@/lib/types'
+import { briefDraftRequestedEventName } from '@/lib/brief/inngest-events'
+import type { Brief, BriefKind } from '@/lib/types'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 
 async function requireAuthorWorkspace(): Promise<{
@@ -219,7 +220,7 @@ export async function enqueueBriefDraft(input: {
   await assertAiBriefDraftAllowed(ctx.workspaceId, ctx.plan)
 
   await inngest.send({
-    name: 'brief/draft-requested',
+    name: briefDraftRequestedEventName(existing.brief_kind as BriefKind),
     data: {
       briefId: input.briefId,
       workspaceId: ctx.workspaceId,

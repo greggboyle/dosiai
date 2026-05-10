@@ -132,7 +132,7 @@ sweep_regulatory
 sweep_self            -- NEW
 scoring
 embedding
-brief_drafting
+brief_drafting_all
 battle_card_interview
 ```
 

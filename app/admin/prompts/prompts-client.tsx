@@ -88,7 +88,7 @@ const purposeLabels: Record<AIPurpose, string> = {
   competitor_profile_refresh: 'Competitor Profile Refresh',
   scoring: 'MIS Scoring',
   embedding: 'Embedding',
-  brief_drafting: 'Brief Drafting',
+  brief_drafting_all: 'Brief Drafting (optional global template)',
   brief_drafting_manual: 'Brief Drafting: Manual',
   brief_drafting_sweep_summary: 'Brief Drafting: Sweep Summary',
   brief_drafting_daily_summary: 'Brief Drafting: Daily Summary',

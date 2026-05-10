@@ -1,4 +1,5 @@
 import { inngest } from '@/inngest/client'
+import { briefDraftRequestedEventName } from '@/lib/brief/inngest-events'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 
 export async function createAutomatedBriefForSweep(params: {
@@ -62,7 +63,7 @@ export async function createAutomatedBriefForSweep(params: {
 
   const autoPublish = params.trigger === 'scheduled' && params.autoApproveScheduled
   await inngest.send({
-    name: 'brief/draft-requested',
+    name: briefDraftRequestedEventName('sweep_summary'),
     data: {
       briefId: inserted.id,
       workspaceId: params.workspaceId,

@@ -62,7 +62,7 @@ export type AiPurpose =
   | 'competitor_profile_refresh'
   | 'scoring'
   | 'embedding'
-  | 'brief_drafting'
+  | 'brief_drafting_all'
   | 'brief_drafting_manual'
   | 'brief_drafting_sweep_summary'
   | 'brief_drafting_daily_summary'

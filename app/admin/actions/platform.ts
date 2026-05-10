@@ -426,7 +426,7 @@ export async function seedPromptTemplatesFromCode() {
 
   // Keep seeded brief drafting templates aligned with runtime fallback prompts.
   const briefPurposes: AIPurpose[] = [
-    'brief_drafting',
+    'brief_drafting_all',
     'brief_drafting_manual',
     'brief_drafting_sweep_summary',
     'brief_drafting_daily_summary',

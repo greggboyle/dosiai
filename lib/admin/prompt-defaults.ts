@@ -154,7 +154,7 @@ Item title: {{item_title}}.`,
     ],
   },
   {
-    purpose: 'brief_drafting',
+    purpose: 'brief_drafting_all',
     content: buildBriefDraftingTemplate(
       'General fallback brief. Keep tone neutral, executive-friendly, and grounded in source evidence.'
     ),

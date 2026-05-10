@@ -33,20 +33,12 @@ export interface RoutingSelection {
   activeRules: AiRoutingRuleRow[]
 }
 
-export async function getRoutingFor(purpose: AiPurposeDb): Promise<RoutingSelection> {
-  const now = Date.now()
-  if (!cache || now - cache.loadedAt > TTL_MS) {
-    const map = await loadAllRouting()
-    cache = { loadedAt: now, map }
-  }
-  const entry = cache.map.get(purpose)
-  if (!entry) {
-    throw new Error(`No ai_routing_config row for purpose ${purpose}`)
-  }
+function routingSelectionFromEntry(entry: {
+  mode: string
+  rules: AiRoutingRuleRow[]
+}): RoutingSelection | null {
   const rules = (entry.rules ?? []).filter((r) => r.isEnabled)
-  if (rules.length === 0) {
-    throw new Error(`No enabled routing rules for ${purpose}`)
-  }
+  if (rules.length === 0) return null
   const primary = rules.find((r) => r.isPrimary) ?? rules[0]
   const mode = entry.mode === 'multi-vendor' ? 'multi-vendor' : 'single-vendor'
   const activeRules = mode === 'multi-vendor' ? rules : [primary]
@@ -56,4 +48,21 @@ export async function getRoutingFor(purpose: AiPurposeDb): Promise<RoutingSelect
     mode,
     activeRules,
   }
+}
+
+export async function getRoutingFor(purpose: AiPurposeDb): Promise<RoutingSelection> {
+  const now = Date.now()
+  if (!cache || now - cache.loadedAt > TTL_MS) {
+    const map = await loadAllRouting()
+    cache = { loadedAt: now, map }
+  }
+  const entry = cache!.map.get(purpose)
+  if (!entry) {
+    throw new Error(`No ai_routing_config row for purpose ${purpose}`)
+  }
+  const sel = routingSelectionFromEntry(entry)
+  if (!sel) {
+    throw new Error(`No enabled routing rules for ${purpose}`)
+  }
+  return sel
 }

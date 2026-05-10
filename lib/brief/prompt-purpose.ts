@@ -1,7 +1,8 @@
 import type { AiPurposeDb } from '@/lib/supabase/types'
 import type { BriefKind } from '@/lib/types'
 
-export function briefKindToPromptPurpose(kind: BriefKind): AiPurposeDb {
+/** Maps brief kind to `/admin/prompts` template purpose (`prompt_template.purpose`). Not used for AI routing. */
+export function briefKindToPromptTemplatePurpose(kind: BriefKind): AiPurposeDb {
   switch (kind) {
     case 'manual':
       return 'brief_drafting_manual'

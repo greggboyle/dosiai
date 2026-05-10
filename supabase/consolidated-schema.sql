@@ -1431,7 +1431,7 @@ begin
       'competitor_profile_refresh',
       'scoring',
       'embedding',
-      'brief_drafting',
+      'brief_drafting_all',
       'battle_card_interview'
     );
   end if;
@@ -1914,7 +1914,7 @@ values
   ('competitor_profile_refresh', 'single-vendor', '[{"vendor":"openai","model":"gpt-4o","isPrimary":true,"isEnabled":true}]'::jsonb),
   ('scoring', 'single-vendor', '[{"vendor":"anthropic","model":"claude-opus-4-7","isPrimary":true,"isEnabled":true}]'::jsonb),
   ('embedding', 'single-vendor', '[{"vendor":"openai","model":"text-embedding-3-small","isPrimary":true,"isEnabled":true}]'::jsonb),
-  ('brief_drafting', 'single-vendor', '[{"vendor":"anthropic","model":"claude-opus-4-7","isPrimary":true,"isEnabled":true}]'::jsonb),
+  ('brief_drafting_all', 'single-vendor', '[{"vendor":"anthropic","model":"claude-opus-4-7","isPrimary":true,"isEnabled":true}]'::jsonb),
   ('battle_card_interview', 'single-vendor', '[{"vendor":"anthropic","model":"claude-opus-4-7","isPrimary":true,"isEnabled":true}]'::jsonb)
 on conflict (purpose) do nothing;
 
