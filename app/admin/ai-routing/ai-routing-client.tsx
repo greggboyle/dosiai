@@ -76,7 +76,17 @@ const modelOptions: Record<AIVendor, string[]> = {
   xai: ['grok-4', 'grok-3-mini'],
 }
 
-// Purpose metadata
+/** `prompt_template.purpose` values for per-kind brief copy — not used for `ai_routing_config` (see `brief_drafting_all`). */
+const BRIEF_PROMPT_ONLY_PURPOSES: readonly AIPurpose[] = [
+  'brief_drafting_manual',
+  'brief_drafting_sweep_summary',
+  'brief_drafting_daily_summary',
+  'brief_drafting_weekly_intelligence',
+  'brief_drafting_regulatory_summary',
+  'brief_drafting_competitor',
+]
+
+// Full labels for every `AIPurpose`; AI Routing table seed excludes `BRIEF_PROMPT_ONLY_PURPOSES` below.
 const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
   sweep_buy: { name: 'sweep_buy', description: 'Buy-side intelligence sweeps' },
   sweep_sell: { name: 'sweep_sell', description: 'Sell-side intelligence sweeps' },
@@ -96,7 +106,8 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
   embedding: { name: 'embedding', description: 'Embedding model (proximity, dedup, competitor matching)' },
   brief_drafting_all: {
     name: 'brief_drafting_all',
-    description: 'All brief drafting — vendor/model for every brief kind',
+    description:
+      'Vendor/model for all brief kinds. Per-kind briefing copy is configured under Prompts (`brief_drafting_*` templates).',
   },
   brief_drafting_manual: { name: 'brief_drafting_manual', description: 'Prompt for manual team brief drafting' },
   brief_drafting_sweep_summary: {
@@ -125,13 +136,15 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
 
 const basePurposeConfigs: AIPurposeConfig[] = (Object.entries(purposeInfo) as Array<
   [AIPurpose, { name: string; description: string }]
->).map(([purpose, info]) => ({
-  purpose,
-  name: info.name,
-  description: info.description,
-  mode: 'single-vendor',
-  rules: [],
-}))
+>)
+  .filter(([purpose]) => !BRIEF_PROMPT_ONLY_PURPOSES.includes(purpose))
+  .map(([purpose, info]) => ({
+    purpose,
+    name: info.name,
+    description: info.description,
+    mode: 'single-vendor',
+    rules: [],
+  }))
 
 function formatDaysAgo(dateStr: string): string {
   const date = new Date(dateStr)
