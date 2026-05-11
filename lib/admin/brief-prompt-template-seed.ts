@@ -12,6 +12,13 @@ export const BRIEF_KIND_TEMPLATE_PURPOSES: readonly AIPurpose[] = [
   'brief_drafting_competitor',
 ] as const
 
+/** Set of `brief_drafting_*` prompt purposes excluding `brief_drafting_all`. */
+export const BRIEF_KIND_TEMPLATE_PURPOSE_SET = new Set<string>(BRIEF_KIND_TEMPLATE_PURPOSES)
+
+export function isPerKindBriefTemplatePurpose(purpose: unknown): purpose is string {
+  return typeof purpose === 'string' && BRIEF_KIND_TEMPLATE_PURPOSE_SET.has(purpose)
+}
+
 export type BriefPromptSeedContext = {
   now: string
   operatorId: string | null

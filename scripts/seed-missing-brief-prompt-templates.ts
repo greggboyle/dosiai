@@ -67,7 +67,18 @@ async function main(): Promise<void> {
   }
 
   const { error: insErr } = await admin.from('prompt_template').insert(rows)
-  if (insErr) throw insErr
+  if (insErr) {
+    const msg = typeof insErr === 'object' && insErr && 'message' in insErr ? String((insErr as { message?: string }).message) : ''
+    const code = typeof insErr === 'object' && insErr && 'code' in insErr ? String((insErr as { code?: string }).code) : ''
+    if (code === '22P02' || msg.includes('invalid input value for enum ai_purpose')) {
+      console.error(
+        'Database ai_purpose enum is missing brief_drafting_* labels. Apply supabase/migrations/0035_brief_kind_prompt_purposes.sql first.\n',
+        msg
+      )
+      process.exit(2)
+    }
+    throw insErr
+  }
   console.info(`Inserted ${rows.length} starter brief prompt template row(s).`)
 }
 

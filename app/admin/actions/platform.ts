@@ -6,7 +6,10 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireOperator, requireOperatorAdminOrOwner } from '@/lib/admin/require-operator'
 import type { VendorAggregateRow, WorkspaceCostRow } from '@/lib/admin/platform-types'
 import type { AIPurpose, AIVendor, PromptVariable } from '@/lib/admin-types'
-import { buildMissingBriefKindPromptTemplateRows } from '@/lib/admin/brief-prompt-template-seed'
+import {
+  buildMissingBriefKindPromptTemplateRows,
+  isPerKindBriefTemplatePurpose,
+} from '@/lib/admin/brief-prompt-template-seed'
 import { buildPromptTemplateName, getEmbeddedPromptDefault } from '@/lib/admin/prompt-defaults'
 import { getVendorClient } from '@/lib/ai/factory'
 import { getRoutingFor } from '@/lib/ai/router'
@@ -430,8 +433,30 @@ export async function seedPromptTemplatesFromCode() {
   )
 
   if (missingRows.length > 0) {
-    const { error } = await admin.from('prompt_template').insert(missingRows)
-    if (error) throw error
+    const nonPerKindBrief = missingRows.filter((r) => !isPerKindBriefTemplatePurpose(r.purpose))
+    const perKindBriefRows = missingRows.filter((r) => isPerKindBriefTemplatePurpose(r.purpose))
+
+    if (nonPerKindBrief.length > 0) {
+      const { error } = await admin.from('prompt_template').insert(nonPerKindBrief)
+      if (error) throw error
+    }
+
+    if (perKindBriefRows.length > 0) {
+      const { error } = await admin.from('prompt_template').insert(perKindBriefRows)
+      if (error) {
+        const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: string }).code) : ''
+        const msg =
+          typeof error === 'object' && error && 'message' in error ? String((error as { message?: string }).message) : ''
+        if (code === '22P02' || msg.includes('invalid input value for enum ai_purpose')) {
+          console.warn(
+            '[seedPromptTemplatesFromCode] Skipped per-kind brief templates: PostgreSQL ai_purpose enum is missing brief_drafting_* labels. Apply supabase/migrations/0035_brief_kind_prompt_purposes.sql (then 0036/0037 as needed).',
+            msg
+          )
+        } else {
+          throw error
+        }
+      }
+    }
   }
 
   // Keep seeded brief drafting templates aligned with runtime fallback prompts.
