@@ -6,9 +6,15 @@ import { ExternalLink, Play, UserCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { startImpersonation } from '@/app/admin/impersonation/actions'
 import { runSweepOnBehalf, updateWorkspacePlan } from '@/app/admin/workspaces/actions'
+import {
+  SWEEP_ORCHESTRATION_PURPOSES,
+  SWEEP_ORCHESTRATION_PURPOSE_LABELS,
+} from '@/lib/sweep/purposes'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -101,6 +107,14 @@ export function WorkspaceDetailClient({ data }: { data: WorkspaceDetailData }) {
   const [busy, setBusy] = React.useState(false)
   const [planChoice, setPlanChoice] = React.useState<WorkspacePlan>(data.workspace.plan as WorkspacePlan)
   const [planMessage, setPlanMessage] = React.useState<string | null>(null)
+  const [purposeSelection, setPurposeSelection] = React.useState<
+    Record<(typeof SWEEP_ORCHESTRATION_PURPOSES)[number], boolean>
+  >(() =>
+    Object.fromEntries(SWEEP_ORCHESTRATION_PURPOSES.map((p) => [p, true])) as Record<
+      (typeof SWEEP_ORCHESTRATION_PURPOSES)[number],
+      boolean
+    >
+  )
 
   React.useEffect(() => {
     setPlanChoice(data.workspace.plan as WorkspacePlan)
@@ -109,9 +123,15 @@ export function WorkspaceDetailClient({ data }: { data: WorkspaceDetailData }) {
   async function onRunSweep() {
     const reason = window.prompt('Reason for manual sweep (required):')
     if (!reason?.trim()) return
+    const selected = SWEEP_ORCHESTRATION_PURPOSES.filter((p) => purposeSelection[p])
+    if (selected.length === 0) {
+      window.alert('Select at least one sweep purpose.')
+      return
+    }
     setBusy(true)
     try {
-      await runSweepOnBehalf(data.workspace.id, reason)
+      const fullRun = selected.length === SWEEP_ORCHESTRATION_PURPOSES.length
+      await runSweepOnBehalf(data.workspace.id, reason, fullRun ? undefined : selected)
       window.location.reload()
     } finally {
       setBusy(false)
@@ -213,6 +233,28 @@ export function WorkspaceDetailClient({ data }: { data: WorkspaceDetailData }) {
             <Play className="mr-2 size-4" />
             Run sweep
           </Button>
+        </div>
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/30">
+        <p className="mb-2 text-xs text-slate-600 dark:text-slate-400">
+          Manual sweep purposes (all checked = same as scheduled full sweep)
+        </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {SWEEP_ORCHESTRATION_PURPOSES.map((p) => (
+            <div key={p} className="flex items-center gap-2">
+              <Checkbox
+                id={`admin-sweep-purpose-${p}`}
+                checked={purposeSelection[p]}
+                onCheckedChange={(c) =>
+                  setPurposeSelection((prev) => ({ ...prev, [p]: c === true }))
+                }
+              />
+              <Label htmlFor={`admin-sweep-purpose-${p}`} className="cursor-pointer text-xs font-normal">
+                {SWEEP_ORCHESTRATION_PURPOSE_LABELS[p]}
+              </Label>
+            </div>
+          ))}
         </div>
       </div>
 

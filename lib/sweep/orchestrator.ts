@@ -7,6 +7,7 @@ import {
   normalizeSweepCategory,
   sweepAiResponseSchema,
   type ParsedSweepItem,
+  type SweepCategoryValue,
 } from '@/lib/sweep/schemas'
 import { SweepRejectedError } from '@/lib/sweep/errors'
 import { computeMis, embedText, loadProfileVectors, type SweepContext } from '@/lib/mis/score'
@@ -19,17 +20,19 @@ import type { WorkspacePlan } from '@/lib/types/dosi'
 import { inngest } from '@/inngest/client'
 import { shouldAutoRefreshTrialOnFirstSweep } from '@/lib/competitors/profile-refresh'
 import { getActivePromptTemplateFor, renderPromptTemplate } from '@/lib/ai/prompt-template'
-import {
-  SWEEP_SHARED_PROMPT_TEMPLATE,
-  SWEEP_UMBRELLA_PROMPT_TEMPLATE,
-} from '@/lib/admin/prompt-defaults'
+import { SWEEP_SHARED_PROMPT_TEMPLATE } from '@/lib/admin/prompt-defaults'
 import { SWEEP_SELF_PROMPT_TEMPLATE } from '@/lib/sweep/self-prompt-template'
 import { validateSweepItemSources } from '@/lib/sweep/validate-sources'
+import { resolveOrchestrationPurposes } from '@/lib/sweep/purposes'
+
+export { resolveOrchestrationPurposes, SWEEP_ORCHESTRATION_PURPOSES } from '@/lib/sweep/purposes'
 
 export interface OrchestrateSweepInput {
   workspaceId: string
   trigger: 'manual' | 'scheduled'
   triggerUserId: string | null
+  /** When set, only these purposes run (must be a subset of SWEEP_ORCHESTRATION_PURPOSES). */
+  purposes?: readonly AiPurposeDb[]
 }
 
 function isNoEnabledRoutingRulesError(error: unknown): boolean {
@@ -58,16 +61,19 @@ async function renderSweepAiPrompt(opts: {
   }
 }
 
-/** Umbrella pass: buy-side, sell-side, and channel only — regulatory items come from sweep_regulatory pass. */
-async function runUmbrellaPass(
+type MarketLensPurpose = 'sweep_buy' | 'sweep_sell' | 'sweep_channel'
+
+/** One LLM pass per market lens; keeps only items whose normalized category matches the lens. */
+async function runSharedMarketLensPass(
   workspaceId: string,
   plan: WorkspacePlan,
   sweepId: string,
+  purpose: MarketLensPurpose,
+  expectedCategory: SweepCategoryValue,
   companySummary: string,
   competitorLines: string,
   topicLines: string
 ): Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[] }> {
-  const purpose: AiPurposeDb = 'sweep_umbrella'
   const routing = await getRoutingFor(purpose)
 
   const vendorCallIds: string[] = []
@@ -77,7 +83,7 @@ async function runUmbrellaPass(
     const { prompt, promptTemplateId, promptTemplateVersion } = await renderSweepAiPrompt({
       purpose,
       vendor: rule.vendor as AiVendorDb,
-      fallbackTemplate: SWEEP_UMBRELLA_PROMPT_TEMPLATE,
+      fallbackTemplate: SWEEP_SHARED_PROMPT_TEMPLATE,
       variables: {
         purpose,
         company_summary: companySummary,
@@ -115,14 +121,21 @@ async function runUmbrellaPass(
 
       const parsed = res.parsed ? sweepAiResponseSchema.safeParse(res.parsed) : null
       if (parsed?.success) {
+        let dropped = 0
         for (const it of parsed.data.items) {
           const cat = normalizeSweepCategory(it.category)
-          // Never emit regulatory from umbrella — those rows must trace to sweep_regulatory only.
-          if (cat === 'regulatory') {
-            merged.push({ ...it, category: 'buy-side' })
+          if (cat === expectedCategory) {
+            merged.push({ ...it, category: expectedCategory })
           } else {
-            merged.push(it)
+            dropped++
           }
+        }
+        if (dropped > 0) {
+          console.info('[sweep] market lens dropped items not matching category', {
+            purpose,
+            expectedCategory,
+            dropped,
+          })
         }
       }
     } catch (e) {
@@ -580,80 +593,132 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
   }
 
   try {
+    const purposes = resolveOrchestrationPurposes(input.purposes)
+    const want = (p: AiPurposeDb) => purposes.includes(p)
+
     const skippedPurposes: AiPurposeDb[] = []
-    const [umbrellaResult, regulatoryResult] = await Promise.all([
-      runUmbrellaPass(
-        input.workspaceId,
-        plan,
-        sweepId,
-        companySummary,
-        competitorLines,
-        topicLines
-      ).catch((error) => {
+
+    const runIfWanted = async (
+      purpose: AiPurposeDb,
+      fn: () => Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[] }>
+    ): Promise<{ items: ParsedSweepItem[]; vendorCallIds: string[] }> => {
+      if (!want(purpose)) return { items: [], vendorCallIds: [] }
+      try {
+        return await fn()
+      } catch (error) {
         if (isNoEnabledRoutingRulesError(error)) {
-          skippedPurposes.push('sweep_umbrella')
+          skippedPurposes.push(purpose)
           return { items: [], vendorCallIds: [] }
         }
         throw error
-      }),
-      runSweepRegulatoryPass(
-        input.workspaceId,
-        plan,
-        sweepId,
-        companySummary,
-        competitorLines,
-        topicLines
-      ).catch((error) => {
-        if (isNoEnabledRoutingRulesError(error)) {
-          skippedPurposes.push('sweep_regulatory')
-          return { items: [], vendorCallIds: [] }
-        }
-        throw error
-      }),
+      }
+    }
+
+    const [buyResult, sellResult, channelResult, regulatoryResult] = await Promise.all([
+      runIfWanted('sweep_buy', () =>
+        runSharedMarketLensPass(
+          input.workspaceId,
+          plan,
+          sweepId,
+          'sweep_buy',
+          'buy-side',
+          companySummary,
+          competitorLines,
+          topicLines
+        )
+      ),
+      runIfWanted('sweep_sell', () =>
+        runSharedMarketLensPass(
+          input.workspaceId,
+          plan,
+          sweepId,
+          'sweep_sell',
+          'sell-side',
+          companySummary,
+          competitorLines,
+          topicLines
+        )
+      ),
+      runIfWanted('sweep_channel', () =>
+        runSharedMarketLensPass(
+          input.workspaceId,
+          plan,
+          sweepId,
+          'sweep_channel',
+          'channel',
+          companySummary,
+          competitorLines,
+          topicLines
+        )
+      ),
+      runIfWanted('sweep_regulatory', () =>
+        runSweepRegulatoryPass(
+          input.workspaceId,
+          plan,
+          sweepId,
+          companySummary,
+          competitorLines,
+          topicLines
+        )
+      ),
     ])
 
-    const topicPassResult = await runTopicsPass(
-      input.workspaceId,
-      plan,
-      sweepId,
-      (topicRows ?? []).map((t) => ({
-        id: t.id,
-        name: t.name,
-        description: t.description,
-        seeds: normalizeSearchSeeds(t.search_seeds),
-      })),
-      companySummary,
-      competitorLines
-    ).catch((error) => {
-      if (isNoEnabledRoutingRulesError(error)) {
-        skippedPurposes.push('sweep_topic')
-        return { items: [], vendorCallIds: [] }
-      }
-      throw error
-    })
+    const topicPassResult = want('sweep_topic')
+      ? await runTopicsPass(
+          input.workspaceId,
+          plan,
+          sweepId,
+          (topicRows ?? []).map((t) => ({
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            seeds: normalizeSearchSeeds(t.search_seeds),
+          })),
+          companySummary,
+          competitorLines
+        ).catch((error) => {
+          if (isNoEnabledRoutingRulesError(error)) {
+            skippedPurposes.push('sweep_topic')
+            return { items: [], vendorCallIds: [] }
+          }
+          throw error
+        })
+      : { items: [], vendorCallIds: [] }
 
-    const selfPassResult = await runSelfPass(
-      input.workspaceId,
-      plan,
-      sweepId,
-      profile as Record<string, unknown> | null
-    ).catch((error) => {
-      if (isNoEnabledRoutingRulesError(error)) {
-        skippedPurposes.push('sweep_self')
-        return { items: [], vendorCallIds: [] }
-      }
-      throw error
-    })
+    const selfPassResult = want('sweep_self')
+      ? await runSelfPass(
+          input.workspaceId,
+          plan,
+          sweepId,
+          profile as Record<string, unknown> | null
+        ).catch((error) => {
+          if (isNoEnabledRoutingRulesError(error)) {
+            skippedPurposes.push('sweep_self')
+            return { items: [], vendorCallIds: [] }
+          }
+          throw error
+        })
+      : { items: [], vendorCallIds: [] }
 
-    const umbrellaValidation = validateSweepItemSources(umbrellaResult.items)
+    const buyValidation = validateSweepItemSources(buyResult.items)
+    const sellValidation = validateSweepItemSources(sellResult.items)
+    const channelValidation = validateSweepItemSources(channelResult.items)
     const regulatoryValidation = validateSweepItemSources(regulatoryResult.items)
     const selfValidation = validateSweepItemSources(selfPassResult.items)
     const topicValidation = validateSweepItemSources(topicPassResult.items)
 
     let taggedIngest: Array<{ item: RawSweepItem; ingestionPurpose: AiPurposeDb }> = [
-      ...umbrellaValidation.kept.map((i) => ({
+      ...buyValidation.kept.map((i) => ({
         item: i as RawSweepItem,
-        ingestionPurpose: 'sweep_umbrella' as AiPurposeDb,
+        ingestionPurpose: 'sweep_buy' as AiPurposeDb,
+      })),
+      ...sellValidation.kept.map((i) => ({
+        item: i as RawSweepItem,
+        ingestionPurpose: 'sweep_sell' as AiPurposeDb,
+      })),
+      ...channelValidation.kept.map((i) => ({
+        item: i as RawSweepItem,
+        ingestionPurpose: 'sweep_channel' as AiPurposeDb,
       })),
       ...regulatoryValidation.kept.map((i) => ({
         item: i as RawSweepItem,
@@ -800,12 +865,16 @@ export async function orchestrateSweep(input: OrchestrateSweepInput): Promise<{ 
       .eq('id', sweepId)
 
     const rejectedBadUrl =
-      umbrellaValidation.rejectedBadUrl +
+      buyValidation.rejectedBadUrl +
+      sellValidation.rejectedBadUrl +
+      channelValidation.rejectedBadUrl +
       regulatoryValidation.rejectedBadUrl +
       selfValidation.rejectedBadUrl +
       topicValidation.rejectedBadUrl
     const rejectedUnknownUrl =
-      umbrellaValidation.rejectedUnknownUrl +
+      buyValidation.rejectedUnknownUrl +
+      sellValidation.rejectedUnknownUrl +
+      channelValidation.rejectedUnknownUrl +
       regulatoryValidation.rejectedUnknownUrl +
       selfValidation.rejectedUnknownUrl +
       topicValidation.rejectedUnknownUrl

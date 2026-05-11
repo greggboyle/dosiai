@@ -2585,6 +2585,20 @@ using (
 );
 
 -- ---------------------------------------------------------------------------
+-- 0039_deprecate_sweep_umbrella.sql
+-- ---------------------------------------------------------------------------
+
+update public.ai_routing_config
+set
+  rules = '[{"vendor":"openai","model":"gpt-4o","isPrimary":true,"isEnabled":false}]'::jsonb,
+  updated_at = now()
+where purpose = 'sweep_umbrella';
+
+update public.prompt_template
+set status = 'archived', updated_at = now()
+where purpose = 'sweep_umbrella' and status = 'active';
+
+-- ---------------------------------------------------------------------------
 -- 0023_channels.sql
 -- ---------------------------------------------------------------------------
 

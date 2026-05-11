@@ -7,6 +7,7 @@ import { requireOperatorAdminOrOwner } from '@/lib/admin/require-operator'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { dispatchSweepRun } from '@/lib/sweep/dispatch-run'
+import type { AiPurposeDb } from '@/lib/supabase/types'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 
 const WORKSPACE_PLANS: WorkspacePlan[] = ['trial', 'starter', 'team', 'business', 'enterprise']
@@ -54,7 +55,11 @@ export async function updateWorkspacePlan(workspaceId: string, plan: WorkspacePl
   return { ok: true as const, unchanged: false as const }
 }
 
-export async function runSweepOnBehalf(workspaceId: string, reason: string) {
+export async function runSweepOnBehalf(
+  workspaceId: string,
+  reason: string,
+  purposes?: readonly AiPurposeDb[]
+) {
   const operatorSession = await getOperatorSession()
   if (!operatorSession) throw new Error('Unauthorized')
   if (!reason.trim()) throw new Error('Reason is required')
@@ -67,6 +72,7 @@ export async function runSweepOnBehalf(workspaceId: string, reason: string) {
     workspaceId,
     trigger: 'manual',
     triggerUserId: null,
+    purposes: purposes?.length ? purposes : undefined,
   })
 
   await logAuditEvent({
@@ -79,7 +85,7 @@ export async function runSweepOnBehalf(workspaceId: string, reason: string) {
     targetType: 'workspace',
     targetId: workspace.id,
     targetName: workspace.name,
-    reason: `Operator-triggered sweep request: ${reason}`,
+    reason: `Operator-triggered sweep request: ${reason}${purposes?.length ? ` (purposes: ${purposes.join(', ')})` : ''}`,
   })
 
   return { accepted: true }

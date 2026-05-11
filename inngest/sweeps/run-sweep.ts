@@ -1,15 +1,17 @@
 import { inngest } from '@/inngest/client'
 import { orchestrateSweep } from '@/lib/sweep/orchestrator'
 import { SweepRejectedError } from '@/lib/sweep/errors'
+import type { AiPurposeDb } from '@/lib/supabase/types'
 
 export const runSweep = inngest.createFunction(
   { id: 'run-sweep', retries: 2 },
   { event: 'sweep/run' },
   async ({ event, step }) => {
-    const { workspaceId, trigger, triggerUserId } = event.data as {
+    const { workspaceId, trigger, triggerUserId, purposes } = event.data as {
       workspaceId: string
       trigger: 'manual' | 'scheduled'
       triggerUserId?: string | null
+      purposes?: readonly AiPurposeDb[]
     }
 
     const result = await step.run('orchestrate-sweep', async () => {
@@ -18,6 +20,7 @@ export const runSweep = inngest.createFunction(
           workspaceId,
           trigger,
           triggerUserId: triggerUserId ?? null,
+          purposes,
         })
         return { ok: true as const, ...out }
       } catch (e) {

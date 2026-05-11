@@ -1,9 +1,12 @@
 import { inngest } from '@/inngest/client'
+import type { AiPurposeDb } from '@/lib/supabase/types'
 
 export type SweepRunPayload = {
   workspaceId: string
   trigger: 'manual' | 'scheduled'
   triggerUserId: string | null
+  /** Subset of market/topic/self purposes; omit for full default sweep. */
+  purposes?: readonly AiPurposeDb[]
 }
 
 function useInngestCloud(): boolean {
@@ -34,6 +37,7 @@ export async function dispatchSweepRun(payload: SweepRunPayload): Promise<void> 
       workspaceId: payload.workspaceId,
       trigger: payload.trigger,
       triggerUserId: payload.triggerUserId,
+      purposes: payload.purposes,
     }).catch((err) => {
       console.error('[dispatchSweepRun] development inline sweep failed:', err)
     })

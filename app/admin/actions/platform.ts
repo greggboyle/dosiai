@@ -535,7 +535,6 @@ export async function seedPromptTemplatesFromCode() {
 
   // Keep sweep variable metadata aligned with embedded defaults.
   const sweepPurposes: AIPurpose[] = [
-    'sweep_umbrella',
     'sweep_buy',
     'sweep_sell',
     'sweep_channel',

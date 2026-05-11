@@ -96,7 +96,7 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
   sweep_regulatory: { name: 'sweep_regulatory', description: 'Regulatory intelligence sweeps' },
   sweep_umbrella: {
     name: 'sweep_umbrella',
-    description: 'Umbrella market sweep (buy/sell/channel/regulatory in one pass — default for scheduled & manual runs)',
+    description: 'Deprecated — sweeps use separate buy/sell/channel/regulatory purposes; kept for historical rows only',
   },
   sweep_self: { name: 'sweep_self', description: 'Own-company intelligence sweeps' },
   sweep_topic: { name: 'sweep_topic', description: 'Topic-focused sweep pass' },
@@ -139,6 +139,7 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
 const basePurposeConfigs: AIPurposeConfig[] = (Object.entries(purposeInfo) as Array<
   [AIPurpose, { name: string; description: string }]
 >)
+  .filter(([purpose]) => purpose !== 'sweep_umbrella')
   .filter(([purpose]) => !BRIEF_PROMPT_ONLY_PURPOSES.includes(purpose))
   .map(([purpose, info]) => ({
     purpose,
