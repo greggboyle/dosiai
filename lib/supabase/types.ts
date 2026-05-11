@@ -289,6 +289,35 @@ export interface Database {
         }
         Update: Partial<Database['public']['Tables']['competitor']['Insert']>
       }
+      competitor_job_posting: {
+        Row: {
+          id: string
+          workspace_id: string
+          competitor_id: string
+          job_url: string
+          title: string
+          posting_status: 'open' | 'closed' | 'unknown'
+          payload: Json
+          raw_description: string | null
+          first_seen_at: string
+          last_seen_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          competitor_id: string
+          job_url: string
+          title?: string
+          posting_status?: 'open' | 'closed' | 'unknown'
+          payload?: Json
+          raw_description?: string | null
+          first_seen_at?: string
+          last_seen_at?: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['competitor_job_posting']['Insert']>
+      }
       topic: {
         Row: {
           id: string

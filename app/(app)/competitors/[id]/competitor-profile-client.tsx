@@ -24,6 +24,7 @@ import {
   Filter,
   ArrowUpDown,
   MessageSquare,
+  Briefcase,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -65,6 +66,7 @@ import { MISBadge } from '@/components/mis-badge'
 import type { Competitor, IntelligenceItem, Category } from '@/lib/types'
 import { formatIntelEventDate, getCategoryInfo, getRelativeTime } from '@/lib/types'
 import type { CompetitorBattleCardRow, CompetitorBriefRow } from '@/lib/competitors/load-profile'
+import type { CompetitorHiringRollup, CompetitorJobPosting } from '@/lib/competitors/job-posting-types'
 import type { WinLossRow } from '@/lib/win-loss/queries'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 import { getCompetitorProfileRefreshPolicy } from '@/lib/competitors/profile-refresh'
@@ -101,6 +103,8 @@ export interface CompetitorProfileClientProps {
   competitor: Competitor
   activityItems: IntelligenceItem[]
   voiceItems: IntelligenceItem[]
+  jobPostings: CompetitorJobPosting[]
+  hiringRollup: CompetitorHiringRollup
   battleCards: CompetitorBattleCardRow[]
   linkedBriefs: CompetitorBriefRow[]
   winLossRows: WinLossRow[]
@@ -162,6 +166,8 @@ export function CompetitorProfileClient({
   competitor,
   activityItems,
   voiceItems,
+  jobPostings,
+  hiringRollup,
   battleCards,
   linkedBriefs,
   winLossRows,
@@ -171,6 +177,9 @@ export function CompetitorProfileClient({
   const [confirmedFields, setConfirmedFields] = React.useState<Set<string>>(new Set())
   const [activityFilter, setActivityFilter] = React.useState<Category | 'all'>('all')
   const [voiceSentimentFilter, setVoiceSentimentFilter] = React.useState<'all' | 'positive' | 'mixed' | 'negative'>('all')
+  const [jobStatusFilter, setJobStatusFilter] = React.useState<'all' | 'open' | 'closed' | 'unknown'>('all')
+  const [jobWorkplaceFilter, setJobWorkplaceFilter] = React.useState<'all' | 'remote' | 'hybrid' | 'onsite'>('all')
+  const [jobThreatFilter, setJobThreatFilter] = React.useState<'all' | 'high' | 'watchlist'>('all')
   const [notesContent, setNotesContent] = React.useState('## Analyst Notes\n\n- Key observation: Their Series D gives them significant runway\n- Watch for: European expansion announcement expected Q3\n- Action item: Update battle card with new pricing intelligence')
 
   // ---- Editable Overview (Name/URL, Summary, Strengths/Weaknesses, Products, Leadership, Segments) ----
@@ -314,6 +323,46 @@ export function CompetitorProfileClient({
       period: '30 days',
     }
   }, [voiceItems])
+
+  const filteredJobPostings = React.useMemo(() => {
+    return jobPostings.filter((p) => {
+      if (jobStatusFilter !== 'all' && p.postingStatus !== jobStatusFilter) return false
+      const wt = (p.payload.location?.workplace_type ?? 'unknown').toLowerCase()
+      if (jobWorkplaceFilter !== 'all') {
+        if (jobWorkplaceFilter === 'remote' && wt !== 'remote') return false
+        if (jobWorkplaceFilter === 'hybrid' && wt !== 'hybrid') return false
+        if (jobWorkplaceFilter === 'onsite' && wt !== 'onsite') return false
+      }
+      const ca = p.payload.competitive_analysis
+      if (jobThreatFilter === 'high' && ca?.threat_level !== 'high') return false
+      if (jobThreatFilter === 'watchlist' && !ca?.watchlist) return false
+      return true
+    })
+  }, [jobPostings, jobStatusFilter, jobWorkplaceFilter, jobThreatFilter])
+
+  const hiringThemeKeywords = React.useMemo(() => {
+    const counts = new Map<string, number>()
+    const add = (s: string) => {
+      const k = s.trim()
+      if (!k) return
+      counts.set(k, (counts.get(k) ?? 0) + 1)
+    }
+    for (const p of jobPostings) {
+      if (p.postingStatus !== 'open') continue
+      const sm = p.payload.strategic_metadata as
+        | {
+            strategic_keywords?: string[]
+            technologies_mentioned?: string[]
+          }
+        | undefined
+      for (const x of sm?.strategic_keywords ?? []) add(x)
+      for (const x of sm?.technologies_mentioned ?? []) add(x)
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([word]) => word)
+  }, [jobPostings])
 
   const winLossSummary = React.useMemo(() => {
     if (winLossRows.length === 0) return undefined
@@ -557,6 +606,15 @@ export function CompetitorProfileClient({
                 Activity
                 <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
                   {activityItems.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger
+                value="hiring"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent data-[state=active]:bg-transparent px-4"
+              >
+                Hiring
+                <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
+                  {jobPostings.length}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger
@@ -1273,6 +1331,91 @@ export function CompetitorProfileClient({
               </CardContent>
             </Card>
 
+            {/* Hiring snapshot */}
+            <Card className="col-span-12 md:col-span-6">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Briefcase className="size-4" />
+                  Hiring signals
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setActiveTab('hiring')}>
+                  View All <ChevronRight className="size-4 ml-1" />
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {jobPostings.length === 0 ? (
+                  <p className="text-muted-foreground">
+                    No job postings ingested for this competitor yet. Postings appear here only (not in the main
+                    intelligence feed).
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Open roles</p>
+                        <p className="text-2xl font-semibold font-mono">{hiringRollup.openCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">New opens (30d)</p>
+                        <p className="text-2xl font-semibold font-mono flex items-center gap-2">
+                          {hiringRollup.newOpensLast30d}
+                          <span
+                            className={cn(
+                              'text-xs font-normal inline-flex items-center gap-0.5',
+                              hiringRollup.newOpensLast30d > hiringRollup.newOpensPrior30d
+                                ? 'text-positive'
+                                : hiringRollup.newOpensLast30d < hiringRollup.newOpensPrior30d
+                                  ? 'text-muted-foreground'
+                                  : 'text-muted-foreground'
+                            )}
+                          >
+                            {hiringRollup.newOpensLast30d > hiringRollup.newOpensPrior30d ? (
+                              <TrendingUp className="size-3" />
+                            ) : hiringRollup.newOpensLast30d < hiringRollup.newOpensPrior30d ? (
+                              <TrendingDown className="size-3" />
+                            ) : (
+                              <Minus className="size-3" />
+                            )}
+                            vs prior 30d ({hiringRollup.newOpensPrior30d})
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Senior+ share (open)</p>
+                        <p className="text-2xl font-semibold font-mono">{hiringRollup.seniorPlusOpenShare}%</p>
+                      </div>
+                    </div>
+                    {(hiringRollup.watchlistOpenCount > 0 || hiringRollup.highThreatOpenCount > 0) && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {hiringRollup.watchlistOpenCount > 0 ? (
+                          <Badge variant="outline" className="text-amber-600 border-amber-600/40">
+                            {hiringRollup.watchlistOpenCount} watchlist
+                          </Badge>
+                        ) : null}
+                        {hiringRollup.highThreatOpenCount > 0 ? (
+                          <Badge variant="outline" className="text-destructive border-destructive/40">
+                            {hiringRollup.highThreatOpenCount} high threat
+                          </Badge>
+                        ) : null}
+                      </div>
+                    )}
+                    {hiringThemeKeywords.length > 0 ? (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1.5">Top themes (open roles)</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {hiringThemeKeywords.slice(0, 8).map((kw) => (
+                            <Badge key={kw} variant="secondary" className="font-normal text-[10px]">
+                              {kw}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Linked Briefs - Full width */}
             <Card className="col-span-12">
               <CardHeader>
@@ -1366,6 +1509,220 @@ export function CompetitorProfileClient({
                 )
               })}
             </div>
+          </div>
+        )}
+
+        {/* Hiring Tab */}
+        {activeTab === 'hiring' && (
+          <div className="space-y-6">
+            {jobPostings.length > 0 && (
+              <Card>
+                <CardContent className="p-4 flex flex-wrap gap-6 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Open roles</p>
+                    <p className="text-xl font-semibold font-mono">{hiringRollup.openCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">New opens (30d)</p>
+                    <p className="text-xl font-semibold font-mono">{hiringRollup.newOpensLast30d}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Senior+ (open)</p>
+                    <p className="text-xl font-semibold font-mono">{hiringRollup.seniorPlusOpenShare}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Watchlist / high threat (open)</p>
+                    <p className="text-xl font-semibold font-mono">
+                      {hiringRollup.watchlistOpenCount} / {hiringRollup.highThreatOpenCount}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {(hiringRollup.highThreatOpenCount > 0 || hiringRollup.watchlistOpenCount > 0) && (
+              <div className="flex flex-wrap gap-2">
+                {hiringRollup.highThreatOpenCount > 0 ? (
+                  <Badge className="bg-destructive/15 text-destructive border-destructive/30">
+                    {hiringRollup.highThreatOpenCount} open role(s) flagged high threat
+                  </Badge>
+                ) : null}
+                {hiringRollup.watchlistOpenCount > 0 ? (
+                  <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                    {hiringRollup.watchlistOpenCount} on watchlist
+                  </Badge>
+                ) : null}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Select
+                value={jobStatusFilter}
+                onValueChange={(v) => setJobStatusFilter(v as 'all' | 'open' | 'closed' | 'unknown')}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <Filter className="size-4 mr-2" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="unknown">Unknown</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={jobWorkplaceFilter}
+                onValueChange={(v) => setJobWorkplaceFilter(v as 'all' | 'remote' | 'hybrid' | 'onsite')}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Workplace" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All workplace</SelectItem>
+                  <SelectItem value="remote">Remote</SelectItem>
+                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                  <SelectItem value="onsite">On-site</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={jobThreatFilter}
+                onValueChange={(v) => setJobThreatFilter(v as 'all' | 'high' | 'watchlist')}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All roles</SelectItem>
+                  <SelectItem value="high">High threat only</SelectItem>
+                  <SelectItem value="watchlist">Watchlist only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {hiringThemeKeywords.length > 0 ? (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Top themes (open roles)</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {hiringThemeKeywords.map((kw) => (
+                    <Badge key={kw} variant="outline" className="font-normal text-[10px]">
+                      {kw}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {jobPostings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No job postings yet. Ingestion writes to this competitor only; listings never appear in the workspace
+                intelligence feed.
+              </p>
+            ) : filteredJobPostings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No postings match the current filters.</p>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Function</TableHead>
+                      <TableHead>Seniority</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Threat</TableHead>
+                      <TableHead className="w-[90px]">Flags</TableHead>
+                      <TableHead className="text-right">Link</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...filteredJobPostings]
+                      .sort((a, b) => {
+                        const ta = a.payload.date_posted ?? a.lastSeenAt
+                        const tb = b.payload.date_posted ?? b.lastSeenAt
+                        return tb.localeCompare(ta)
+                      })
+                      .map((p) => {
+                        const ca = p.payload.competitive_analysis
+                        const highThreat = ca?.threat_level === 'high'
+                        const watch = Boolean(ca?.watchlist)
+                        const loc =
+                          p.payload.location?.raw ??
+                          [p.payload.location?.city, p.payload.location?.state, p.payload.location?.country]
+                            .filter(Boolean)
+                            .join(', ') ||
+                          '—'
+                        return (
+                          <TableRow
+                            key={p.id}
+                            className={cn(
+                              highThreat && 'border-l-4 border-l-destructive bg-destructive/5',
+                              !highThreat && watch && 'border-l-4 border-l-amber-500 bg-amber-500/5'
+                            )}
+                          >
+                            <TableCell className="font-medium max-w-[240px]">
+                              <div className="truncate" title={p.title}>
+                                {p.title}
+                              </div>
+                              {ca?.inferred_priority ? (
+                                <p className="text-[10px] text-muted-foreground font-normal line-clamp-2 mt-0.5">
+                                  {ca.inferred_priority}
+                                </p>
+                              ) : null}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize text-[10px]">
+                                {p.postingStatus}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-xs max-w-[120px] truncate">
+                              {p.payload.function ?? '—'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-xs capitalize">
+                              {(p.payload.seniority ?? '—').replace(/_/g, ' ')}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-xs max-w-[160px] truncate" title={loc}>
+                              {loc}
+                            </TableCell>
+                            <TableCell>
+                              {ca?.threat_level ? (
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'text-[10px] capitalize',
+                                    ca.threat_level === 'high' && 'text-destructive border-destructive/50',
+                                    ca.threat_level === 'medium' && 'text-amber-600 border-amber-600/40'
+                                  )}
+                                >
+                                  {ca.threat_level}
+                                </Badge>
+                              ) : (
+                                '—'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {watch ? (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Watch
+                                </Badge>
+                              ) : (
+                                '—'
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" className="h-8 px-2" asChild>
+                                <a href={p.jobUrl} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="size-4" />
+                                </a>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
         )}
 

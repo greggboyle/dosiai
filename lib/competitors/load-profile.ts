@@ -1,5 +1,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { listIntelItemsForCompetitor } from '@/lib/feed/queries'
+import { computeHiringRollup, listJobPostingsForCompetitor } from '@/lib/competitors/job-postings-queries'
+import type { CompetitorHiringRollup, CompetitorJobPosting } from '@/lib/competitors/job-posting-types'
 import { listWinLossOutcomes } from '@/lib/win-loss/queries'
 import type { Competitor, CompetitorLeader, CompetitorProduct, IntelligenceItem, MISScore } from '@/lib/types'
 import { getMISBand } from '@/lib/types'
@@ -79,6 +81,8 @@ export type CompetitorProfilePayload = {
   competitor: Competitor
   activityItems: IntelligenceItem[]
   voiceItems: IntelligenceItem[]
+  jobPostings: CompetitorJobPosting[]
+  hiringRollup: CompetitorHiringRollup
   battleCards: CompetitorBattleCardRow[]
   linkedBriefs: CompetitorBriefRow[]
   winLossRows: WinLossRow[]
@@ -101,8 +105,9 @@ export async function loadCompetitorProfile(
 
   const since7 = new Date(Date.now() - 7 * 86400000).toISOString()
 
-  const [intelItems, battleRes, briefRes, allWin] = await Promise.all([
+  const [intelItems, jobPostings, battleRes, briefRes, allWin] = await Promise.all([
     listIntelItemsForCompetitor(workspaceId, competitorId, { limit: 40, days: 90 }),
+    listJobPostingsForCompetitor(workspaceId, competitorId, { limit: 500, days: 365 }),
     supabase
       .from('battle_card')
       .select('id,updated_at,status')
@@ -122,6 +127,7 @@ export async function loadCompetitorProfile(
 
   const activityItems = intelItems
   const voiceCandidates = intelItems.filter((i) => i.category === 'buy-side')
+  const hiringRollup = computeHiringRollup(jobPostings)
 
   const recentActivity = activityItems.filter((i) => i.timestamp >= since7).length
 
@@ -189,6 +195,8 @@ export async function loadCompetitorProfile(
     competitor,
     activityItems,
     voiceItems: voiceCandidates,
+    jobPostings,
+    hiringRollup,
     battleCards,
     linkedBriefs,
     winLossRows,
