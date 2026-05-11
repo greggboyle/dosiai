@@ -1646,12 +1646,14 @@ export function CompetitorProfileClient({
                         const ca = p.payload.competitive_analysis
                         const highThreat = ca?.threat_level === 'high'
                         const watch = Boolean(ca?.watchlist)
-                        const loc =
-                          p.payload.location?.raw ??
-                          [p.payload.location?.city, p.payload.location?.state, p.payload.location?.country]
-                            .filter(Boolean)
-                            .join(', ') ||
-                          '—'
+                        const locJoined = [
+                          p.payload.location?.city,
+                          p.payload.location?.state,
+                          p.payload.location?.country,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')
+                        const loc = p.payload.location?.raw ?? (locJoined || '—')
                         return (
                           <TableRow
                             key={p.id}
