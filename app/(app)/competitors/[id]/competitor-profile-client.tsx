@@ -160,6 +160,15 @@ function SentimentBar({ positive, mixed, negative }: { positive: number; mixed: 
   )
 }
 
+/** `payload.date_posted` from listings (ISO date); hiring sweep may omit. */
+function formatJobPostedDate(datePosted: string | null | undefined): string {
+  const raw = datePosted?.trim()
+  if (!raw) return '—'
+  const ms = Date.parse(raw)
+  if (Number.isNaN(ms)) return raw
+  return new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
 export function CompetitorProfileClient({
   workspacePlan,
   workspaceId,
@@ -1626,7 +1635,7 @@ export function CompetitorProfileClient({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Posted</TableHead>
                       <TableHead>Function</TableHead>
                       <TableHead>Seniority</TableHead>
                       <TableHead>Location</TableHead>
@@ -1672,10 +1681,10 @@ export function CompetitorProfileClient({
                                 </p>
                               ) : null}
                             </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="capitalize text-[10px]">
-                                {p.postingStatus}
-                              </Badge>
+                            <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
+                              <span title={p.payload.date_posted ?? undefined}>
+                                {formatJobPostedDate(p.payload.date_posted)}
+                              </span>
                             </TableCell>
                             <TableCell className="text-muted-foreground text-xs max-w-[120px] truncate">
                               {p.payload.function ?? '—'}
