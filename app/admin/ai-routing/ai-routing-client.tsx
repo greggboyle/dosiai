@@ -197,7 +197,8 @@ export function AiRoutingClient({ initialConfigs, initialAuditRows }: AiRoutingC
       setSavingDb(false)
     }
   }
-  const [expandedPurposes, setExpandedPurposes] = React.useState<Set<AIPurpose>>(new Set(basePurposeConfigs.map(c => c.purpose)))
+  const [expandedPurposes, setExpandedPurposes] = React.useState<Set<AIPurpose>>(() => new Set())
+  const [routingAuditExpanded, setRoutingAuditExpanded] = React.useState(false)
   const [editingRule, setEditingRule] = React.useState<{ purpose: AIPurpose; rule: AIRoutingRule } | null>(null)
   const [editDraft, setEditDraft] = React.useState<{
     costPer1MTokens: string
@@ -616,37 +617,59 @@ export function AiRoutingClient({ initialConfigs, initialAuditRows }: AiRoutingC
 
       {/* Global audit log preview */}
       <div className="rounded-lg border border-border bg-card">
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <h2 className="text-[14px] font-medium text-foreground">Recent Routing Changes</h2>
-          <Button variant="ghost" size="sm" className="h-7 text-[11px]" asChild>
-            <Link href="/admin/audit-log?category=ai_routing">
-            <ExternalLink className="mr-1.5 size-3.5" />
-            Full audit log
-            </Link>
-          </Button>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="text-[11px] w-[140px]">Timestamp</TableHead>
-              <TableHead className="text-[11px] w-[100px]">Operator</TableHead>
-              <TableHead className="text-[11px] w-[120px]">Action</TableHead>
-              <TableHead className="text-[11px]">Details</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {initialAuditRows.map((entry, i) => (
-              <TableRow key={i}>
-                <TableCell className="py-2 text-[11px] font-mono text-muted-foreground">{new Date(entry.timestamp).toLocaleString()}</TableCell>
-                <TableCell className="py-2 text-[11px] text-foreground">{entry.operator_role}</TableCell>
-                <TableCell className="py-2">
-                  <Badge variant="outline" className="text-[10px] font-mono">{entry.action}</Badge>
-                </TableCell>
-                <TableCell className="py-2 text-[11px] text-muted-foreground">{entry.reason || entry.target_name}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <Collapsible open={routingAuditExpanded} onOpenChange={setRoutingAuditExpanded}>
+          <div className="flex items-center justify-between gap-2 p-4 border-b border-border">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left hover:bg-muted/50 transition-colors -m-1 p-1"
+              >
+                {routingAuditExpanded ? (
+                  <ChevronDown className="size-4 text-muted-foreground shrink-0" />
+                ) : (
+                  <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+                )}
+                <h2 className="text-[14px] font-medium text-foreground">Recent Routing Changes</h2>
+              </button>
+            </CollapsibleTrigger>
+            <Button variant="ghost" size="sm" className="h-7 shrink-0 text-[11px]" asChild>
+              <Link href="/admin/audit-log?category=ai_routing">
+                <ExternalLink className="mr-1.5 size-3.5" />
+                Full audit log
+              </Link>
+            </Button>
+          </div>
+          <CollapsibleContent>
+            <div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-[11px] w-[140px]">Timestamp</TableHead>
+                    <TableHead className="text-[11px] w-[100px]">Operator</TableHead>
+                    <TableHead className="text-[11px] w-[120px]">Action</TableHead>
+                    <TableHead className="text-[11px]">Details</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {initialAuditRows.map((entry, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="py-2 text-[11px] font-mono text-muted-foreground">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="py-2 text-[11px] text-foreground">{entry.operator_role}</TableCell>
+                      <TableCell className="py-2">
+                        <Badge variant="outline" className="text-[10px] font-mono">
+                          {entry.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-2 text-[11px] text-muted-foreground">{entry.reason || entry.target_name}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       {/* Edit rule dialog */}
