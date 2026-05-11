@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth/session'
 import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { checkCostBudget } from '@/lib/ai/cost'
+import { dispatchHiringSweepRun } from '@/lib/sweep/dispatch-hiring-sweep'
 import { dispatchSweepRun } from '@/lib/sweep/dispatch-run'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 
@@ -81,11 +82,18 @@ export async function triggerManualSweep(
       }
     }
 
-    await dispatchSweepRun({
-      workspaceId,
-      trigger: 'manual',
-      triggerUserId: userId,
-    })
+    await Promise.all([
+      dispatchSweepRun({
+        workspaceId,
+        trigger: 'manual',
+        triggerUserId: userId,
+      }),
+      dispatchHiringSweepRun({
+        workspaceId,
+        trigger: 'manual',
+        triggerUserId: userId,
+      }),
+    ])
     return { ok: true }
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Sweep could not be scheduled'
