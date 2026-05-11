@@ -2,10 +2,10 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { ExternalLink, Play, UserCheck } from 'lucide-react'
+import { Briefcase, ExternalLink, Play, UserCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { startImpersonation } from '@/app/admin/impersonation/actions'
-import { runSweepOnBehalf, updateWorkspacePlan } from '@/app/admin/workspaces/actions'
+import { runHiringSweepOnBehalf, runSweepOnBehalf, updateWorkspacePlan } from '@/app/admin/workspaces/actions'
 import {
   SWEEP_ORCHESTRATION_PURPOSES,
   SWEEP_ORCHESTRATION_PURPOSE_LABELS,
@@ -29,6 +29,7 @@ export type WorkspaceDetailData = {
     createdAt: string
     lastActiveAt: string
     lastSweepAt: string | null
+    lastHiringSweepAt: string | null
     aiCostMtdCents: number
     reviewQueueThreshold: number
     gracePeriodEndsAt: string | null
@@ -119,6 +120,18 @@ export function WorkspaceDetailClient({ data }: { data: WorkspaceDetailData }) {
   React.useEffect(() => {
     setPlanChoice(data.workspace.plan as WorkspacePlan)
   }, [data.workspace.plan])
+
+  async function onRunHiringSweep() {
+    const reason = window.prompt('Reason for hiring sweep (required):')
+    if (!reason?.trim()) return
+    setBusy(true)
+    try {
+      await runHiringSweepOnBehalf(data.workspace.id, reason)
+      window.location.reload()
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function onRunSweep() {
     const reason = window.prompt('Reason for manual sweep (required):')
@@ -229,6 +242,10 @@ export function WorkspaceDetailClient({ data }: { data: WorkspaceDetailData }) {
             <UserCheck className="mr-2 size-4" />
             Impersonate
           </Button>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={onRunHiringSweep}>
+            <Briefcase className="mr-2 size-4" />
+            Run hiring sweep
+          </Button>
           <Button size="sm" disabled={busy} onClick={onRunSweep}>
             <Play className="mr-2 size-4" />
             Run sweep
@@ -258,11 +275,12 @@ export function WorkspaceDetailClient({ data }: { data: WorkspaceDetailData }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
         <Stat label="Members" value={String(data.members.length)} />
         <Stat label="MTD AI Cost" value={`$${(data.workspace.aiCostMtdCents / 100).toFixed(2)}`} />
         <Stat label="Review Threshold" value={String(data.workspace.reviewQueueThreshold)} />
         <Stat label="Last Sweep" value={formatRelativeTime(data.workspace.lastSweepAt)} />
+        <Stat label="Last Hiring Sweep" value={formatRelativeTime(data.workspace.lastHiringSweepAt)} />
         <Stat label="Active Overrides" value={String(data.overrides.filter((o) => o.isActive).length)} />
       </div>
 

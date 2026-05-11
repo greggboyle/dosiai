@@ -28,6 +28,50 @@ Grounding rules (mandatory):
 
 export { SWEEP_SHARED_PROMPT as SWEEP_SHARED_PROMPT_TEMPLATE }
 
+export const SWEEP_HIRING_PROMPT_TEMPLATE = `You are a competitive intelligence researcher. Use web search to find **current job postings** for the competitor below (careers site, ATS pages, or official listings clearly tied to this company).
+
+Return STRICT JSON matching {"jobs":[...]} — no markdown fences.
+
+## Disambiguation (our customer / workspace)
+{{workspace_company_summary}}
+
+## Target competitor
+Name: {{competitor_name}}
+Primary website: {{competitor_website}}
+
+## Each job object (required fields)
+- **job_url**: absolute https URL to the specific posting or requisition (not the homepage alone).
+- **title**: posting title as shown.
+- **status**: one of "open", "closed", "unknown" (use "unknown" if unclear).
+
+Optional fields when known from the listing: **raw_description** (short excerpt), **department**, **function**, **seniority**, **employment_type**, **location_raw** (single line), **date_posted** (ISO date if stated).
+
+## Grounding rules (mandatory)
+- Do not invent postings, titles, or URLs. Every job must be plausibly real and tied to {{competitor_name}} or its official careers presence linked to {{competitor_website}}.
+- If you cannot verify any roles, return {"jobs":[]}.
+- Prefer fewer accurate rows over speculative ones.`
+
+const SWEEP_HIRING_VARIABLES: PromptVariable[] = [
+  {
+    name: 'workspace_company_summary',
+    type: 'string',
+    description: 'Workspace profile summary for disambiguation.',
+    example: 'B2B logistics SaaS; mid-market shippers',
+  },
+  {
+    name: 'competitor_name',
+    type: 'string',
+    description: 'Competitor display name.',
+    example: 'FleetOps Inc.',
+  },
+  {
+    name: 'competitor_website',
+    type: 'string',
+    description: 'Competitor primary website URL.',
+    example: 'https://fleetops.example',
+  },
+]
+
 const SWEEP_VARIABLES: PromptVariable[] = [
   { name: 'purpose', type: 'string', description: 'Sweep purpose key.', example: 'sweep_buy' },
   {
@@ -113,6 +157,7 @@ const EMBEDDED_PROMPTS: EmbeddedPromptDefault[] = [
   { purpose: 'sweep_regulatory', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
   { purpose: 'sweep_self', content: SWEEP_SELF_PROMPT_TEMPLATE, variables: SWEEP_SELF_VARIABLES },
   { purpose: 'sweep_topic', content: SWEEP_SHARED_PROMPT, variables: SWEEP_VARIABLES },
+  { purpose: 'sweep_hiring', content: SWEEP_HIRING_PROMPT_TEMPLATE, variables: SWEEP_HIRING_VARIABLES },
   {
     purpose: 'scoring',
     content: `You are scoring competitive intelligence. In one short paragraph, explain why this item has MIS {{mis_value}}/100 for our user.

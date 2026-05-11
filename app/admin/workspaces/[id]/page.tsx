@@ -51,6 +51,7 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
       createdAt: workspace.created_at,
       lastActiveAt: workspace.last_active_at,
       lastSweepAt: workspace.last_sweep_at,
+      lastHiringSweepAt: workspace.last_hiring_sweep_at,
       aiCostMtdCents: workspace.ai_cost_mtd_cents ?? 0,
       reviewQueueThreshold: workspace.review_queue_threshold ?? 30,
       gracePeriodEndsAt: workspace.grace_period_ends_at,

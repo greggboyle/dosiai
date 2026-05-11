@@ -100,6 +100,10 @@ const purposeInfo: Record<AIPurpose, { name: string; description: string }> = {
   },
   sweep_self: { name: 'sweep_self', description: 'Own-company intelligence sweeps' },
   sweep_topic: { name: 'sweep_topic', description: 'Topic-focused sweep pass' },
+  sweep_hiring: {
+    name: 'sweep_hiring',
+    description: 'Hiring sweep — LLM + web search to refresh competitor_job_posting (no intelligence feed)',
+  },
   competitor_profile_refresh: {
     name: 'competitor_profile_refresh',
     description: 'Competitor profile refresh (summary, products, leadership)',

@@ -59,6 +59,7 @@ export type AiPurpose =
   | 'sweep_umbrella'
   | 'sweep_self'
   | 'sweep_topic'
+  | 'sweep_hiring'
   | 'competitor_profile_refresh'
   | 'scoring'
   | 'embedding'

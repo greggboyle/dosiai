@@ -15,7 +15,9 @@ import {
   indexUploadedResource,
 } from '@/inngest/functions/index-resource-document'
 import { runSweep } from '@/inngest/sweeps/run-sweep'
+import { runHiringSweep } from '@/inngest/sweeps/run-hiring-sweep'
 import { scheduleSweeps } from '@/inngest/sweeps/schedule-sweeps'
+import { scheduleHiringSweeps } from '@/inngest/sweeps/schedule-hiring-sweeps'
 
 export const functions = [
   learnFromOutcome,
@@ -33,5 +35,7 @@ export const functions = [
   extractResourceText,
   embedResourceChunks,
   runSweep,
+  runHiringSweep,
   scheduleSweeps,
+  scheduleHiringSweeps,
 ]

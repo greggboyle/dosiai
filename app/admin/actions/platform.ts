@@ -541,6 +541,7 @@ export async function seedPromptTemplatesFromCode() {
     'sweep_regulatory',
     'sweep_self',
     'sweep_topic',
+    'sweep_hiring',
   ]
   for (const purpose of sweepPurposes) {
     const def = getEmbeddedPromptDefault(purpose)

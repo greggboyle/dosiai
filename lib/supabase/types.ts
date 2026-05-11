@@ -8,6 +8,7 @@ export type AiPurposeDb =
   | 'sweep_umbrella'
   | 'sweep_self'
   | 'sweep_topic'
+  | 'sweep_hiring'
   | 'competitor_profile_refresh'
   | 'scoring'
   | 'embedding'
@@ -47,6 +48,7 @@ export interface Database {
           created_at: string
           last_active_at: string
           last_sweep_at: string | null
+          last_hiring_sweep_at: string | null
           review_queue_threshold: number
           scoring_weights: Json
           auto_briefs_auto_approve: boolean
@@ -69,6 +71,7 @@ export interface Database {
           created_at?: string
           last_active_at?: string
           last_sweep_at?: string | null
+          last_hiring_sweep_at?: string | null
           review_queue_threshold?: number
           scoring_weights?: Json
           auto_briefs_auto_approve?: boolean

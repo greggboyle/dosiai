@@ -88,6 +88,7 @@ const purposeLabels: Record<AIPurpose, string> = {
   sweep_umbrella: 'Sweep: Umbrella (deprecated)',
   sweep_self: 'Sweep: Own Company',
   sweep_topic: 'Sweep: Topic',
+  sweep_hiring: 'Sweep: Hiring (job postings)',
   competitor_profile_refresh: 'Competitor Profile Refresh',
   scoring: 'MIS Scoring',
   embedding: 'Embedding',
