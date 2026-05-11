@@ -6,6 +6,7 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import { requireOperator, requireOperatorAdminOrOwner } from '@/lib/admin/require-operator'
 import type { VendorAggregateRow, WorkspaceCostRow } from '@/lib/admin/platform-types'
 import type { AIPurpose, AIVendor, PromptVariable } from '@/lib/admin-types'
+import { buildMissingBriefKindPromptTemplateRows } from '@/lib/admin/brief-prompt-template-seed'
 import { buildPromptTemplateName, getEmbeddedPromptDefault } from '@/lib/admin/prompt-defaults'
 import { getVendorClient } from '@/lib/ai/factory'
 import { getRoutingFor } from '@/lib/ai/router'
@@ -418,6 +419,15 @@ export async function seedPromptTemplatesFromCode() {
       })
     }
   }
+
+  const briefAllRouting = (routingRes.data ?? []).find((r) => r.purpose === 'brief_drafting_all')
+  missingRows.push(
+    ...buildMissingBriefKindPromptTemplateRows(briefAllRouting?.rules, existing, {
+      now,
+      operatorId: operator.id,
+      operatorName: operator.name,
+    })
+  )
 
   if (missingRows.length > 0) {
     const { error } = await admin.from('prompt_template').insert(missingRows)

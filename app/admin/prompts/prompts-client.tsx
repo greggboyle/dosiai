@@ -63,7 +63,10 @@ import {
   Variable,
   History,
   Loader2,
+  Info,
 } from 'lucide-react'
+import Link from 'next/link'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import type { PromptTemplate, PromptVariable, AIVendor, AIPurpose } from '@/lib/admin-types'
 import {
   activatePromptTemplate,
@@ -384,7 +387,21 @@ export function PromptsClient({ initialTemplates }: PromptsClientProps) {
               New template
             </Button>
           </div>
-          
+
+          <Alert className="mb-3 border-slate-200 bg-slate-50">
+            <Info className="text-slate-600" />
+            <AlertTitle className="text-[13px]">Brief drafting</AlertTitle>
+            <AlertDescription className="text-[12px] text-slate-600 leading-snug">
+              Set the AI vendor and model for all brief kinds in{' '}
+              <Link href="/admin/ai-routing" className="underline font-medium text-slate-800">
+                AI Routing
+              </Link>{' '}
+              (<span className="font-mono">brief_drafting_all</span>). Edit per-kind instructions here: each{' '}
+              <span className="font-mono">brief_drafting_*</span> template applies when that brief kind is drafted; use
+              the same vendor as in routing so the active template is picked up.
+            </AlertDescription>
+          </Alert>
+
           {/* Filters */}
           <div className="flex gap-2">
             <Select value={filterPurpose} onValueChange={setFilterPurpose}>

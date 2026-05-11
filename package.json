@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "purge-system": "tsx scripts/purge-system.ts"
+    "purge-system": "tsx scripts/purge-system.ts",
+    "seed-brief-prompts": "tsx scripts/seed-missing-brief-prompt-templates.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

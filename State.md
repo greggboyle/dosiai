@@ -11,7 +11,7 @@
 - `populate-competitor-profile` (stub, event `competitor/populate-profile`)
 - `reembed-corpus` (stub, event `embedding/reembed-corpus`)
 - `monthly-cost-reset` (cron 1st of month UTC)
-- Brief drafting: six functions on `brief/draft-requested/<kind>`; legacy `brief/draft-requested` compat re-emits by `brief_kind`; AI routing uses `brief_drafting_all` only (`/admin/ai-routing`).
+- Brief drafting: six functions on `brief/draft-requested/<kind>`; legacy `brief/draft-requested` compat re-emits by `brief_kind`; **`ai_routing_config`** uses **`brief_drafting_all`** only for vendor/model; **`prompt_template`** uses per-kind **`brief_drafting_*`** purposes for copy (`/admin/ai-routing` vs `/admin/prompts`).
 
 ### Routes / surfaces wired to real data
 - `/intel` — server-loaded `intelligence_item` rows (`visibility=feed`); review queue tab uses workspace `review_queue_threshold`; **Mark reviewed** persists `reviewed_at` / `reviewed_by`; detail panel shows vendor consensus ratio

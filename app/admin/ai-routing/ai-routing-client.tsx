@@ -55,7 +55,9 @@ import {
   History,
   ExternalLink,
   Trash2,
+  Info,
 } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import type { AIPurposeConfig, AIRoutingRule, AIVendor, AIPurpose } from '@/lib/admin-types'
 import type { AiRoutingDbRow } from '@/lib/admin/map-ai-routing-db'
 import { mergeDbIntoConfigs, serializeRulesForDb } from '@/lib/admin/map-ai-routing-db'
@@ -353,6 +355,19 @@ export function AiRoutingClient({ initialConfigs, initialAuditRows }: AiRoutingC
           </Button>
         </div>
       </div>
+
+      <Alert className="border-muted bg-muted/40">
+        <Info className="text-muted-foreground" />
+        <AlertTitle className="text-[13px]">Brief drafting</AlertTitle>
+        <AlertDescription className="text-[12px] text-muted-foreground leading-snug">
+          The <span className="font-mono">brief_drafting_all</span> row sets vendor/model for every brief kind. Per-kind
+          prompt wording lives under{' '}
+          <Link href="/admin/prompts" className="underline font-medium text-foreground">
+            Prompts
+          </Link>{' '}
+          (<span className="font-mono">brief_drafting_manual</span>, <span className="font-mono">brief_drafting_sweep_summary</span>, etc.).
+        </AlertDescription>
+      </Alert>
 
       {/* Routing rules by purpose */}
       <div className="space-y-4">
