@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import { getSession } from '@/lib/auth/session'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseAdminClient } from '@/lib/supabase/admin'
 import type { OperatorRole } from '@/lib/types/dosi'
 
 export interface OperatorSession {
@@ -18,11 +18,14 @@ export async function getOperatorSession(): Promise<OperatorSession | null> {
   const session = await getSession()
   if (!session?.user?.email) return null
 
-  const supabase = await createSupabaseServerClient()
-  const { data: operator } = await supabase
+  // `operator_user` has RLS with no member-facing SELECT policies, so the user-scoped client
+  // never sees rows. Match `requireOperator`: resolve identity from Auth, then load operator via admin.
+  const email = session.user.email.toLowerCase()
+  const admin = createSupabaseAdminClient()
+  const { data: operator } = await admin
     .from('operator_user')
     .select('*')
-    .eq('email', session.user.email.toLowerCase())
+    .eq('email', email)
     .eq('status', 'active')
     .maybeSingle()
 
