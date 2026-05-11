@@ -12,7 +12,7 @@ import {
 } from '@/lib/admin/brief-prompt-template-seed'
 import { buildPromptTemplateName, getEmbeddedPromptDefault } from '@/lib/admin/prompt-defaults'
 import { getVendorClient } from '@/lib/ai/factory'
-import { getRoutingFor } from '@/lib/ai/router'
+import { getRoutingFor, invalidateRoutingCache } from '@/lib/ai/router'
 import { sweepAiResponseSchema, type ParsedSweepItem } from '@/lib/sweep/schemas'
 import { validateSweepItemSources } from '@/lib/sweep/validate-sources'
 
@@ -31,17 +31,22 @@ export async function updateAiRoutingConfig(input: {
 }) {
   const { operator } = await requireOperatorAdminOrOwner()
   const admin = createSupabaseAdminClient()
-  const { error } = await admin
-    .from('ai_routing_config')
-    .update({
+  const now = new Date().toISOString()
+  // Upsert: `update` alone updates 0 rows when no `ai_routing_config` row exists yet
+  // (e.g. new enum purpose before migration seed), and PostgREST still returns success.
+  const { error } = await admin.from('ai_routing_config').upsert(
+    {
+      purpose: input.purpose,
       mode: input.mode,
       rules: input.rules as object,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
       updated_by_operator_id: operator.id,
-    })
-    .eq('purpose', input.purpose)
+    },
+    { onConflict: 'purpose' }
+  )
 
   if (error) throw error
+  invalidateRoutingCache()
   revalidatePath('/admin/ai-routing')
 }
 
