@@ -9,6 +9,7 @@ import { countWords } from '@/lib/brief/queries'
 import { notifyBriefSubscribersOfPublish } from '@/lib/notifications/brief-published'
 import { filterItemIdsToSweepRegulatoryOnly } from '@/lib/brief/regulatory-items'
 import { briefDraftRequestedEventName } from '@/lib/brief/inngest-events'
+import { listIntelItemsForCompetitor } from '@/lib/feed/queries'
 import type { Brief, BriefKind } from '@/lib/types'
 import type { WorkspacePlan } from '@/lib/types/dosi'
 
@@ -230,6 +231,111 @@ export async function enqueueBriefDraft(input: {
   })
 
   revalidatePath(`/briefs/${input.briefId}/edit`)
+}
+
+export type RequestCompetitorDossierBriefResult =
+  | { ok: true; briefId: string }
+  | {
+      ok: false
+      reason: 'unauthorized' | 'forbidden' | 'read_only' | 'not_found' | 'no_intelligence' | 'limit' | 'failed'
+      message?: string
+    }
+
+/**
+ * Creates a competitor-scoped brief, links top feed intel for that competitor, and enqueues the AI draft (Inngest).
+ */
+export async function requestCompetitorDossierBrief(competitorId: string): Promise<RequestCompetitorDossierBriefResult> {
+  let ctx: Awaited<ReturnType<typeof requireAuthorWorkspace>>
+  try {
+    ctx = await requireAuthorWorkspace()
+  } catch (e) {
+    const m = e instanceof Error ? e.message : ''
+    if (m.includes('Unauthorized')) {
+      return { ok: false, reason: 'unauthorized', message: 'Sign in to request a dossier brief.' }
+    }
+    if (m.includes('Forbidden') || m.includes('No workspace')) {
+      return { ok: false, reason: 'forbidden', message: m || 'You do not have access to create briefs.' }
+    }
+    return { ok: false, reason: 'failed', message: m || 'Could not verify workspace.' }
+  }
+
+  if (ctx.status === 'read_only') {
+    return { ok: false, reason: 'read_only', message: 'Workspace is read-only.' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+  const { data: comp, error: cErr } = await supabase
+    .from('competitor')
+    .select('id,name')
+    .eq('id', competitorId)
+    .eq('workspace_id', ctx.workspaceId)
+    .maybeSingle()
+
+  if (cErr || !comp) {
+    return { ok: false, reason: 'not_found', message: 'Competitor not found.' }
+  }
+
+  const intelItems = await listIntelItemsForCompetitor(ctx.workspaceId, competitorId, { limit: 25, days: 120 })
+  const itemIds = intelItems.map((i) => i.id)
+  if (itemIds.length < 1) {
+    return {
+      ok: false,
+      reason: 'no_intelligence',
+      message:
+        'No feed intelligence mentions this competitor yet. Run a sweep or wait for intel, then try again.',
+    }
+  }
+
+  try {
+    await assertAiBriefDraftAllowed(ctx.workspaceId, ctx.plan)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Monthly AI brief limit reached.'
+    return { ok: false, reason: 'limit', message: msg }
+  }
+
+  const title = `Competitor dossier: ${comp.name}`
+  const { data: inserted, error: insErr } = await supabase
+    .from('brief')
+    .insert({
+      workspace_id: ctx.workspaceId,
+      author_id: ctx.userId,
+      title,
+      summary: '',
+      body: '',
+      word_count: 0,
+      brief_kind: 'competitor',
+      audience: 'general',
+      priority: 'medium',
+      status: 'draft',
+      ai_drafted: false,
+      human_reviewed: false,
+      linked_item_ids: itemIds,
+      linked_topic_ids: [],
+      linked_competitor_ids: [competitorId],
+    })
+    .select('id')
+    .single()
+
+  if (insErr || !inserted) {
+    return { ok: false, reason: 'failed', message: insErr?.message ?? 'Could not create brief.' }
+  }
+
+  const briefId = inserted.id
+
+  await inngest.send({
+    name: briefDraftRequestedEventName('competitor'),
+    data: {
+      briefId,
+      workspaceId: ctx.workspaceId,
+      itemIds,
+    },
+  })
+
+  revalidatePath('/briefs')
+  revalidatePath(`/briefs/${briefId}/edit`)
+  revalidatePath(`/competitors/${competitorId}`)
+
+  return { ok: true, briefId }
 }
 
 export async function archiveBrief(briefId: string): Promise<void> {

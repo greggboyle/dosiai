@@ -79,6 +79,7 @@ import {
   updateCompetitorSegments,
   updateCompetitorStrengthsWeaknesses,
 } from '@/lib/competitors/actions'
+import { requestCompetitorDossierBrief } from '@/lib/brief/actions'
 import { toast } from 'sonner'
 
 const tierLabels: Record<string, string> = {
@@ -257,6 +258,24 @@ export function CompetitorProfileClient({
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
+  const [dossierRequesting, setDossierRequesting] = React.useState(false)
+
+  const handleRequestDossier = React.useCallback(async () => {
+    setDossierRequesting(true)
+    try {
+      const res = await requestCompetitorDossierBrief(competitor.id)
+      if (res.ok) {
+        toast.success('Dossier brief started. Opening editor…')
+        router.push(`/briefs/${res.briefId}/edit`)
+      } else {
+        toast.error(res.message ?? 'Could not start dossier brief.')
+      }
+    } catch {
+      toast.error('Something went wrong.')
+    } finally {
+      setDossierRequesting(false)
+    }
+  }, [competitor.id, router])
 
   React.useEffect(() => {
     const saved = searchParams.get('saved')
@@ -838,16 +857,14 @@ export function CompetitorProfileClient({
               )}
             </Card>
 
-            {/* Briefing + Leadership: stacked sidebar beside Company Summary */}
+            {/* Dossier (linked brief) + Leadership: stacked sidebar beside Company Summary */}
             <div className="col-span-12 md:col-span-4 flex flex-col gap-3 min-w-0">
-            {/* Competitor Briefing Card */}
+            {/* Competitor Dossier card (linked brief) */}
             <Card className="shrink-0">
               <CardHeader className="py-2.5 px-4 space-y-0">
-                <CardTitle className="text-sm font-semibold">Competitor Briefing</CardTitle>
+                <CardTitle className="text-sm font-semibold">Competitor Dossier</CardTitle>
                 <CardDescription className="text-[11px] leading-snug line-clamp-1">
-                  {latestLinkedBrief
-                    ? 'Latest linked briefing'
-                    : 'No briefing linked yet'}
+                  {latestLinkedBrief ? 'Latest linked dossier brief' : 'No dossier brief linked yet'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 px-4 pb-3 pt-0">
@@ -859,14 +876,25 @@ export function CompetitorProfileClient({
                   </div>
                 ) : (
                   <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
-                    Link a briefing to track intel for this competitor.
+                    Generate an AI competitor dossier brief from this profile and the top feed items for this
+                    competitor.
                   </p>
                 )}
-                <Button asChild size="sm" className="w-full h-8 text-xs">
-                  <Link href={latestLinkedBrief ? `/briefs/${latestLinkedBrief.id}` : '/briefs/new'}>
-                    {latestLinkedBrief ? 'View Briefing' : 'Request Briefing'}
-                  </Link>
-                </Button>
+                {latestLinkedBrief ? (
+                  <Button asChild size="sm" className="w-full h-8 text-xs">
+                    <Link href={`/briefs/${latestLinkedBrief.id}`}>View dossier brief</Link>
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full h-8 text-xs"
+                    disabled={dossierRequesting}
+                    onClick={handleRequestDossier}
+                  >
+                    {dossierRequesting ? 'Starting…' : 'Request Dossier'}
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
