@@ -3,10 +3,11 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FileText } from 'lucide-react'
+import { ChevronDown, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import type { MyMarketBriefRow } from '@/lib/brief/my-market-queries'
@@ -40,6 +41,11 @@ export function MyMarketBriefsClient({ rows, subscriptions }: MyMarketBriefsClie
     return m
   }, [subscriptions])
 
+  const enabledSubCount = React.useMemo(
+    () => SUBSCRIPTION_ORDER.filter((k) => subMap.get(k)).length,
+    [subMap]
+  )
+
   const toggle = async (kind: BriefKind, next: boolean) => {
     setPending(kind)
     try {
@@ -61,40 +67,6 @@ export function MyMarketBriefsClient({ rows, subscriptions }: MyMarketBriefsClie
           Briefs you follow appear here. Unread items stay highlighted until you open them.
         </p>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Brief types you receive</CardTitle>
-          <CardDescription>
-            Choose which automated and team brief categories appear in this list and trigger in-app
-            notifications when published.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {SUBSCRIPTION_ORDER.map((kind) => (
-            <div key={kind} className="flex items-center justify-between gap-4 rounded-lg border px-3 py-2">
-              <div className="space-y-0.5">
-                <Label htmlFor={`sub-${kind}`} className="text-sm font-medium">
-                  {BRIEF_KIND_LABELS[kind]}
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  {kind === 'sweep_summary'
-                    ? 'Off by default — summaries tied to sweep runs.'
-                    : kind === 'manual'
-                      ? 'Briefs authored by your team.'
-                      : 'Automated brief when available for your workspace.'}
-                </p>
-              </div>
-              <Switch
-                id={`sub-${kind}`}
-                checked={subMap.get(kind) ?? false}
-                disabled={pending === kind}
-                onCheckedChange={(v) => void toggle(kind, v)}
-              />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
 
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground">Your briefs</h2>
@@ -147,6 +119,57 @@ export function MyMarketBriefsClient({ rows, subscriptions }: MyMarketBriefsClie
           </ul>
         )}
       </div>
+
+      <Collapsible defaultOpen={false} className="rounded-lg border bg-card text-card-foreground shadow-sm">
+        <CollapsibleTrigger className="group flex w-full items-center gap-3 px-4 py-3 text-left outline-none transition-colors hover:bg-muted/40 [&[data-state=open]]:border-b [&[data-state=open]]:border-border">
+          <ChevronDown
+            className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180"
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Which brief types appear here</p>
+            <p className="text-xs text-muted-foreground">
+              {enabledSubCount} of {SUBSCRIPTION_ORDER.length} enabled · expand to change in-app list and publish
+              notifications
+            </p>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="border-t px-4 pb-4 pt-3">
+            <p className="mb-3 text-xs text-muted-foreground">
+              These toggles are only for this page and notifications — most visits are just reading briefs above.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {SUBSCRIPTION_ORDER.map((kind) => (
+                <div
+                  key={kind}
+                  className="flex items-center justify-between gap-3 rounded-md border bg-background/60 px-3 py-2"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <Label htmlFor={`sub-${kind}`} className="text-sm font-medium leading-tight">
+                      {BRIEF_KIND_LABELS[kind]}
+                    </Label>
+                    <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                      {kind === 'sweep_summary'
+                        ? 'Off by default — tied to sweep runs.'
+                        : kind === 'manual'
+                          ? 'Team-authored briefs.'
+                          : 'Automated when available.'}
+                    </p>
+                  </div>
+                  <Switch
+                    id={`sub-${kind}`}
+                    className="shrink-0"
+                    checked={subMap.get(kind) ?? false}
+                    disabled={pending === kind}
+                    onCheckedChange={(v) => void toggle(kind, v)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   )
 }
