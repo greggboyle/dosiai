@@ -38,18 +38,26 @@ export function buildBriefDraftPromptVariables(opts: {
   audience: Audience
   items: { title: string; summary: string; content: string }[]
   audienceHint?: string
+  /** Prepended before feed excerpts (e.g. full competitor dossier for competitor briefs). */
+  competitorContextPrefix?: string
 }): Record<string, string> {
   const blocks = opts.items.map((it, i) => {
     const body = (it.content || '').slice(0, 14_000)
     return `### Item ${i + 1}: ${it.title}\nSummary: ${it.summary || ''}\n\n${body}`
   })
 
+  const prefix = opts.competitorContextPrefix?.trim()
+  let itemsBlock = blocks.join('\n\n---\n\n')
+  if (prefix) {
+    itemsBlock = `${prefix}\n\n---\n\n## Selected intelligence excerpts (author-linked items)\n\n${itemsBlock}`
+  }
+
   const hint = opts.audienceHint?.trim()
   return {
     audience: String(opts.audience),
     audience_hint: hint ?? '',
     audience_hint_line: hint ? `\nAdditional guidance from the author: ${hint}` : '',
-    items_block: blocks.join('\n\n---\n\n'),
+    items_block: itemsBlock,
   }
 }
 

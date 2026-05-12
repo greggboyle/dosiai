@@ -11,6 +11,7 @@ import type { WorkspacePlan } from '@/lib/types/dosi'
 import { notifyBriefSubscribersOfPublish } from '@/lib/notifications/brief-published'
 import { filterItemIdsToSweepRegulatoryOnly } from '@/lib/brief/regulatory-items'
 import { briefKindToPromptTemplatePurpose } from '@/lib/brief/prompt-purpose'
+import { buildCompetitorBriefContextMarkdown, inferCompetitorIdForBrief } from '@/lib/brief/competitor-brief-context'
 import type { BriefKind } from '@/lib/types'
 
 export type BriefDraftJobPayload = {
@@ -66,13 +67,23 @@ export async function runBriefDraftStep(input: BriefDraftJobPayload): Promise<{ 
     }
   }
 
+  const itemSelect =
+    brief.brief_kind === 'competitor' ? 'id,title,summary,content,related_competitors' : 'id,title,summary,content'
   const { data: items, error: iErr } = await supabase
     .from('intelligence_item')
-    .select('id,title,summary,content')
+    .select(itemSelect)
     .eq('workspace_id', workspaceId)
     .in('id', draftItemIds)
   if (iErr) throw iErr
   if (!items?.length) throw new Error('No intelligence items found for draft')
+
+  let competitorContextPrefix = ''
+  if (brief.brief_kind === 'competitor') {
+    const competitorId = inferCompetitorIdForBrief(brief.linked_competitor_ids ?? [], items as { related_competitors: string[] | null }[])
+    if (competitorId) {
+      competitorContextPrefix = await buildCompetitorBriefContextMarkdown(supabase, workspaceId, competitorId)
+    }
+  }
 
   const promptTemplatePurpose = briefKindToPromptTemplatePurpose(brief.brief_kind)
   const routing = await getRoutingFor('brief_drafting_all')
@@ -81,6 +92,7 @@ export async function runBriefDraftStep(input: BriefDraftJobPayload): Promise<{ 
   const promptVars = buildBriefDraftPromptVariables({
     audience: brief.audience,
     audienceHint,
+    competitorContextPrefix: competitorContextPrefix || undefined,
     items: items.map((it) => ({
       title: it.title,
       summary: it.summary ?? '',
