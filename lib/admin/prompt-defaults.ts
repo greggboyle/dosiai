@@ -126,9 +126,17 @@ const BRIEF_DRAFTING_VARIABLES: PromptVariable[] = [
     example: '\nAdditional guidance from the author: Focus on renewal risk in EMEA.',
   },
   {
+    name: 'brief_evidence_json',
+    type: 'string',
+    description:
+      'Pretty-printed BriefEvidenceJsonV1: schemaVersion, briefKind, resolvedCompetitorId, competitorResolution, dataNotes, competitorDossier (or null), authorLinkedIntelligenceItems.',
+    example: '{ "schemaVersion": 1, "briefKind": "competitor", ... }',
+  },
+  {
     name: 'items_block',
     type: 'string',
-    description: 'Formatted intelligence items block from linked feed items.',
+    description:
+      'Legacy markdown excerpts for non-competitor briefs. Empty for competitor briefs (evidence is only in brief_evidence_json).',
     example: '### Item 1: ...',
   },
 ]
@@ -138,7 +146,15 @@ function buildBriefDraftingTemplate(kindGuidance: string): string {
 
 Primary audience for tone and framing: {{audience}}.{{audience_hint_line}}
 
-Below are intelligence items from our workspace feed. Ground every factual claim in these sources. If the sources conflict, say so briefly.
+Structured evidence is provided as JSON below. Parse it as a single object:
+- authorLinkedIntelligenceItems: feed items the author explicitly linked to this brief (always present).
+- competitorDossier: when non-null (competitor briefs with a resolved competitor id), full dossier — company profile, win/loss, hiring, battle cards, and feed intel mentioning that competitor.
+- resolvedCompetitorId / competitorResolution: how the competitor was chosen (competitor briefs).
+
+Ground factual claims in that JSON (and in items_block when non-empty). If sources conflict, say so briefly.
+
+{{brief_evidence_json}}
+
 {{items_block}}
 
 Return ONLY valid JSON with this exact shape (no markdown code fences):

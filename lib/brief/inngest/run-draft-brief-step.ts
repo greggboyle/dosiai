@@ -11,7 +11,8 @@ import type { WorkspacePlan } from '@/lib/types/dosi'
 import { notifyBriefSubscribersOfPublish } from '@/lib/notifications/brief-published'
 import { filterItemIdsToSweepRegulatoryOnly } from '@/lib/brief/regulatory-items'
 import { briefKindToPromptTemplatePurpose } from '@/lib/brief/prompt-purpose'
-import { buildCompetitorBriefContextMarkdown, inferCompetitorIdForBrief } from '@/lib/brief/competitor-brief-context'
+import { buildCompetitorDossierJson, inferCompetitorIdForBrief } from '@/lib/brief/competitor-brief-context'
+import { buildBriefEvidencePayloadBase, stringifyBriefEvidenceJson, type IntelEvidenceRow } from '@/lib/brief/brief-evidence-json'
 import type { BriefKind } from '@/lib/types'
 
 export type BriefDraftJobPayload = {
@@ -77,22 +78,38 @@ export async function runBriefDraftStep(input: BriefDraftJobPayload): Promise<{ 
   if (iErr) throw iErr
   if (!items?.length) throw new Error('No intelligence items found for draft')
 
-  let competitorContextPrefix = ''
+  let resolution: 'linked_first' | 'inferred_dominant' | 'none' = 'none'
+  let resolvedCompetitorId: string | null = null
+  let competitorDossier = null
+
   if (brief.brief_kind === 'competitor') {
-    const competitorId = inferCompetitorIdForBrief(brief.linked_competitor_ids ?? [], items as { related_competitors: string[] | null }[])
-    if (competitorId) {
-      competitorContextPrefix = await buildCompetitorBriefContextMarkdown(supabase, workspaceId, competitorId)
+    const linked = brief.linked_competitor_ids ?? []
+    resolvedCompetitorId = inferCompetitorIdForBrief(linked, items as { related_competitors: string[] | null }[])
+    if (linked.length >= 1) resolution = 'linked_first'
+    else if (resolvedCompetitorId) resolution = 'inferred_dominant'
+    if (resolvedCompetitorId) {
+      competitorDossier = await buildCompetitorDossierJson(supabase, workspaceId, resolvedCompetitorId)
     }
   }
+
+  const evidencePayload = buildBriefEvidencePayloadBase(
+    brief,
+    resolution,
+    resolvedCompetitorId,
+    competitorDossier,
+    items as IntelEvidenceRow[]
+  )
+  const briefEvidenceJson = stringifyBriefEvidenceJson(evidencePayload)
 
   const promptTemplatePurpose = briefKindToPromptTemplatePurpose(brief.brief_kind)
   const routing = await getRoutingFor('brief_drafting_all')
   const vendorClient = getVendorClient(routing.vendor, routing.model)
   const template = await getActivePromptTemplateFor(promptTemplatePurpose, routing.vendor)
   const promptVars = buildBriefDraftPromptVariables({
+    briefKind: brief.brief_kind as BriefKind,
     audience: brief.audience,
     audienceHint,
-    competitorContextPrefix: competitorContextPrefix || undefined,
+    briefEvidenceJson,
     items: items.map((it) => ({
       title: it.title,
       summary: it.summary ?? '',

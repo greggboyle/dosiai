@@ -8,7 +8,15 @@ export const BRIEF_DRAFT_PROMPT_TEMPLATE = `You are a competitive intelligence a
 
 Primary audience for tone and framing: {{audience}}.{{audience_hint_line}}
 
-Below are intelligence items from our workspace feed. Ground every factual claim in these sources. If the sources conflict, say so briefly.
+Structured evidence is provided as JSON below. Parse it as a single object:
+- \`authorLinkedIntelligenceItems\`: feed items the author explicitly linked to this brief (always present).
+- \`competitorDossier\`: when non-null (competitor briefs with a resolved competitor id), full dossier — company profile, win/loss, hiring, battle cards, and feed intel mentioning that competitor.
+- \`resolvedCompetitorId\` / \`competitorResolution\`: how the competitor was chosen.
+
+Ground every factual claim in that JSON (and in \`items_block\` when non-empty for backward-compatible templates). If sources conflict, say so briefly.
+
+{{brief_evidence_json}}
+
 {{items_block}}
 
 Return ONLY valid JSON with this exact shape (no markdown code fences):
@@ -35,37 +43,34 @@ export function getBriefDraftPromptTemplateForKind(kind: BriefKind): string {
 }
 
 export function buildBriefDraftPromptVariables(opts: {
+  briefKind: BriefKind
   audience: Audience
   items: { title: string; summary: string; content: string }[]
   audienceHint?: string
-  /** Prepended before feed excerpts (e.g. full competitor dossier for competitor briefs). */
-  competitorContextPrefix?: string
+  /** Pretty-printed JSON string (see `BriefEvidenceJsonV1`). */
+  briefEvidenceJson: string
 }): Record<string, string> {
   const blocks = opts.items.map((it, i) => {
     const body = (it.content || '').slice(0, 14_000)
     return `### Item ${i + 1}: ${it.title}\nSummary: ${it.summary || ''}\n\n${body}`
   })
 
-  const prefix = opts.competitorContextPrefix?.trim()
-  let itemsBlock = blocks.join('\n\n---\n\n')
-  if (prefix) {
-    itemsBlock = `${prefix}\n\n---\n\n## Selected intelligence excerpts (author-linked items)\n\n${itemsBlock}`
-  }
+  const itemsBlock =
+    opts.briefKind === 'competitor'
+      ? ''
+      : blocks.join('\n\n---\n\n')
 
   const hint = opts.audienceHint?.trim()
   return {
     audience: String(opts.audience),
     audience_hint: hint ?? '',
     audience_hint_line: hint ? `\nAdditional guidance from the author: ${hint}` : '',
+    brief_evidence_json: opts.briefEvidenceJson,
     items_block: itemsBlock,
   }
 }
 
-export function buildBriefDraftPrompt(opts: {
-  audience: Audience
-  items: { title: string; summary: string; content: string }[]
-  audienceHint?: string
-}): string {
+export function buildBriefDraftPrompt(opts: Parameters<typeof buildBriefDraftPromptVariables>[0]): string {
   const vars = buildBriefDraftPromptVariables(opts)
   return renderPromptTemplate(BRIEF_DRAFT_PROMPT_TEMPLATE, vars)
 }
