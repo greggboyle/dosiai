@@ -41,7 +41,7 @@ export default async function CompanyProfilePage() {
     .maybeSingle()
   const { data: workspace } = await supabase
     .from('workspace')
-    .select('auto_briefs_auto_approve')
+    .select('auto_briefs_auto_approve, daily_intelligence_sweep_hour_utc')
     .eq('id', membership.workspace_id)
     .maybeSingle()
 
@@ -159,6 +159,26 @@ export default async function CompanyProfilePage() {
             <Label htmlFor="otherSocial">Other social</Label>
             <Input id="otherSocial" name="otherSocial" defaultValue={socialValue(profile?.social_handles, 'other')} />
           </div>
+        </div>
+
+        <div className="space-y-2 rounded-md border p-3">
+          <Label htmlFor="dailyIntelligenceSweepHourUtc">Daily intelligence run (UTC)</Label>
+          <p className="text-xs text-muted-foreground">
+            Hour when the scheduled intelligence sweep may run (checked hourly). Default 17:00 UTC matches
+            9:00 AM Pacific Standard Time; 9:00 AM Pacific Daylight Time is 16:00 UTC.
+          </p>
+          <select
+            id="dailyIntelligenceSweepHourUtc"
+            name="dailyIntelligenceSweepHourUtc"
+            className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-xs rounded-md border px-3 py-1 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            defaultValue={String(workspace?.daily_intelligence_sweep_hour_utc ?? 17)}
+          >
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={String(h)}>
+                {String(h).padStart(2, '0')}:00 UTC
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-3 rounded-md border p-3">

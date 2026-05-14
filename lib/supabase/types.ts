@@ -52,6 +52,7 @@ export interface Database {
           review_queue_threshold: number
           scoring_weights: Json
           auto_briefs_auto_approve: boolean
+          daily_intelligence_sweep_hour_utc: number
         }
         Insert: {
           id?: string
@@ -75,6 +76,7 @@ export interface Database {
           review_queue_threshold?: number
           scoring_weights?: Json
           auto_briefs_auto_approve?: boolean
+          daily_intelligence_sweep_hour_utc?: number
         }
         Update: Partial<Database['public']['Tables']['workspace']['Insert']>
       }

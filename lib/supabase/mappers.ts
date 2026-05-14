@@ -20,6 +20,7 @@ export function workspaceFromDb(row: Database['public']['Tables']['workspace']['
     createdAt: row.created_at,
     lastActiveAt: row.last_active_at,
     lastSweepAt: row.last_sweep_at ?? undefined,
+    dailyIntelligenceSweepHourUtc: row.daily_intelligence_sweep_hour_utc ?? undefined,
     reviewQueueThreshold: row.review_queue_threshold,
     scoringWeights: (row.scoring_weights as Record<string, number>) ?? undefined,
   }
@@ -46,6 +47,7 @@ export function workspaceToDb(
     created_at: workspace.createdAt,
     last_active_at: workspace.lastActiveAt,
     last_sweep_at: workspace.lastSweepAt ?? null,
+    daily_intelligence_sweep_hour_utc: workspace.dailyIntelligenceSweepHourUtc,
     review_queue_threshold: workspace.reviewQueueThreshold,
     scoring_weights: workspace.scoringWeights ?? undefined,
   }

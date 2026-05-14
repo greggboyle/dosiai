@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { withWorkspace } from '@/lib/auth/workspace'
+import { clampDailyIntelligenceSweepHourUtc } from '@/lib/sweep/daily-intelligence-slot'
 import { persistWorkspaceProfileEmbeddings } from '@/lib/workspace/profile-embeddings'
 
 function parseLines(value: FormDataEntryValue | null): string[] {
@@ -81,25 +82,38 @@ export async function updateCompanyProfile(formData: FormData) {
     })
 
     const autoBriefsAutoApprove = formData.get('autoBriefsAutoApprove') === 'on'
-    const { error: wsError } = await supabase
-      .from('workspace')
-      .update({ auto_briefs_auto_approve: autoBriefsAutoApprove })
-      .eq('id', workspace.id)
+    const hourRaw = formData.get('dailyIntelligenceSweepHourUtc')
+    const dailyIntelligenceSweepHourUtc = clampDailyIntelligenceSweepHourUtc(
+      typeof hourRaw === 'string' ? Number.parseInt(hourRaw, 10) : hourRaw
+    )
+    let wsError =
+      (
+        await supabase
+          .from('workspace')
+          .update({
+            auto_briefs_auto_approve: autoBriefsAutoApprove,
+            daily_intelligence_sweep_hour_utc: dailyIntelligenceSweepHourUtc,
+          })
+          .eq('id', workspace.id)
+      ).error ?? null
 
-    // Allow profile save to succeed in environments where this newer column
-    // has not been migrated yet.
     if (wsError) {
-      const msg = (wsError.message ?? '').toLowerCase()
-      const details = (wsError.details ?? '').toLowerCase()
-      const hint = (wsError.hint ?? '').toLowerCase()
-      const missingAutoBriefsColumn =
-        wsError.code === '42703' ||
-        wsError.code === 'PGRST204' ||
-        msg.includes('auto_briefs_auto_approve') ||
-        details.includes('auto_briefs_auto_approve') ||
-        hint.includes('auto_briefs_auto_approve')
-      if (!missingAutoBriefsColumn) throw wsError
+      const withoutSweep = await supabase
+        .from('workspace')
+        .update({ auto_briefs_auto_approve: autoBriefsAutoApprove })
+        .eq('id', workspace.id)
+      if (!withoutSweep.error) wsError = null
+      else {
+        const withoutAuto = await supabase
+          .from('workspace')
+          .update({ daily_intelligence_sweep_hour_utc: dailyIntelligenceSweepHourUtc })
+          .eq('id', workspace.id)
+        if (!withoutAuto.error) wsError = null
+        else wsError = withoutSweep.error
+      }
     }
+
+    if (wsError) throw wsError
   })
 
   revalidatePath('/settings/company-profile')

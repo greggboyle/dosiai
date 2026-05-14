@@ -44,6 +44,7 @@ export interface Workspace {
   createdAt: string
   lastActiveAt: string
   lastSweepAt?: string
+  dailyIntelligenceSweepHourUtc?: number
   reviewQueueThreshold?: number
   scoringWeights?: Record<string, number>
 }
