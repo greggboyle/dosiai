@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { formatUtcSweepHourForProfileDisplay } from '@/lib/datetime/format-utc-sweep-hour-for-profile'
 import { updateCompanyProfile } from './actions'
 import { CompanyProfileSaveToast } from './save-toast'
 import { Button } from '@/components/ui/button'
@@ -33,6 +35,9 @@ export default async function CompanyProfilePage() {
 
   if (!membership) redirect('/onboarding')
   if (membership.role !== 'admin') redirect('/settings/members')
+
+  const profileTimeZone =
+    typeof session.user.user_metadata?.timezone === 'string' ? session.user.user_metadata.timezone.trim() : ''
 
   const { data: profile } = await supabase
     .from('workspace_profile')
@@ -162,20 +167,35 @@ export default async function CompanyProfilePage() {
         </div>
 
         <div className="space-y-2 rounded-md border p-3">
-          <Label htmlFor="dailyIntelligenceSweepHourUtc">Daily intelligence run (UTC)</Label>
+          <Label htmlFor="dailyIntelligenceSweepHourUtc">Daily intelligence run</Label>
           <p className="text-xs text-muted-foreground">
-            Hour when the scheduled intelligence sweep may run (checked hourly). Default 17:00 UTC matches
-            9:00 AM Pacific Standard Time; 9:00 AM Pacific Daylight Time is 16:00 UTC.
+            {profileTimeZone ? (
+              <>
+                Each option is one UTC hour of day, labeled in {profileTimeZone.replaceAll('_', ' ')} from your{' '}
+                <Link href="/profile" className="text-primary underline-offset-4 hover:underline">
+                  profile
+                </Link>
+                . The scheduler still runs on that UTC hour.
+              </>
+            ) : (
+              <>
+                Set a timezone on your{' '}
+                <Link href="/profile" className="text-primary underline-offset-4 hover:underline">
+                  profile
+                </Link>{' '}
+                to see local-time labels; until then options show as UTC only.
+              </>
+            )}
           </p>
           <select
             id="dailyIntelligenceSweepHourUtc"
             name="dailyIntelligenceSweepHourUtc"
-            className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-xs rounded-md border px-3 py-1 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-md rounded-md border px-3 py-1 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             defaultValue={String(workspace?.daily_intelligence_sweep_hour_utc ?? 17)}
           >
             {Array.from({ length: 24 }, (_, h) => (
               <option key={h} value={String(h)}>
-                {String(h).padStart(2, '0')}:00 UTC
+                {formatUtcSweepHourForProfileDisplay(h, profileTimeZone || null)}
               </option>
             ))}
           </select>
