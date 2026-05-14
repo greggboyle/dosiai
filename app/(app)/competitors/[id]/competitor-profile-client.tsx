@@ -25,11 +25,13 @@ import {
   ArrowUpDown,
   MessageSquare,
   Briefcase,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -79,7 +81,7 @@ import {
   updateCompetitorSegments,
   updateCompetitorStrengthsWeaknesses,
 } from '@/lib/competitors/actions'
-import { requestCompetitorDossierBrief } from '@/lib/brief/actions'
+import { requestCompetitorDossierBrief, getBriefDraftGenerationStatus } from '@/lib/brief/actions'
 import { toast } from 'sonner'
 
 const tierLabels: Record<string, string> = {
@@ -259,14 +261,17 @@ export function CompetitorProfileClient({
   const pathname = usePathname()
   const router = useRouter()
   const [dossierRequesting, setDossierRequesting] = React.useState(false)
+  const [dossierGen, setDossierGen] = React.useState<
+    { phase: 'idle' } | { phase: 'polling'; briefId: string } | { phase: 'ready'; briefId: string } | { phase: 'stalled'; briefId: string }
+  >({ phase: 'idle' })
 
   const handleRequestDossier = React.useCallback(async () => {
     setDossierRequesting(true)
     try {
       const res = await requestCompetitorDossierBrief(competitor.id)
       if (res.ok) {
-        toast.success('Dossier brief started. Opening editor…')
-        router.push(`/briefs/${res.briefId}/edit`)
+        toast.success('Dossier draft started. You can keep browsing this page — we will show when it is ready.')
+        setDossierGen({ phase: 'polling', briefId: res.briefId })
       } else {
         toast.error(res.message ?? 'Could not start dossier brief.')
       }
@@ -275,7 +280,43 @@ export function CompetitorProfileClient({
     } finally {
       setDossierRequesting(false)
     }
-  }, [competitor.id, router])
+  }, [competitor.id])
+
+  const pollingBriefId = dossierGen.phase === 'polling' ? dossierGen.briefId : null
+
+  React.useEffect(() => {
+    if (!pollingBriefId) return
+    const briefId = pollingBriefId
+    let cancelled = false
+    let attempts = 0
+    const maxAttempts = 48
+
+    const poll = async () => {
+      if (cancelled) return
+      attempts += 1
+      try {
+        const s = await getBriefDraftGenerationStatus(briefId)
+        if (cancelled) return
+        if (s.ok && s.aiDrafted) {
+          setDossierGen({ phase: 'ready', briefId })
+          toast.success('Dossier brief is published. Check My Briefs or open it below.')
+          return
+        }
+        if (!s.ok || attempts >= maxAttempts) {
+          setDossierGen({ phase: 'stalled', briefId })
+        }
+      } catch {
+        if (!cancelled) setDossierGen({ phase: 'stalled', briefId })
+      }
+    }
+
+    void poll()
+    const interval = setInterval(() => void poll(), 2500)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [pollingBriefId])
 
   React.useEffect(() => {
     const saved = searchParams.get('saved')
@@ -676,6 +717,58 @@ export function CompetitorProfileClient({
 
       {/* Tab Content */}
       <div className="p-6">
+        {dossierGen.phase === 'polling' ? (
+          <Alert className="mb-6 border-primary/30 bg-primary/5">
+            <Loader2 className="animate-spin text-primary" aria-hidden />
+            <AlertTitle>Dossier brief in progress</AlertTitle>
+            <AlertDescription className="text-muted-foreground">
+              We are generating your competitor dossier brief in the background. This usually takes about a minute. You
+              can stay on this page — the status updates automatically.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {dossierGen.phase === 'ready' ? (
+          <Alert className="mb-6 border-emerald-500/30 bg-emerald-500/5">
+            <Check className="text-emerald-600 dark:text-emerald-400" aria-hidden />
+            <AlertTitle>Dossier brief ready</AlertTitle>
+            <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Your competitor dossier brief has been published. It appears in My Briefs for subscribers and is
+                available to read here.
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm">
+                  <Link href={`/briefs/${dossierGen.briefId}`}>Read brief</Link>
+                </Button>
+                <Button asChild size="sm" variant="secondary">
+                  <Link href="/my-briefs">My Briefs</Link>
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setDossierGen({ phase: 'idle' })}>
+                  Dismiss
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {dossierGen.phase === 'stalled' ? (
+          <Alert className="mb-6 border-amber-500/40 bg-amber-500/5">
+            <AlertTitle>Dossier brief status unclear</AlertTitle>
+            <AlertDescription className="flex flex-col gap-3 text-foreground sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-muted-foreground">
+                We could not confirm the draft finished from this page. Open the brief to check progress or try
+                generating again from the editor.
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="secondary">
+                  <Link href={`/briefs/${dossierGen.briefId}/edit`}>Open brief</Link>
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setDossierGen({ phase: 'idle' })}>
+                  Dismiss
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="grid grid-cols-12 gap-6">
@@ -860,7 +953,12 @@ export function CompetitorProfileClient({
             {/* Dossier (linked brief) + Leadership: stacked sidebar beside Company Summary */}
             <div className="col-span-12 md:col-span-4 flex flex-col gap-3 min-w-0">
             {/* Competitor Dossier card (linked brief) */}
-            <Card className="shrink-0">
+            <Card
+              className={cn(
+                'shrink-0',
+                dossierGen.phase === 'polling' && 'border-primary/50 ring-2 ring-primary/10'
+              )}
+            >
               <CardHeader className="py-2.5 px-4 space-y-0">
                 <CardTitle className="text-sm font-semibold">Competitor Dossier</CardTitle>
                 <CardDescription className="text-[11px] leading-snug line-clamp-1">
@@ -889,10 +987,10 @@ export function CompetitorProfileClient({
                     type="button"
                     size="sm"
                     className="w-full h-8 text-xs"
-                    disabled={dossierRequesting}
+                    disabled={dossierRequesting || dossierGen.phase === 'polling'}
                     onClick={handleRequestDossier}
                   >
-                    {dossierRequesting ? 'Starting…' : 'Request Dossier'}
+                    {dossierRequesting ? 'Starting…' : dossierGen.phase === 'polling' ? 'Drafting dossier…' : 'Request Dossier'}
                   </Button>
                 )}
               </CardContent>

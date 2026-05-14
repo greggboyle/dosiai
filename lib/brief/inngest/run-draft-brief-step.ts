@@ -188,6 +188,14 @@ export async function runBriefDraftStep(input: BriefDraftJobPayload): Promise<{ 
     } catch {
       // Brief is published; notification delivery is best-effort
     }
+    try {
+      const { revalidatePath } = await import('next/cache')
+      revalidatePath('/my-briefs')
+      revalidatePath('/briefs')
+      revalidatePath('/', 'layout')
+    } catch {
+      // revalidatePath is only available in the Next.js request context
+    }
   }
 
   return { ok: true as const, briefId }

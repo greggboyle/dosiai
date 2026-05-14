@@ -328,6 +328,8 @@ export async function requestCompetitorDossierBrief(competitorId: string): Promi
       briefId,
       workspaceId: ctx.workspaceId,
       itemIds,
+      /** Publish when drafting finishes so /my-briefs and subscriber email/notifications run. */
+      autoPublish: true,
     },
   })
 
@@ -336,6 +338,33 @@ export async function requestCompetitorDossierBrief(competitorId: string): Promi
   revalidatePath(`/competitors/${competitorId}`)
 
   return { ok: true, briefId }
+}
+
+export type BriefDraftPollResult = { ok: true; aiDrafted: boolean } | { ok: false; reason: 'not_found' | 'forbidden' }
+
+/** Poll whether AI draft has finished writing to the brief (author or workspace admin only). */
+export async function getBriefDraftGenerationStatus(briefId: string): Promise<BriefDraftPollResult> {
+  let ctx: Awaited<ReturnType<typeof requireAuthorWorkspace>>
+  try {
+    ctx = await requireAuthorWorkspace()
+  } catch {
+    return { ok: false, reason: 'forbidden' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+  const { data: row, error } = await supabase
+    .from('brief')
+    .select('workspace_id, author_id, ai_drafted')
+    .eq('id', briefId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!row) return { ok: false, reason: 'not_found' }
+  if (row.workspace_id !== ctx.workspaceId) return { ok: false, reason: 'forbidden' }
+  const isOwner = row.author_id === ctx.userId
+  if (!isOwner && ctx.role !== 'admin') return { ok: false, reason: 'forbidden' }
+
+  return { ok: true, aiDrafted: row.ai_drafted }
 }
 
 export async function archiveBrief(briefId: string): Promise<void> {
