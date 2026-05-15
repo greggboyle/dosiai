@@ -63,7 +63,7 @@ type NavItemConfig = {
 const coreNavItems: NavItemConfig[] = [
   { label: 'Home', href: '/', icon: LayoutDashboard },
   {
-    label: 'My Market Briefs',
+    label: 'Briefs',
     href: '/my-briefs',
     icon: Sparkles,
     badge: (c) => (c.myMarketBriefsUnread > 0 ? c.myMarketBriefsUnread : undefined),

@@ -26,6 +26,17 @@ export type AuditCategory =
   | 'ai_routing'
 export type ImpersonationMode = 'read_only' | 'write'
 
+/** Per-user state on /my-briefs and notifications (stored in `brief_user_state`). */
+export type BriefReadStatus = 'unread' | 'read' | 'saved' | 'dismissed'
+
+export interface BriefUserState {
+  briefId: string
+  userId: string
+  status: BriefReadStatus
+  readAt?: string
+  updatedAt: string
+}
+
 export interface Workspace {
   id: string
   name: string

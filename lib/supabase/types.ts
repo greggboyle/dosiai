@@ -715,6 +715,7 @@ export interface Database {
           published_at: string | null
           created_at: string
           updated_at: string
+          cached_scope_label: string | null
         }
         Insert: {
           id?: string
@@ -742,6 +743,7 @@ export interface Database {
           published_at?: string | null
           created_at?: string
           updated_at?: string
+          cached_scope_label?: string | null
         }
         Update: Partial<Database['public']['Tables']['brief']['Insert']>
       }
@@ -777,18 +779,22 @@ export interface Database {
           updated_at: string
         }>
       }
-      brief_user_read: {
+      brief_user_state: {
         Row: {
-          user_id: string
           brief_id: string
-          read_at: string
+          user_id: string
+          status: string
+          read_at: string | null
+          updated_at: string
         }
         Insert: {
-          user_id: string
           brief_id: string
-          read_at?: string
+          user_id: string
+          status?: string
+          read_at?: string | null
+          updated_at?: string
         }
-        Update: Partial<Database['public']['Tables']['brief_user_read']['Insert']>
+        Update: Partial<Database['public']['Tables']['brief_user_state']['Insert']>
       }
       user_notification: {
         Row: {

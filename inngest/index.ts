@@ -18,6 +18,7 @@ import { runSweep } from '@/inngest/sweeps/run-sweep'
 import { runHiringSweep } from '@/inngest/sweeps/run-hiring-sweep'
 import { scheduleSweeps } from '@/inngest/sweeps/schedule-sweeps'
 import { scheduleHiringSweeps } from '@/inngest/sweeps/schedule-hiring-sweeps'
+import { backfillBriefSummaryBatch } from '@/inngest/functions/backfill-brief-summary'
 
 export const functions = [
   learnFromOutcome,
@@ -38,4 +39,5 @@ export const functions = [
   runHiringSweep,
   scheduleSweeps,
   scheduleHiringSweeps,
+  backfillBriefSummaryBatch,
 ]

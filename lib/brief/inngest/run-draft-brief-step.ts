@@ -182,6 +182,10 @@ export async function runBriefDraftStep(input: BriefDraftJobPayload): Promise<{ 
 
   if (upErr) throw upErr
 
+  void import('@/lib/brief/recompute-scope').then(({ recomputeBriefScopeAfterWriteAdmin }) =>
+    recomputeBriefScopeAfterWriteAdmin(briefId)
+  )
+
   if (autoPublish) {
     try {
       await notifyBriefSubscribersOfPublish(briefId)

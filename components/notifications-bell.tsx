@@ -152,7 +152,7 @@ export function NotificationsBell({ userId, initialUnread, initialRecent }: Noti
         <div className="border-t px-3 py-2">
           <Button variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
             <Link href="/my-briefs" onClick={() => setOpen(false)}>
-              View My Market Briefs
+              View briefs
             </Link>
           </Button>
         </div>

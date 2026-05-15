@@ -124,6 +124,10 @@ export async function saveBrief(input: {
 
   if (error) throw error
 
+  void import('@/lib/brief/recompute-scope').then(({ recomputeBriefScopeAfterWrite }) =>
+    recomputeBriefScopeAfterWrite(input.briefId)
+  )
+
   const { data: afterSave } = await supabase
     .from('brief')
     .select('brief_kind, status')
@@ -174,6 +178,10 @@ export async function publishBrief(briefId: string): Promise<void> {
     .eq('id', briefId)
 
   if (error) throw error
+
+  void import('@/lib/brief/recompute-scope').then(({ recomputeBriefScopeAfterWrite }) =>
+    recomputeBriefScopeAfterWrite(briefId)
+  )
 
   try {
     await notifyBriefSubscribersOfPublish(briefId)

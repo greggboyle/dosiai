@@ -54,6 +54,10 @@
   --chart-4: oklch(0.65 0.22 30);
   --chart-5: oklch(0.6 0.15 260);
   --radius: 0.5rem;
+
+  /* My Briefs card surfaces (executive list) */
+  --brief-card-read: oklch(0.98 0 0);
+  --brief-card-unread: oklch(0.965 0.01 75);
   
   /* Sidebar - slightly off-white with shadow */
   --sidebar: oklch(0.98 0 0);
@@ -110,6 +114,9 @@
   --chart-3: oklch(0.45 0.02 240);
   --chart-4: oklch(0.6 0.22 30);
   --chart-5: oklch(0.55 0.15 260);
+
+  --brief-card-read: oklch(0.18 0 0);
+  --brief-card-unread: oklch(0.2 0.01 75);
 
   /* Sidebar - slightly lighter than background */
   --sidebar: oklch(0.15 0 0);

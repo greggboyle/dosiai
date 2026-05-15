@@ -1,5 +1,10 @@
 // Shared types for DOSI.AI platform
 
+export type {
+  BriefReadStatus,
+  BriefUserState,
+} from '@/lib/types/dosi'
+
 export type Category = 'buy-side' | 'sell-side' | 'channel' | 'regulatory'
 
 export interface MISScore {

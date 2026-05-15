@@ -15,7 +15,7 @@ export type SidebarNavBadgeCounts = {
   feedReviewQueue: number
   /** Non-archived briefs in the workspace (archived are hidden from the count). */
   briefCount: number
-  /** Published My Market briefs the user has not marked read (0 when userId omitted). */
+  /** Published briefs the user has not marked read (0 when userId omitted). */
   myMarketBriefsUnread: number
 }
 

@@ -1,9 +1,13 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { loadBriefSubscriptions, loadMyMarketBriefs } from '@/lib/brief/my-market-queries'
-import { MyMarketBriefsClient } from './my-market-client'
+import { loadMyBriefsPageData, type MyBriefsSearchParams } from '@/lib/brief/my-market-queries'
+import { MyBriefsClient } from './my-market-client'
 
-export default async function MyMarketBriefsPage() {
+export default async function MyMarketBriefsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const supabase = await createSupabaseServerClient()
   const {
     data: { user },
@@ -22,15 +26,29 @@ export default async function MyMarketBriefsPage() {
 
   if (!member) redirect('/onboarding')
 
+  const raw = await searchParams
+  const pick = (k: string): string | undefined => {
+    const v = raw[k]
+    return Array.isArray(v) ? v[0] : v
+  }
+
+  const sp: MyBriefsSearchParams = {
+    view: pick('view'),
+    q: pick('q'),
+    types: pick('types'),
+    audience: pick('audience'),
+    status: pick('status'),
+    from: pick('from'),
+    roffset: pick('roffset'),
+    coffset: pick('coffset'),
+  }
+
   const authorSelfLabel =
     (user.user_metadata?.full_name as string | undefined) ??
     user.email?.split('@')[0] ??
     'You'
 
-  const [rows, subscriptions] = await Promise.all([
-    loadMyMarketBriefs(member.workspace_id, user.id, authorSelfLabel),
-    loadBriefSubscriptions(member.workspace_id, user.id),
-  ])
+  const data = await loadMyBriefsPageData(member.workspace_id, user.id, authorSelfLabel, sp)
 
-  return <MyMarketBriefsClient rows={rows} subscriptions={subscriptions} />
+  return <MyBriefsClient data={data} />
 }
