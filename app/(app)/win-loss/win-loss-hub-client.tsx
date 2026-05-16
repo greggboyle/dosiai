@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ListCard } from '@/components/list-view/list-card'
+import type { ListCardData } from '@/lib/types/dosi'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { CompetitorWinLossAgg, ReasonTagAgg, WinLossRow } from '@/lib/win-loss/queries'
 
@@ -22,6 +23,38 @@ function rate(won: number, lost: number): string {
   const d = won + lost
   if (!d) return '—'
   return `${Math.round((won / d) * 100)}%`
+}
+
+function outcomeToListCard(o: WinLossRow & { competitorName?: string }): ListCardData<WinLossRow & { competitorName?: string }> {
+  const primaryBadge =
+    o.outcome === 'won'
+      ? { label: 'Won', variant: 'success' as const }
+      : o.outcome === 'lost'
+        ? { label: 'Lost', variant: 'warning' as const }
+        : o.outcome === 'no_decision'
+          ? { label: 'No decision', variant: 'neutral' as const }
+          : { label: 'Disqualified', variant: 'neutral' as const }
+
+  return {
+    recordId: o.id,
+    recordType: 'win_loss',
+    title: `${o.deal_name} — ${o.outcome.replace(/_/g, ' ')}`,
+    preview: o.reason_summary,
+    primaryBadge,
+    scoreIndicator:
+      o.deal_size_cents != null
+        ? { value: Math.round(o.deal_size_cents / 100), label: 'ACV' }
+        : undefined,
+    metadata: {
+      relatedEntities: o.competitorName
+        ? [{ label: o.competitorName, type: 'competitor' as const }]
+        : [],
+      sourceLabel: o.source === 'crm_sync' ? 'CRM sync' : 'Manual',
+    },
+    timestamp: o.close_date,
+    userState: 'read',
+    raw: o,
+  }
 }
 
 export function WinLossHubClient({ canAnalyst, outcomes, byCompetitor, byReason }: Props) {
@@ -76,35 +109,15 @@ export function WinLossHubClient({ canAnalyst, outcomes, byCompetitor, byReason 
           ) : outcomes.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8">No outcomes yet — log your first deal.</p>
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Deal</TableHead>
-                    <TableHead>Outcome</TableHead>
-                    <TableHead>Competitor</TableHead>
-                    <TableHead>Close</TableHead>
-                    <TableHead>Summary</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {outcomes.map((o) => (
-                    <TableRow key={o.id}>
-                      <TableCell className="font-medium max-w-[180px] truncate">{o.deal_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[10px]">
-                          {o.outcome}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{o.competitorName}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{o.close_date}</TableCell>
-                      <TableCell className="max-w-[280px] truncate text-xs text-muted-foreground">
-                        {o.reason_summary}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-3">
+              {outcomes.map((o) => (
+                <ListCard
+                  key={o.id}
+                  data={outcomeToListCard(o)}
+                  href="/win-loss/log"
+                  density="comfortable"
+                />
+              ))}
             </div>
           )}
         </TabsContent>

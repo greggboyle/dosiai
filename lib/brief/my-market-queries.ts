@@ -123,13 +123,15 @@ export async function countMyMarketUnread(workspaceId: string, userId: string): 
   if (briefIds.length === 0) return 0
 
   const { data: states, error: stErr } = await supabase
-    .from('brief_user_state')
-    .select('brief_id, status')
+    .from('user_record_state')
+    .select('record_id, status')
+    .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
-    .in('brief_id', briefIds)
+    .eq('record_type', 'brief')
+    .in('record_id', briefIds)
 
   if (stErr) throw stErr
-  const stateMap = new Map((states ?? []).map((s) => [s.brief_id, s.status]))
+  const stateMap = new Map((states ?? []).map((s) => [s.record_id, s.status]))
 
   return briefIds.filter((id) => {
     const st = stateMap.get(id)
@@ -279,13 +281,15 @@ export async function loadMyBriefsPageData(
 
   const ids = rows.map((r) => r.id)
   const { data: states, error: sErr } = await supabase
-    .from('brief_user_state')
-    .select('brief_id, status, read_at')
+    .from('user_record_state')
+    .select('record_id, status, read_at')
+    .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
-    .in('brief_id', ids)
+    .eq('record_type', 'brief')
+    .in('record_id', ids)
 
   if (sErr) throw sErr
-  const stateMap = new Map((states ?? []).map((s) => [s.brief_id, { status: s.status, read_at: s.read_at }]))
+  const stateMap = new Map((states ?? []).map((s) => [s.record_id, { status: s.status, read_at: s.read_at }]))
 
   let cards: BriefCardData[] = rows.map((r) => rowToCardData(r, userId, stateMap, authorSelfLabel))
 

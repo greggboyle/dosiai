@@ -27,6 +27,32 @@ export async function markIntelligenceItemReviewed(itemId: string): Promise<void
   revalidatePath('/')
 }
 
+/** Batch mark feed items read for the current user (item_user_state). */
+export async function bulkMarkIntelItemsRead(itemIds: string[]): Promise<void> {
+  if (itemIds.length === 0) return
+  const workspaceId = await getWorkspaceIdForUser()
+  if (!workspaceId) throw new Error('Unauthorized')
+
+  await withWorkspace(workspaceId, ['admin', 'analyst', 'viewer'], async ({ user }) => {
+    const supabase = await createSupabaseServerClient()
+    const now = new Date().toISOString()
+    const rows = itemIds.map((item_id) => ({
+      item_id,
+      user_id: user.id,
+      status: 'read' as const,
+      is_watching: false,
+      updated_at: now,
+    }))
+    const { error } = await supabase.from('item_user_state').upsert(rows, {
+      onConflict: 'item_id,user_id',
+    })
+    if (error) throw error
+  })
+
+  revalidatePath('/intel')
+  revalidatePath('/')
+}
+
 export async function attachCompetitorToIntelligenceItem(
   itemId: string,
   competitorId: string
@@ -90,6 +116,34 @@ export async function detachCompetitorFromIntelligenceItem(
       .update({ related_competitors: next })
       .eq('id', itemId)
       .eq('workspace_id', workspaceId)
+    if (error) throw error
+  })
+
+  revalidatePath('/intel')
+  revalidatePath('/')
+}
+
+export async function setIntelligenceItemBookmarked(
+  itemId: string,
+  bookmarked: boolean
+): Promise<void> {
+  const workspaceId = await getWorkspaceIdForUser()
+  if (!workspaceId) throw new Error('Unauthorized')
+  if (!itemId) throw new Error('Missing item id')
+
+  await withWorkspace(workspaceId, ['admin', 'analyst', 'viewer'], async ({ user }) => {
+    const supabase = await createSupabaseServerClient()
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('item_user_state').upsert(
+      {
+        item_id: itemId,
+        user_id: user.id,
+        status: bookmarked ? 'bookmarked' : 'read',
+        is_watching: false,
+        updated_at: now,
+      },
+      { onConflict: 'item_id,user_id' }
+    )
     if (error) throw error
   })
 

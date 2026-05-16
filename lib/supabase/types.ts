@@ -796,6 +796,31 @@ export interface Database {
         }
         Update: Partial<Database['public']['Tables']['brief_user_state']['Insert']>
       }
+      user_record_state: {
+        Row: {
+          workspace_id: string
+          record_type: string
+          record_id: string
+          user_id: string
+          status: string
+          read_at: string | null
+          saved_at: string | null
+          dismissed_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          workspace_id: string
+          record_type: string
+          record_id: string
+          user_id: string
+          status?: string
+          read_at?: string | null
+          saved_at?: string | null
+          dismissed_at?: string | null
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['user_record_state']['Insert']>
+      }
       user_notification: {
         Row: {
           id: string

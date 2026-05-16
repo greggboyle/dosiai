@@ -20,9 +20,20 @@ interface FeedListProps {
   selectedId?: string
   onSelect: (item: IntelligenceItem) => void
   onToggleWatching?: (item: IntelligenceItem) => void | Promise<void>
+  bulkSelectMode?: boolean
+  bulkSelectedIds?: string[]
+  onToggleBulkSelect?: (itemId: string) => void
 }
 
-export function FeedList({ items, selectedId, onSelect, onToggleWatching }: FeedListProps) {
+export function FeedList({
+  items,
+  selectedId,
+  onSelect,
+  onToggleWatching,
+  bulkSelectMode,
+  bulkSelectedIds,
+  onToggleBulkSelect,
+}: FeedListProps) {
   if (items.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -49,6 +60,9 @@ export function FeedList({ items, selectedId, onSelect, onToggleWatching }: Feed
             isSelected={selectedId === item.id}
             onSelect={() => onSelect(item)}
             onToggleWatching={() => onToggleWatching?.(item)}
+            bulkSelectMode={bulkSelectMode}
+            bulkSelected={bulkSelectedIds?.includes(item.id)}
+            onToggleBulkSelect={onToggleBulkSelect}
           />
         ))}
       </div>
@@ -61,9 +75,20 @@ interface FeedListItemProps {
   isSelected: boolean
   onSelect: () => void
   onToggleWatching: () => void | Promise<void>
+  bulkSelectMode?: boolean
+  bulkSelected?: boolean
+  onToggleBulkSelect?: (itemId: string) => void
 }
 
-function FeedListItem({ item, isSelected, onSelect, onToggleWatching }: FeedListItemProps) {
+function FeedListItem({
+  item,
+  isSelected,
+  onSelect,
+  onToggleWatching,
+  bulkSelectMode,
+  bulkSelected,
+  onToggleBulkSelect,
+}: FeedListItemProps) {
   const [isHovered, setIsHovered] = React.useState(false)
   const categoryInfo = getCategoryInfo(item.category)
 
@@ -82,12 +107,26 @@ function FeedListItem({ item, isSelected, onSelect, onToggleWatching }: FeedList
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
         'relative w-full cursor-pointer px-4 py-3 text-left transition-colors sm:px-6 sm:py-4',
-        isSelected
-          ? 'bg-accent/10'
-          : 'hover:bg-muted/50',
+        bulkSelectMode && 'pl-11',
+        isSelected ? 'bg-accent/10' : 'hover:bg-muted/50',
         !item.isRead && 'bg-accent/5'
       )}
     >
+      {bulkSelectMode ? (
+        <button
+          type="button"
+          className={cn(
+            'absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 rounded border border-border',
+            bulkSelected && 'border-accent bg-accent'
+          )}
+          aria-pressed={bulkSelected}
+          aria-label={bulkSelected ? 'Deselect item' : 'Select item'}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleBulkSelect?.(item.id)
+          }}
+        />
+      ) : null}
       {/* Unread indicator */}
       {!item.isRead && (
         <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-accent" />

@@ -1,4 +1,13 @@
-import type { AuditLogEntry, OperatorUser, Workspace, WorkspaceInvite, WorkspaceMember, WorkspaceOverride } from '@/lib/types/dosi'
+import type {
+  AuditLogEntry,
+  OperatorUser,
+  UserRecordState,
+  UserRecordType,
+  Workspace,
+  WorkspaceInvite,
+  WorkspaceMember,
+  WorkspaceOverride,
+} from '@/lib/types/dosi'
 import type { Database } from '@/lib/supabase/types'
 
 export function workspaceFromDb(row: Database['public']['Tables']['workspace']['Row']): Workspace {
@@ -216,5 +225,37 @@ export function auditLogEntryToDb(
     after_value: entry.afterValue ?? null,
     ip_address: entry.ipAddress ?? null,
     session_id: entry.sessionId ?? null,
+  }
+}
+
+export function userRecordStateFromDb(
+  row: Database['public']['Tables']['user_record_state']['Row']
+): UserRecordState {
+  return {
+    workspaceId: row.workspace_id,
+    recordType: row.record_type as UserRecordType,
+    recordId: row.record_id,
+    userId: row.user_id,
+    status: row.status as UserRecordState['status'],
+    readAt: row.read_at ?? undefined,
+    savedAt: row.saved_at ?? undefined,
+    dismissedAt: row.dismissed_at ?? undefined,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function userRecordStateToDb(
+  row: Partial<UserRecordState>
+): Partial<Database['public']['Tables']['user_record_state']['Insert']> {
+  return {
+    workspace_id: row.workspaceId,
+    record_type: row.recordType,
+    record_id: row.recordId,
+    user_id: row.userId,
+    status: row.status,
+    read_at: row.readAt ?? null,
+    saved_at: row.savedAt ?? null,
+    dismissed_at: row.dismissedAt ?? null,
+    updated_at: row.updatedAt,
   }
 }

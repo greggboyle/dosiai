@@ -50,5 +50,5 @@ export default async function MyMarketBriefsPage({
 
   const data = await loadMyBriefsPageData(member.workspace_id, user.id, authorSelfLabel, sp)
 
-  return <MyBriefsClient data={data} />
+  return <MyBriefsClient data={data} userId={user.id} />
 }

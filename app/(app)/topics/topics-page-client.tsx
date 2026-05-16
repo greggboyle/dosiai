@@ -52,6 +52,9 @@ import { canMutate, mutationBlockedReason } from '@/lib/auth/permissions'
 import type { Topic, TopicImportance } from '@/lib/types'
 import { createTopic, updateTopic, archiveTopic } from '@/lib/topics/actions'
 import { toast } from 'sonner'
+import { ListViewLayout } from '@/components/list-view/list-view-layout'
+import { ListControlBar } from '@/components/list-view/list-control-bar'
+import { ListEmptyState } from '@/components/list-view/list-empty-state'
 import {
   LineChart,
   Line,
@@ -486,6 +489,7 @@ function TopicCard({
 
 export function TopicsPageClient({ initialTopics }: { initialTopics: Topic[] }) {
   const [topics, setTopics] = React.useState(initialTopics)
+  const [searchQuery, setSearchQuery] = React.useState('')
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   const [editingTopic, setEditingTopic] = React.useState<Topic | undefined>()
   const [archivingTopicId, setArchivingTopicId] = React.useState<string | null>(null)
@@ -496,6 +500,12 @@ export function TopicsPageClient({ initialTopics }: { initialTopics: Topic[] }) 
   React.useEffect(() => {
     setTopics(initialTopics)
   }, [initialTopics])
+
+  const filteredTopics = topics.filter(
+    (t) =>
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.description.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   const handleCreate = () => {
     setEditingTopic(undefined)
@@ -556,41 +566,45 @@ export function TopicsPageClient({ initialTopics }: { initialTopics: Topic[] }) 
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Topics</h1>
-          <p className="text-sm text-muted-foreground">
-            Track specific themes and trends across your competitive landscape
-          </p>
-        </div>
-        <MutationGuard canMutate={canAddTopic} reason={mutationBlockedReason({ status: workspace.status })}>
-          <Button onClick={handleCreate}>
-            <Plus className="size-4 mr-2" />
-            Create Topic
-          </Button>
-        </MutationGuard>
-      </div>
-
-      {topics.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16">
-          <div className="size-16 rounded-full bg-muted flex items-center justify-center mb-4">
-            <Hash className="size-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-sm font-medium">No topics configured</h3>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm text-center">
-            Create topics to track specific themes, technologies, or trends across all competitor activity.
-          </p>
+    <>
+      <ListViewLayout
+        className="mx-auto max-w-6xl px-4 py-6 md:px-6"
+        title="Topics"
+        subtitle="Track specific themes and trends across your competitive landscape"
+        layout="grid"
+        headerActions={
           <MutationGuard canMutate={canAddTopic} reason={mutationBlockedReason({ status: workspace.status })}>
-            <Button className="mt-4" onClick={handleCreate}>
+            <Button onClick={handleCreate}>
               <Plus className="size-4 mr-2" />
-              Create your first topic
+              Create Topic
             </Button>
           </MutationGuard>
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {topics.map((topic) => (
+        }
+        controlBar={
+          topics.length > 0 ? (
+            <ListControlBar>
+              <Input
+                placeholder="Search topics…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full max-w-sm"
+                aria-label="Search topics"
+              />
+            </ListControlBar>
+          ) : null
+        }
+      >
+        {topics.length === 0 ? (
+          <ListEmptyState
+            className="col-span-full"
+            variant="no_records"
+            recordLabel="topics"
+            description="Create topics to track specific themes, technologies, or trends across all competitor activity."
+          />
+        ) : filteredTopics.length === 0 ? (
+          <ListEmptyState className="col-span-full" variant="filtered_empty" recordLabel="topics" />
+        ) : (
+          filteredTopics.map((topic) => (
             <TopicCard
               key={topic.id}
               topic={topic}
@@ -600,9 +614,9 @@ export function TopicsPageClient({ initialTopics }: { initialTopics: Topic[] }) 
                 void handleArchive(topic.id)
               }}
             />
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </ListViewLayout>
 
       <TopicFormModal
         open={isModalOpen}
@@ -610,6 +624,6 @@ export function TopicsPageClient({ initialTopics }: { initialTopics: Topic[] }) 
         topic={editingTopic}
         onSave={handleSave}
       />
-    </div>
+    </>
   )
 }

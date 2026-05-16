@@ -29,12 +29,98 @@ export type ImpersonationMode = 'read_only' | 'write'
 /** Per-user state on /my-briefs and notifications (stored in `brief_user_state`). */
 export type BriefReadStatus = 'unread' | 'read' | 'saved' | 'dismissed'
 
+/** Universal read-state for list surfaces (stored in `user_record_state`). */
+export type RecordReadStatus = BriefReadStatus
+
+export type UserRecordType =
+  | 'brief'
+  | 'intelligence_item'
+  | 'competitor'
+  | 'topic'
+  | 'win_loss'
+  | 'customer_voice'
+  | 'channel'
+  | 'battle_card'
+
+export interface UserRecordState {
+  workspaceId: string
+  recordType: UserRecordType
+  recordId: string
+  userId: string
+  status: RecordReadStatus
+  readAt?: string
+  savedAt?: string
+  dismissedAt?: string
+  updatedAt: string
+}
+
 export interface BriefUserState {
   briefId: string
   userId: string
   status: BriefReadStatus
   readAt?: string
   updatedAt: string
+}
+
+export type MisBand = 'noise' | 'low' | 'medium' | 'high' | 'critical'
+
+export type ListCardBadgeVariant =
+  | 'neutral'
+  | 'buy_side'
+  | 'sell_side'
+  | 'channel'
+  | 'regulatory'
+  | 'critical'
+  | 'success'
+  | 'warning'
+
+export interface ListCardBadge {
+  label: string
+  variant: ListCardBadgeVariant
+}
+
+export type ListCardConfidence = 'low' | 'medium' | 'high'
+
+export interface ListCardScore {
+  value: number
+  band?: MisBand
+  label?: string
+}
+
+export interface ListCardMetadataAttribution {
+  type: 'ai_drafted' | 'human_authored' | 'ai_drafted_human_reviewed' | 'system'
+  authorName?: string
+  authorAvatarUrl?: string
+}
+
+export interface ListCardRelatedEntity {
+  label: string
+  type: 'competitor' | 'topic' | 'segment' | 'audience' | 'channel'
+  href?: string
+}
+
+export interface ListCardMetadata {
+  attribution?: ListCardMetadataAttribution
+  relatedEntities?: ListCardRelatedEntity[]
+  sourceLabel?: string
+}
+
+/** Canonical shape for shared list cards; specialization via metadata and slots. */
+export interface ListCardData<T = unknown> {
+  recordId: string
+  recordType: UserRecordType
+  title: string
+  preview?: string
+  primaryBadge?: ListCardBadge
+  secondaryBadges?: ListCardBadge[]
+  scoreIndicator?: ListCardScore
+  confidenceIndicator?: ListCardConfidence
+  priority?: 'critical' | 'high' | 'medium' | null
+  metadata: ListCardMetadata
+  scopeLabel?: string
+  timestamp: string
+  userState: RecordReadStatus
+  raw: T
 }
 
 export interface Workspace {
@@ -91,8 +177,6 @@ export interface AiRoutingRuleRow {
   isPrimary: boolean
   isEnabled: boolean
 }
-
-export type MisBand = 'noise' | 'low' | 'medium' | 'high' | 'critical'
 
 export interface MisScore {
   value: number

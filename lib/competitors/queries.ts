@@ -12,6 +12,7 @@ export type CompetitorTableRow = {
   overallMIS: MISScore
   recentActivity: number
   lastActivityLabel: string
+  lastActivityAt?: string
 }
 
 function normalizeBand(b: string): MISScore['band'] {
@@ -94,6 +95,7 @@ export async function listCompetitorsForWorkspace(workspaceId: string): Promise<
       overallMIS,
       recentActivity: count7d.get(r.id) ?? 0,
       lastActivityLabel: lastIso ? formatRelativeLabel(lastIso) : '—',
+      lastActivityAt: lastIso,
     }
   })
 }

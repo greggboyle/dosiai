@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { MISBadge } from '@/components/mis-badge'
+import { ListCard } from '@/components/list-view/list-card'
+import { intelligenceItemToListCardData } from '@/lib/intel/intel-list-card-map'
 import { cn } from '@/lib/utils'
 import type { IntelligenceItem, ReviewPlatform, Sentiment } from '@/lib/types'
 import type { SubjectSummary } from '@/lib/customer-voice/queries'
@@ -205,34 +207,23 @@ export function CustomerVoiceClient(props: { items: IntelligenceItem[]; subjects
             <CardTitle className="text-base">Items</CardTitle>
           </CardHeader>
           <ScrollArea className="flex-1 min-h-[320px] border-t">
-            <div className="p-2 space-y-1">
+            <div className="p-2 space-y-2">
               {filtered.map((i) => {
-                const r = i.reviewMetadata
                 const active = i.id === selectedId
+                const data = intelligenceItemToListCardData(i)
                 return (
-                  <button
+                  <div
                     key={i.id}
-                    type="button"
-                    onClick={() => setSelectedId(i.id)}
-                    className={cn(
-                      'w-full text-left rounded-md px-2 py-2 text-sm transition-colors',
-                      active ? 'bg-accent' : 'hover:bg-muted/60'
-                    )}
+                    className={cn('rounded-lg', active && 'ring-2 ring-accent ring-offset-2 ring-offset-background')}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-medium line-clamp-2">{r?.subjectName ?? i.title}</span>
-                      <MISBadge score={i.mis} size="sm" showConfidence={false} className="shrink-0 scale-90" />
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-1">
-                      {r?.platform ? <span className="capitalize">{r.platform.replace('-', ' ')}</span> : null}
-                      {r?.sentiment ? (
-                        <Badge variant="outline" className="text-[10px] h-5">
-                          {r.sentiment}
-                        </Badge>
-                      ) : null}
-                      <span>· {formatDate(i.timestamp)}</span>
-                    </div>
-                  </button>
+                    <ListCard
+                      data={data}
+                      href="/customer-voice"
+                      misScore={i.mis}
+                      density="compact"
+                      onNavigate={() => setSelectedId(i.id)}
+                    />
+                  </div>
                 )
               })}
             </div>

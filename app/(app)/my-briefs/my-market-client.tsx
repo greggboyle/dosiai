@@ -6,27 +6,33 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Check,
   ChevronDown,
-  Filter,
   LayoutGrid,
   ListOrdered,
   Rows3,
   Settings2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import type { MyBriefsPagePayload } from '@/lib/brief/my-briefs-types'
 import type { Brief, BriefKind } from '@/lib/types'
 import { BRIEF_KIND_LABELS } from '@/lib/brief/brief-kind'
-import type { MyBriefsViewMode } from '@/lib/brief/my-briefs-types'
 import { MyBriefCard } from '@/components/feature/brief/my-brief-card'
 import { updateBriefSubscription } from '@/lib/brief/my-market-actions'
 import { toast } from 'sonner'
+import { ListViewLayout } from '@/components/list-view/list-view-layout'
+import { ListViewSection } from '@/components/list-view/list-view-section'
+import { ListControlBar } from '@/components/list-view/list-control-bar'
+import { ListSearch } from '@/components/list-view/list-search'
+import { ListViewToggle } from '@/components/list-view/list-view-toggle'
+import { ListClearFilters } from '@/components/list-view/list-clear-filters'
+import { ListFilters } from '@/components/list-view/list-filters'
+import { ListEmptyState } from '@/components/list-view/list-empty-state'
+import { mergeListViewHref } from '@/lib/utils/list-view-url'
+import { useUserRecordStateBroadcast } from '@/lib/realtime/user-record-state'
 
 const SUBSCRIPTION_ORDER: BriefKind[] = [
   'manual',
@@ -53,44 +59,17 @@ const AUDIENCE_OPTIONS: { id: Brief['audience']; label: string }[] = [
   { id: 'general', label: 'General' },
 ]
 
-function mergeHref(pathname: string, current: URLSearchParams, patch: Record<string, string | null | undefined>) {
-  const next = new URLSearchParams(current.toString())
-  for (const [k, v] of Object.entries(patch)) {
-    if (v == null || v === '') next.delete(k)
-    else next.set(k, v)
-  }
-  const s = next.toString()
-  return s ? `${pathname}?${s}` : pathname
-}
-
-function useDebouncedValue<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = React.useState(value)
-  React.useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay)
-    return () => clearTimeout(t)
-  }, [value, delay])
-  return debounced
-}
-
-export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
+export function MyBriefsClient({ data, userId }: { data: MyBriefsPagePayload; userId: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [qInput, setQInput] = React.useState(data.searchQuery)
-  const debouncedQ = useDebouncedValue(qInput, 300)
   const [prefsOpen, setPrefsOpen] = React.useState(false)
   const [pendingKind, setPendingKind] = React.useState<BriefKind | null>(null)
 
-  React.useEffect(() => {
-    setQInput(data.searchQuery)
-  }, [data.searchQuery])
-
-  React.useEffect(() => {
-    const next = debouncedQ.trim()
-    const cur = (searchParams.get('q') ?? '').trim()
-    if (next === cur) return
-    router.replace(mergeHref(pathname, searchParams, { q: next || null }))
-  }, [debouncedQ, pathname, router, searchParams])
+  const onRecordStateEvent = React.useCallback(() => {
+    router.refresh()
+  }, [router])
+  useUserRecordStateBroadcast(userId, onRecordStateEvent)
 
   const subMap = React.useMemo(() => {
     const m = new Map<BriefKind, boolean>()
@@ -99,16 +78,6 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
   }, [data.subscriptions])
 
   const enabledSubCount = SUBSCRIPTION_ORDER.filter((k) => subMap.get(k)).length
-
-  const setView = (view: MyBriefsViewMode) => {
-    router.push(
-      mergeHref(pathname, searchParams, {
-        view: view === 'importance' ? null : view,
-        roffset: null,
-        coffset: null,
-      })
-    )
-  }
 
   const togglePref = async (kind: BriefKind, next: boolean) => {
     setPendingKind(kind)
@@ -133,7 +102,7 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
     if (checked) next.add(id)
     else next.delete(id)
     router.push(
-      mergeHref(pathname, searchParams, {
+      mergeListViewHref(pathname, searchParams, {
         types: next.size ? [...next].join(',') : null,
       })
     )
@@ -144,18 +113,18 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
     if (checked) next.add(id)
     else next.delete(id)
     router.push(
-      mergeHref(pathname, searchParams, {
+      mergeListViewHref(pathname, searchParams, {
         audience: next.size ? [...next].join(',') : null,
       })
     )
   }
 
   const setStatusFilter = (status: string) => {
-    router.push(mergeHref(pathname, searchParams, { status: status === 'all' ? null : status }))
+    router.push(mergeListViewHref(pathname, searchParams, { status: status === 'all' ? null : status }))
   }
 
   const setFromFilter = (from: string) => {
-    router.push(mergeHref(pathname, searchParams, { from: from === 'all' ? null : from }))
+    router.push(mergeListViewHref(pathname, searchParams, { from: from === 'all' ? null : from }))
   }
 
   const clearFilters = () => {
@@ -170,57 +139,37 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
     <MyBriefCard key={c.brief.id} data={c} regulatoryTint={c.brief.briefKind === 'regulatory_summary'} />
   )
 
+  const subtitle = (
+    <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+      {data.unreadCount === 0 ? (
+        <>
+          <Check className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+          <span>All caught up · {data.totalCount} total{sweepSuffix}</span>
+        </>
+      ) : (
+        <span>
+          {data.unreadCount} unread · {data.totalCount} total{sweepSuffix}
+        </span>
+      )}
+    </p>
+  )
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 md:px-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Briefs</h1>
-          <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-            {data.unreadCount === 0 ? (
-              <>
-                <Check className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                <span>All caught up · {data.totalCount} total{sweepSuffix}</span>
-              </>
-            ) : (
-              <span>
-                {data.unreadCount} unread · {data.totalCount} total{sweepSuffix}
-              </span>
-            )}
-          </p>
-        </div>
+    <ListViewLayout
+      className="mx-auto max-w-4xl px-4 py-6 md:px-6"
+      title="Briefs"
+      subtitle={subtitle}
+      headerActions={
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-md border p-0.5">
-            <Button
-              type="button"
-              variant={data.view === 'importance' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-8 gap-1"
-              onClick={() => setView('importance')}
-            >
-              <LayoutGrid className="size-3.5" />
-              Importance
-            </Button>
-            <Button
-              type="button"
-              variant={data.view === 'type' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-8 gap-1"
-              onClick={() => setView('type')}
-            >
-              <Rows3 className="size-3.5" />
-              By type
-            </Button>
-            <Button
-              type="button"
-              variant={data.view === 'chronological' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-8 gap-1"
-              onClick={() => setView('chronological')}
-            >
-              <ListOrdered className="size-3.5" />
-              Chronological
-            </Button>
-          </div>
+          <ListViewToggle
+            defaultId="importance"
+            clearParams={['roffset', 'coffset']}
+            options={[
+              { id: 'importance', label: 'Importance', icon: <LayoutGrid className="size-3.5" /> },
+              { id: 'type', label: 'By type', icon: <Rows3 className="size-3.5" /> },
+              { id: 'chronological', label: 'Chronological', icon: <ListOrdered className="size-3.5" /> },
+            ]}
+          />
           <Sheet open={prefsOpen} onOpenChange={setPrefsOpen}>
             <SheetTrigger asChild>
               <Button type="button" variant="outline" size="icon" className="size-9 shrink-0" aria-label="My Briefs preferences">
@@ -270,35 +219,17 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
             </SheetContent>
           </Sheet>
         </div>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Input
+      }
+      controlBar={
+        <ListControlBar>
+        <ListSearch
           placeholder="Search briefs..."
-          value={qInput}
-          onChange={(e) => setQInput(e.target.value)}
+          initialValue={data.searchQuery}
           className="w-full sm:max-w-[280px]"
-          aria-label="Search briefs"
         />
         <div className="flex flex-wrap items-center gap-2">
-          {filterCount > 0 ? (
-            <Button type="button" variant="link" size="sm" className="h-8 px-1 text-xs" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          ) : null}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="gap-2">
-                <Filter className="size-3.5" />
-                Filters
-                {filterCount > 0 ? (
-                  <Badge variant="secondary" className="font-normal">
-                    {filterCount}
-                  </Badge>
-                ) : null}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 space-y-4" align="end">
+          <ListClearFilters activeCount={filterCount} />
+          <ListFilters activeCount={filterCount}>
               <div className="space-y-2">
                 <p className="text-xs font-medium">Brief types</p>
                 <div className="grid gap-2">
@@ -356,11 +287,11 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
                   <option value="90d">Last 90 days</option>
                 </select>
               </div>
-            </PopoverContent>
-          </Popover>
+          </ListFilters>
         </div>
-      </div>
-
+        </ListControlBar>
+      }
+    >
       {data.noSubscriptions ? (
         <div className="rounded-lg border bg-card px-6 py-12 text-center">
           <p className="text-sm text-muted-foreground">
@@ -380,12 +311,7 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
           </Button>
         </div>
       ) : data.totalCount === 0 && data.emptyBecauseFilters ? (
-        <div className="flex flex-col items-center rounded-lg border py-12 text-center">
-          <p className="text-sm text-muted-foreground">No briefs match your filters. Clear filters to see everything.</p>
-          <Button type="button" variant="outline" className="mt-4" onClick={clearFilters}>
-            Clear filters
-          </Button>
-        </div>
+        <ListEmptyState variant="filtered_empty" recordLabel="briefs" clearFiltersHref={pathname} />
       ) : data.totalCount === 0 ? (
         <div className="rounded-lg border py-12 text-center">
           <p className="text-sm text-muted-foreground">
@@ -396,27 +322,23 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
       ) : data.view === 'importance' ? (
         <div className="space-y-10">
           {data.newForYou.length > 0 ? (
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-xl font-semibold">New for you</h2>
-                <p className="text-sm text-muted-foreground">
-                  {data.newForYou.length} brief{data.newForYou.length === 1 ? '' : 's'} unread
-                </p>
-              </div>
+            <ListViewSection
+              title="New for you"
+              subtitle={`${data.newForYou.length} brief${data.newForYou.length === 1 ? '' : 's'} unread`}
+            >
               <ul className="space-y-3">{data.newForYou.map((c) => renderCard(c))}</ul>
               {data.newForYouOverflow > 0 ? (
                 <Link
-                  href={mergeHref(pathname, searchParams, { status: 'unread', view: null })}
+                  href={mergeListViewHref(pathname, searchParams, { status: 'unread', view: null })}
                   className="text-sm font-medium text-primary underline-offset-4 hover:underline"
                 >
                   View {data.newForYouOverflow} more new briefs →
                 </Link>
               ) : null}
-            </section>
+            </ListViewSection>
           ) : null}
 
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold">Recent</h2>
+          <ListViewSection title="Recent">
             {data.recent.length === 0 ? (
               <p className="text-sm text-muted-foreground">No read briefs in this view yet.</p>
             ) : (
@@ -425,7 +347,7 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
                 {data.hasMoreRecent ? (
                   <Button variant="outline" size="sm" asChild>
                     <Link
-                      href={mergeHref(pathname, searchParams, {
+                      href={mergeListViewHref(pathname, searchParams, {
                         roffset: String(data.recentOffset + 20),
                       })}
                     >
@@ -435,7 +357,7 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
                 ) : null}
               </>
             )}
-          </section>
+          </ListViewSection>
 
           {data.archived.length > 0 ? (
             <Collapsible defaultOpen={false} className="group">
@@ -454,8 +376,7 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
           ) : null}
         </div>
       ) : data.view === 'chronological' ? (
-        <div className="space-y-3">
-          <h2 className="text-xl font-semibold">All briefs</h2>
+        <ListViewSection title="All briefs">
           {data.chronological.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing to show.</p>
           ) : (
@@ -464,7 +385,7 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
               {data.hasMoreChronological ? (
                 <Button variant="outline" size="sm" asChild>
                   <Link
-                    href={mergeHref(pathname, searchParams, {
+                    href={mergeListViewHref(pathname, searchParams, {
                       coffset: String(data.chronologicalOffset + 20),
                     })}
                   >
@@ -474,18 +395,17 @@ export function MyBriefsClient({ data }: { data: MyBriefsPagePayload }) {
               ) : null}
             </>
           )}
-        </div>
+        </ListViewSection>
       ) : (
         <div className="space-y-10">
           {data.byType.map((sec) => (
-            <section key={sec.sectionTitle} className="space-y-3">
-              <h2 className="text-xl font-semibold">{sec.sectionTitle}</h2>
+            <ListViewSection key={sec.sectionTitle} title={sec.sectionTitle}>
               <ul className="space-y-3">{sec.cards.map((c) => renderCard(c))}</ul>
-            </section>
+            </ListViewSection>
           ))}
         </div>
       )}
-    </div>
+    </ListViewLayout>
   )
 }
 

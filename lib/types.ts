@@ -3,6 +3,17 @@
 export type {
   BriefReadStatus,
   BriefUserState,
+  ListCardBadge,
+  ListCardBadgeVariant,
+  ListCardConfidence,
+  ListCardData,
+  ListCardMetadata,
+  ListCardMetadataAttribution,
+  ListCardRelatedEntity,
+  ListCardScore,
+  RecordReadStatus,
+  UserRecordState,
+  UserRecordType,
 } from '@/lib/types/dosi'
 
 export type Category = 'buy-side' | 'sell-side' | 'channel' | 'regulatory'

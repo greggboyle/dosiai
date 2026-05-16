@@ -2,25 +2,18 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Plus, Search, Smartphone, ChevronRight, Trash2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Plus, Smartphone, ChevronRight, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { getRelativeTime } from '@/lib/types'
+import { ListViewLayout } from '@/components/list-view/list-view-layout'
+import { ListControlBar } from '@/components/list-view/list-control-bar'
+import { ListCard } from '@/components/list-view/list-card'
+import { ListEmptyState } from '@/components/list-view/list-empty-state'
+import { battleCardRowToListCardData } from '@/lib/battle-cards/battle-card-list-map'
 import { deleteBattleCard } from '@/lib/battle-cards/actions'
+import type { BattleCardListRow } from '@/lib/battle-cards/battle-card-types'
 
-export interface BattleCardListRow {
-  id: string
-  competitorId: string
-  competitorName: string
-  status: string
-  version: number
-  freshness_score: number | null
-  updated_at: string
-  aiDraftStatus: 'queued' | 'processing' | 'ready' | 'failed' | null
-}
+export type { BattleCardListRow }
 
 interface Props {
   cards: BattleCardListRow[]
@@ -38,116 +31,118 @@ export function BattleCardsListClient({ cards, canAuthor, canDelete }: Props) {
       c.status.toLowerCase().includes(q.toLowerCase())
   )
 
-  const handleDelete = React.useCallback(async (card: BattleCardListRow) => {
-    if (deletingId) return
-    const confirmed = window.confirm(
-      `Delete the battle card for ${card.competitorName}? This action cannot be undone.`
-    )
-    if (!confirmed) return
-    try {
-      setDeletingId(card.id)
-      await deleteBattleCard(card.id)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete battle card'
-      window.alert(message)
-    } finally {
-      setDeletingId(null)
-    }
-  }, [deletingId])
+  const handleDelete = React.useCallback(
+    async (card: BattleCardListRow) => {
+      if (deletingId) return
+      const confirmed = window.confirm(
+        `Delete the battle card for ${card.competitorName}? This action cannot be undone.`
+      )
+      if (!confirmed) return
+      try {
+        setDeletingId(card.id)
+        await deleteBattleCard(card.id)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to delete battle card'
+        window.alert(message)
+      } finally {
+        setDeletingId(null)
+      }
+    },
+    [deletingId]
+  )
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Battle cards</h1>
-          <p className="text-sm text-muted-foreground">
-            Interview-backed positioning, objections, and talk tracks per competitor
-          </p>
-        </div>
-        {canAuthor ? (
+    <ListViewLayout
+      className="mx-auto max-w-6xl px-4 py-6 md:px-6"
+      title="Battle cards"
+      subtitle="Interview-backed positioning, objections, and talk tracks per competitor"
+      layout="grid"
+      headerActions={
+        canAuthor ? (
           <Button asChild>
             <Link href="/battle-cards/new">
               <Plus className="size-4 mr-2" />
               New battle card
             </Link>
           </Button>
-        ) : null}
-      </div>
-
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} className="pl-9" />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {filtered.map((card) => {
-          const stale = card.freshness_score !== null && card.freshness_score < 60
+        ) : null
+      }
+      controlBar={
+        <ListControlBar>
+          <Input
+            placeholder="Search battle cards…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="w-full max-w-md"
+            aria-label="Search battle cards"
+          />
+        </ListControlBar>
+      }
+    >
+      {filtered.length === 0 ? (
+        <ListEmptyState
+          className="col-span-full"
+          variant="no_records"
+          recordLabel="battle cards"
+          description={
+            canAuthor
+              ? 'Create a battle card to run the interview flow.'
+              : 'Battle cards will appear here when your team publishes them.'
+          }
+          primaryAction={
+            canAuthor ? { label: 'New battle card', href: '/battle-cards/new' } : undefined
+          }
+        />
+      ) : (
+        filtered.map((card) => {
+          const data = battleCardRowToListCardData(card)
           return (
-            <Card key={card.id} className="hover:border-accent/40 transition-colors">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base">{card.competitorName}</CardTitle>
-                  <div className="flex items-center gap-1">
-                    {card.aiDraftStatus === 'queued' || card.aiDraftStatus === 'processing' ? (
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        AI drafting…
-                      </Badge>
-                    ) : null}
-                    <Badge variant={card.status === 'published' ? 'default' : 'secondary'} className="text-[10px] shrink-0">
-                      {card.status}
-                    </Badge>
-                  </div>
-                </div>
-                <CardDescription className="text-xs">
-                  v{card.version}
-                  {card.freshness_score != null ? (
-                    <>
-                      {' · '}
-                      <span className={cn(stale && 'text-amber-500')}>freshness {card.freshness_score}</span>
-                    </>
-                  ) : null}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex items-center justify-between gap-2 pt-0">
-                <span className="text-xs text-muted-foreground">
-                  Updated {getRelativeTime(card.updated_at)}
-                </span>
-                <div className="flex gap-2">
+            <ListCard
+              key={card.id}
+              data={data}
+              href={`/battle-cards/${card.id}/edit`}
+              customRight={
+                <div className="flex shrink-0 flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   {canDelete ? (
                     <Button
+                      type="button"
                       variant="destructive"
                       size="sm"
                       disabled={deletingId === card.id}
-                      onClick={() => void handleDelete(card)}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        void handleDelete(card)
+                      }}
                     >
                       <Trash2 className="size-3.5 mr-1" />
                       {deletingId === card.id ? 'Deleting…' : 'Delete'}
                     </Button>
                   ) : null}
-                  <Button variant="outline" size="sm" asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <Link href={`/rep/${card.competitorId}`} target="_blank">
                       <Smartphone className="size-3.5 mr-1" />
                       Rep
                     </Link>
                   </Button>
-                  <Button size="sm" asChild>
+                  <Button type="button" size="sm" asChild onClick={(e) => e.stopPropagation()}>
                     <Link href={`/battle-cards/${card.id}/edit`}>
                       Open
                       <ChevronRight className="size-4 ml-1" />
                     </Link>
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              }
+            />
           )
-        })}
-      </div>
-
-      {filtered.length === 0 && (
-        <p className="text-sm text-muted-foreground py-8 text-center">
-          {canAuthor ? 'Create a battle card to run the interview flow.' : 'No battle cards yet.'}
-        </p>
+        })
       )}
-    </div>
+    </ListViewLayout>
   )
 }

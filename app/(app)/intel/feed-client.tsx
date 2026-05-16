@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -34,19 +33,28 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { FeedList } from '@/components/feed/feed-list'
+import { IntelFeedList } from '@/components/feed/intel-feed-list'
+import { ListKeyboardShortcuts } from '@/components/list-view/list-keyboard-shortcuts'
+import type { ListCardDensity } from '@/components/list-view/list-card'
 import { FeedDetail } from '@/components/feed/feed-detail'
+import { ListBulkActions } from '@/components/list-view/list-bulk-actions'
+import { ListDensityToggle } from '@/components/list-view/list-density-toggle'
 import type { IntelligenceItem, Category } from '@/lib/types'
+import type { FeedSubject } from '@/lib/feed/queries'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useMediaQuery } from '@/hooks/use-media-query'
+import { toast } from 'sonner'
 import {
   attachCompetitorToIntelligenceItem,
   detachCompetitorFromIntelligenceItem,
   markIntelligenceItemReviewed,
   setIntelligenceItemWatching,
   updateIntelligenceItemEventDate,
+  bulkMarkIntelItemsRead,
+  setIntelligenceItemBookmarked,
 } from '@/lib/intelligence/actions'
 import { fetchFeedItemsForFilters } from './actions'
+import { useUserRecordStateBroadcast } from '@/lib/realtime/user-record-state'
 
 // Helper to create mock dates relative to "now" - using fixed offsets in hours
 function createMockDate(hoursAgo: number): string {
@@ -432,8 +440,6 @@ Note: Reddit reports are unverified and may not represent the full scope of the 
 
 type ViewTab = 'today' | 'week' | 'watching' | 'all' | 'review'
 type SortOption = 'score' | 'recent' | 'competitor' | 'collected'
-type SubjectFilter = 'competitors' | 'our-company'
-
 function getEventTimestampMs(item: IntelligenceItem): number {
   return item.eventDate ? new Date(item.eventDate).getTime() : Number.NaN
 }
@@ -455,16 +461,20 @@ export function FeedClient({
   totalItems,
   totalPages,
   initialSelectedItem,
+  listHeaderSubtitle,
+  userId,
 }: {
   initialItems: IntelligenceItem[]
   competitorOptions: Array<{ id: string; name: string }>
   reviewQueueThreshold?: number
-  initialSubject?: SubjectFilter
+  initialSubject?: FeedSubject
   currentPage: number
   pageSize: number
   totalItems: number
   totalPages: number
   initialSelectedItem?: IntelligenceItem | null
+  listHeaderSubtitle?: string | null
+  userId?: string
 }) {
   const [items, setItems] = React.useState<IntelligenceItem[]>(() => {
     if (!initialSelectedItem) return initialItems
@@ -493,8 +503,25 @@ export function FeedClient({
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+
+  const onRecordStateEvent = React.useCallback(() => {
+    router.refresh()
+  }, [router])
+  useUserRecordStateBroadcast(userId, onRecordStateEvent)
   const [activeTab, setActiveTab] = React.useState<ViewTab>('all')
-  const [subject, setSubject] = React.useState<SubjectFilter>(initialSubject)
+  const [subject, setSubject] = React.useState<FeedSubject>(initialSubject)
+  const [bulkSelectMode, setBulkSelectMode] = React.useState(false)
+  const [bulkSelectedIds, setBulkSelectedIds] = React.useState<string[]>([])
+  const [focusedIndex, setFocusedIndex] = React.useState(0)
+
+  const density: ListCardDensity =
+    searchParams.get('density') === 'compact' || searchParams.get('density') === 'dense'
+      ? (searchParams.get('density') as ListCardDensity)
+      : 'comfortable'
+
+  const toggleBulkSelect = React.useCallback((id: string) => {
+    setBulkSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }, [])
 
   React.useEffect(() => {
     const tabFromUrl = searchParams.get('tab')
@@ -503,7 +530,9 @@ export function FeedClient({
     } else {
       setActiveTab('all')
     }
-    const subjectFromUrl = searchParams.get('subject') === 'our-company' ? 'our-company' : 'competitors'
+    const s = searchParams.get('subject')
+    const subjectFromUrl: FeedSubject =
+      s === 'our-company' ? 'our-company' : s === 'all' ? 'all' : 'competitors'
     setSubject(subjectFromUrl)
   }, [searchParams])
 
@@ -733,6 +762,10 @@ export function FeedClient({
     reviewQueueThreshold,
   ])
 
+  React.useEffect(() => {
+    setFocusedIndex((i) => Math.min(i, Math.max(0, filteredItems.length - 1)))
+  }, [filteredItems.length, activeTab, subject])
+
   const handleMarkReviewed = React.useCallback(
     async (item: IntelligenceItem) => {
       await markIntelligenceItemReviewed(item.id)
@@ -911,9 +944,8 @@ export function FeedClient({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [detailOpen, goToNextVisibleItem, goToPreviousVisibleItem])
 
-  const handleSubjectToggle = React.useCallback(
-    (checked: boolean) => {
-      const next = checked ? 'our-company' : 'competitors'
+  const handleSubjectChange = React.useCallback(
+    (next: FeedSubject) => {
       const params = new URLSearchParams(searchParams.toString())
       params.set('subject', next)
       params.set('page', '1')
@@ -933,25 +965,38 @@ export function FeedClient({
             <div>
               <h1 className="text-xl font-semibold tracking-tight">Market Intelligence</h1>
               <p className="text-sm text-muted-foreground">
-                {hasServerSideFilters
-                  ? `${dataSource.length} matching item${dataSource.length !== 1 ? 's' : ''}`
-                  : `${totalItems} intelligence item${totalItems !== 1 ? 's' : ''} total`}
+                {listHeaderSubtitle ??
+                  (hasServerSideFilters
+                    ? `${dataSource.length} matching item${dataSource.length !== 1 ? 's' : ''}`
+                    : `${totalItems} intelligence item${totalItems !== 1 ? 's' : ''} total`)}
                 {isFilterQueryLoading ? ' · applying filters…' : ''}
               </p>
             </div>
-            <div className="flex w-full items-center justify-center gap-2 rounded-md border px-3 py-1.5 md:w-auto">
-              <Label htmlFor="feed-subject-switch" className="text-xs text-muted-foreground">
-                Competitors
-              </Label>
-              <Switch
-                id="feed-subject-switch"
-                checked={subject === 'our-company'}
-                onCheckedChange={handleSubjectToggle}
-                aria-label="Toggle feed subject between competitors and our company"
-              />
-              <Label htmlFor="feed-subject-switch" className="text-xs text-muted-foreground">
-                Our Company
-              </Label>
+            <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-row md:items-center">
+              <div className="flex flex-wrap items-center gap-1 rounded-md border p-1">
+                {(['competitors', 'our-company', 'all'] as const).map((key) => (
+                  <Button
+                    key={key}
+                    size="sm"
+                    variant={subject === key ? 'default' : 'ghost'}
+                    className="h-8 text-xs"
+                    onClick={() => handleSubjectChange(key)}
+                  >
+                    {key === 'competitors' ? 'Competitors' : key === 'our-company' ? 'Our Company' : 'All'}
+                  </Button>
+                ))}
+              </div>
+              <Button
+                size="sm"
+                variant={bulkSelectMode ? 'secondary' : 'outline'}
+                className="h-8 text-xs"
+                onClick={() => {
+                  setBulkSelectMode((v) => !v)
+                  setBulkSelectedIds([])
+                }}
+              >
+                {bulkSelectMode ? 'Done selecting' : 'Select'}
+              </Button>
             </div>
           </div>
 
@@ -1269,7 +1314,7 @@ export function FeedClient({
               Unread Only
             </Button>
 
-            <div className="flex-1" />
+            <ListDensityToggle className="hidden sm:inline-flex" />
 
             {/* Sort */}
             <DropdownMenu>
@@ -1305,12 +1350,50 @@ export function FeedClient({
           )}
         </div>
 
+        <ListKeyboardShortcuts
+          enabled={!detailOpen}
+          focusedIndex={focusedIndex}
+          itemCount={filteredItems.length}
+          onFocusIndex={setFocusedIndex}
+          onOpenFocused={() => {
+            const item = filteredItems[focusedIndex]
+            if (item) handleSelectItem(item)
+          }}
+          onMarkRead={() => {
+            const item = filteredItems[focusedIndex]
+            if (item) void bulkMarkIntelItemsRead([item.id]).then(() => router.refresh())
+          }}
+          onSave={() => {
+            const item = filteredItems[focusedIndex]
+            if (!item) return
+            void setIntelligenceItemBookmarked(item.id, !item.isBookmarked).then(() => router.refresh())
+          }}
+          onDismiss={() => {
+            const item = filteredItems[focusedIndex]
+            if (item) void bulkMarkIntelItemsRead([item.id]).then(() => router.refresh())
+          }}
+        />
+
         {/* Feed List */}
-        <FeedList
+        <IntelFeedList
           items={filteredItems}
           selectedId={selectedItem?.id}
+          focusedIndex={focusedIndex}
+          density={density}
           onSelect={handleSelectItem}
-          onToggleWatching={handleToggleWatching}
+          bulkSelectMode={bulkSelectMode}
+          bulkSelectedIds={bulkSelectedIds}
+          onToggleBulkSelect={toggleBulkSelect}
+        />
+        <ListBulkActions
+          selectedCount={bulkSelectedIds.length}
+          onMarkRead={async () => {
+            await bulkMarkIntelItemsRead(bulkSelectedIds)
+            toast.success('Marked read')
+            setBulkSelectedIds([])
+            router.refresh()
+          }}
+          onClear={() => setBulkSelectedIds([])}
         />
         <div className="flex items-center justify-between border-t border-border px-6 py-3">
           <div className="text-xs text-muted-foreground">

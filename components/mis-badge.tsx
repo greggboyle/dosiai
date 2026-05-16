@@ -7,6 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { ListConsensusIndicator } from '@/components/list-view/list-consensus-indicator'
 
 interface MISBadgeProps {
   score: MISScore
@@ -133,18 +134,7 @@ export function MISBadgeExtended({
     <div className={cn('flex items-center gap-1.5', className)}>
       <MISBadge score={score} size={size} showConfidence={showConfidence} />
       {vendorConsensus && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {vendorConsensus.confirmed}/{vendorConsensus.total}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top">
-            <p className="text-xs">
-              {vendorConsensus.confirmed} of {vendorConsensus.total} AI vendors confirmed this signal
-            </p>
-          </TooltipContent>
-        </Tooltip>
+        <ListConsensusIndicator confirmed={vendorConsensus.confirmed} total={vendorConsensus.total} />
       )}
     </div>
   )

@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { intelligenceItemFromDb } from '@/lib/intelligence/map-row'
 import type { IntelligenceItem } from '@/lib/types'
 
-export type FeedSubject = 'competitors' | 'our-company'
+export type FeedSubject = 'competitors' | 'our-company' | 'all'
 
 export type FeedServerFilters = {
   subject?: FeedSubject
@@ -105,7 +105,8 @@ export async function listFeedItems(
     .select('*')
     .eq('workspace_id', workspaceId)
     .eq('visibility', 'feed')
-  query = subject === 'our-company' ? query.eq('is_about_self', true) : query.eq('is_about_self', false)
+  if (subject === 'our-company') query = query.eq('is_about_self', true)
+  else if (subject === 'competitors') query = query.eq('is_about_self', false)
 
   const { data: rows, error } = await query
     .order('event_at', { ascending: false, nullsFirst: false })
@@ -132,7 +133,8 @@ export async function listFeedItemsPage(
     .select('*', { count: 'exact' })
     .eq('workspace_id', workspaceId)
     .eq('visibility', 'feed')
-  query = subject === 'our-company' ? query.eq('is_about_self', true) : query.eq('is_about_self', false)
+  if (subject === 'our-company') query = query.eq('is_about_self', true)
+  else if (subject === 'competitors') query = query.eq('is_about_self', false)
 
   const { data: rows, error, count } = await query
     .order('event_at', { ascending: false, nullsFirst: false })
@@ -180,7 +182,8 @@ export async function listFeedItemsFiltered(
     .eq('workspace_id', workspaceId)
     .eq('visibility', 'feed')
 
-  query = subject === 'our-company' ? query.eq('is_about_self', true) : query.eq('is_about_self', false)
+  if (subject === 'our-company') query = query.eq('is_about_self', true)
+  else if (subject === 'competitors') query = query.eq('is_about_self', false)
   if (categories.length > 0) query = query.in('category', categories as string[])
   if (minScore > 0) query = query.gte('mi_score', minScore)
   if (filters.customerVoiceOnly) query = query.not('review_metadata', 'is', null)
