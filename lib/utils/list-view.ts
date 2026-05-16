@@ -10,6 +10,9 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** Hyphen, en/em dash, or colon after a type badge in titles (hyphen first — safe in `[]`). */
+const TITLE_BADGE_SEP = '[-—–:]'
+
 /**
  * Remove redundant type prefixes from brief titles when the badge already names the type,
  * or when a primary badge label repeats at the start of the title.
@@ -25,7 +28,7 @@ export function stripRedundantPrefix(
   if (typeof ref === 'string') {
     const badge = ref.trim()
     if (!badge) return t
-    const re = new RegExp(`^${escapeRegex(badge)}\\s*[—–-:]\\s*`, 'i')
+    const re = new RegExp(`^${escapeRegex(badge)}\\s*${TITLE_BADGE_SEP}\\s*`, 'i')
     return stripLeading(t, re)
   }
 
@@ -35,7 +38,7 @@ export function stripRedundantPrefix(
     case 'sweep_summary':
       return stripLeading(
         t,
-        /^(sweep\s+summary\s*:\s*|sweep\s+summary\s*[—–-]\s*|sweep\s*:\s*)/i
+        /^(sweep\s+summary\s*:\s*|sweep\s+summary\s*[-—–]\s*|sweep\s*:\s*)/i
       )
     case 'competitor':
       return stripLeading(
