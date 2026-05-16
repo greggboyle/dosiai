@@ -8,6 +8,7 @@ import type { BriefReadStatus } from '@/lib/types/dosi'
 import { getRelativeTime } from '@/lib/types'
 import type { Database } from '@/lib/supabase/types'
 import type { MyBriefsPagePayload, BriefCardData, MyBriefsViewMode } from '@/lib/brief/my-briefs-types'
+import { fetchBriefReadStates } from '@/lib/brief/brief-read-state'
 
 type BriefRow = Database['public']['Tables']['brief']['Row']
 
@@ -122,16 +123,8 @@ export async function countMyMarketUnread(workspaceId: string, userId: string): 
   const briefIds = (briefRows ?? []).map((b) => b.id)
   if (briefIds.length === 0) return 0
 
-  const { data: states, error: stErr } = await supabase
-    .from('user_record_state')
-    .select('record_id, status')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', userId)
-    .eq('record_type', 'brief')
-    .in('record_id', briefIds)
-
-  if (stErr) throw stErr
-  const stateMap = new Map((states ?? []).map((s) => [s.record_id, s.status]))
+  const readStates = await fetchBriefReadStates(workspaceId, userId, briefIds)
+  const stateMap = new Map([...readStates.entries()].map(([id, s]) => [id, s.status]))
 
   return briefIds.filter((id) => {
     const st = stateMap.get(id)
@@ -280,16 +273,10 @@ export async function loadMyBriefsPageData(
   }
 
   const ids = rows.map((r) => r.id)
-  const { data: states, error: sErr } = await supabase
-    .from('user_record_state')
-    .select('record_id, status, read_at')
-    .eq('workspace_id', workspaceId)
-    .eq('user_id', userId)
-    .eq('record_type', 'brief')
-    .in('record_id', ids)
-
-  if (sErr) throw sErr
-  const stateMap = new Map((states ?? []).map((s) => [s.record_id, { status: s.status, read_at: s.read_at }]))
+  const readStates = await fetchBriefReadStates(workspaceId, userId, ids)
+  const stateMap = new Map(
+    [...readStates.entries()].map(([id, s]) => [id, { status: s.status, read_at: s.read_at }])
+  )
 
   let cards: BriefCardData[] = rows.map((r) => rowToCardData(r, userId, stateMap, authorSelfLabel))
 

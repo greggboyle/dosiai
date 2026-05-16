@@ -5,6 +5,10 @@ import { getSession } from '@/lib/auth/session'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { withWorkspace } from '@/lib/auth/workspace'
 import type { RecordReadStatus, UserRecordType } from '@/lib/types/dosi'
+import { isPostgrestMissingTable } from '@/lib/supabase/postgrest-errors'
+
+const MIGRATION_HINT =
+  'Apply Supabase migrations 0042_brief_user_state.sql and 0044_user_record_state.sql, then reload the API schema.'
 
 async function resolveWorkspaceForRecord(
   recordType: UserRecordType,
@@ -70,14 +74,14 @@ async function broadcastRecordState(userId: string, payload: Record<string, unkn
   })
 }
 
-function dualWriteBriefUserState(
+async function dualWriteBriefUserState(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   briefId: string,
   userId: string,
   status: RecordReadStatus,
   now: string
 ) {
-  return supabase.from('brief_user_state').upsert(
+  const { error } = await supabase.from('brief_user_state').upsert(
     {
       brief_id: briefId,
       user_id: userId,
@@ -87,6 +91,61 @@ function dualWriteBriefUserState(
     },
     { onConflict: 'brief_id,user_id' }
   )
+  if (error && !isPostgrestMissingTable(error)) throw error
+}
+
+async function upsertUserRecordState(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  row: {
+    workspace_id: string
+    record_type: UserRecordType
+    record_id: string
+    user_id: string
+    status: RecordReadStatus
+    read_at: string | null
+    saved_at: string | null
+    dismissed_at: string | null
+    updated_at: string
+  }
+) {
+  const { error } = await supabase.from('user_record_state').upsert(row, {
+    onConflict: 'record_type,record_id,user_id',
+  })
+  if (!error) return
+
+  if (isPostgrestMissingTable(error) && row.record_type === 'brief') {
+    const { error: legacyErr } = await supabase.from('brief_user_state').upsert(
+      {
+        brief_id: row.record_id,
+        user_id: row.user_id,
+        status: row.status,
+        read_at: row.updated_at,
+        updated_at: row.updated_at,
+      },
+      { onConflict: 'brief_id,user_id' }
+    )
+    if (!legacyErr) return
+    if (!isPostgrestMissingTable(legacyErr)) throw legacyErr
+
+    if (row.status === 'read') {
+      const { error: readErr } = await supabase.from('brief_user_read').upsert(
+        {
+          brief_id: row.record_id,
+          user_id: row.user_id,
+          read_at: row.updated_at,
+        },
+        { onConflict: 'user_id,brief_id' }
+      )
+      if (!readErr) return
+      if (isPostgrestMissingTable(readErr)) throw new Error(MIGRATION_HINT)
+      throw readErr
+    }
+
+    throw new Error(MIGRATION_HINT)
+  }
+
+  if (isPostgrestMissingTable(error)) throw new Error(MIGRATION_HINT)
+  throw error
 }
 
 export async function markRecordRead(recordType: UserRecordType, recordId: string): Promise<void> {
@@ -97,25 +156,20 @@ export async function markRecordRead(recordType: UserRecordType, recordId: strin
 
   await withWorkspace(workspaceId, ['admin', 'analyst', 'viewer'], async ({ user }) => {
     const supabase = await createSupabaseServerClient()
-    const { error: uErr } = await supabase.from('user_record_state').upsert(
-      {
-        workspace_id: workspaceId,
-        record_type: recordType,
-        record_id: recordId,
-        user_id: user.id,
-        status: 'read',
-        read_at: now,
-        saved_at: null,
-        dismissed_at: null,
-        updated_at: now,
-      },
-      { onConflict: 'record_type,record_id,user_id' }
-    )
-    if (uErr) throw uErr
+    await upsertUserRecordState(supabase, {
+      workspace_id: workspaceId,
+      record_type: recordType,
+      record_id: recordId,
+      user_id: user.id,
+      status: 'read',
+      read_at: now,
+      saved_at: null,
+      dismissed_at: null,
+      updated_at: now,
+    })
 
     if (recordType === 'brief') {
-      const { error: bErr } = await dualWriteBriefUserState(supabase, recordId, user.id, 'read', now)
-      if (bErr) throw bErr
+      await dualWriteBriefUserState(supabase, recordId, user.id, 'read', now)
       await supabase
         .from('user_notification')
         .update({ read_at: now })
@@ -140,7 +194,7 @@ export async function saveRecord(recordType: UserRecordType, recordId: string): 
 
   await withWorkspace(workspaceId, ['admin', 'analyst', 'viewer'], async ({ user }) => {
     const supabase = await createSupabaseServerClient()
-    const { data: row } = await supabase
+    const { data: row, error: readErr } = await supabase
       .from('user_record_state')
       .select('status')
       .eq('record_type', recordType)
@@ -148,26 +202,23 @@ export async function saveRecord(recordType: UserRecordType, recordId: string): 
       .eq('user_id', user.id)
       .maybeSingle()
 
+    if (readErr && !isPostgrestMissingTable(readErr)) throw readErr
+
     const nextStatus: RecordReadStatus = row?.status === 'saved' ? 'read' : 'saved'
-    const { error: uErr } = await supabase.from('user_record_state').upsert(
-      {
-        workspace_id: workspaceId,
-        record_type: recordType,
-        record_id: recordId,
-        user_id: user.id,
-        status: nextStatus,
-        read_at: now,
-        saved_at: nextStatus === 'saved' ? now : null,
-        dismissed_at: null,
-        updated_at: now,
-      },
-      { onConflict: 'record_type,record_id,user_id' }
-    )
-    if (uErr) throw uErr
+    await upsertUserRecordState(supabase, {
+      workspace_id: workspaceId,
+      record_type: recordType,
+      record_id: recordId,
+      user_id: user.id,
+      status: nextStatus,
+      read_at: now,
+      saved_at: nextStatus === 'saved' ? now : null,
+      dismissed_at: null,
+      updated_at: now,
+    })
 
     if (recordType === 'brief') {
-      const { error: bErr } = await dualWriteBriefUserState(supabase, recordId, user.id, nextStatus, now)
-      if (bErr) throw bErr
+      await dualWriteBriefUserState(supabase, recordId, user.id, nextStatus, now)
     }
 
     await broadcastRecordState(user.id, { recordType, recordId, status: nextStatus })
@@ -185,24 +236,20 @@ export async function dismissRecord(recordType: UserRecordType, recordId: string
 
   await withWorkspace(workspaceId, ['admin', 'analyst', 'viewer'], async ({ user }) => {
     const supabase = await createSupabaseServerClient()
-    const { error: uErr } = await supabase.from('user_record_state').upsert(
-      {
-        workspace_id: workspaceId,
-        record_type: recordType,
-        record_id: recordId,
-        user_id: user.id,
-        status: 'dismissed',
-        read_at: now,
-        dismissed_at: now,
-        updated_at: now,
-      },
-      { onConflict: 'record_type,record_id,user_id' }
-    )
-    if (uErr) throw uErr
+    await upsertUserRecordState(supabase, {
+      workspace_id: workspaceId,
+      record_type: recordType,
+      record_id: recordId,
+      user_id: user.id,
+      status: 'dismissed',
+      read_at: now,
+      saved_at: null,
+      dismissed_at: now,
+      updated_at: now,
+    })
 
     if (recordType === 'brief') {
-      const { error: bErr } = await dualWriteBriefUserState(supabase, recordId, user.id, 'dismissed', now)
-      if (bErr) throw bErr
+      await dualWriteBriefUserState(supabase, recordId, user.id, 'dismissed', now)
     }
 
     await broadcastRecordState(user.id, { recordType, recordId, status: 'dismissed' })
@@ -229,24 +276,19 @@ export async function bulkUpdateRecordStatus(
     for (const recordId of recordIds) {
       const ws = await resolveWorkspaceForRecord(recordType, recordId)
       if (ws !== workspaceId) throw new Error('Mixed workspace batch not supported')
-      const { error: uErr } = await supabase.from('user_record_state').upsert(
-        {
-          workspace_id: workspaceId,
-          record_type: recordType,
-          record_id: recordId,
-          user_id: user.id,
-          status: newStatus,
-          read_at: newStatus === 'read' || newStatus === 'saved' || newStatus === 'dismissed' ? now : null,
-          saved_at: newStatus === 'saved' ? now : null,
-          dismissed_at: newStatus === 'dismissed' ? now : null,
-          updated_at: now,
-        },
-        { onConflict: 'record_type,record_id,user_id' }
-      )
-      if (uErr) throw uErr
+      await upsertUserRecordState(supabase, {
+        workspace_id: workspaceId,
+        record_type: recordType,
+        record_id: recordId,
+        user_id: user.id,
+        status: newStatus,
+        read_at: newStatus === 'read' || newStatus === 'saved' || newStatus === 'dismissed' ? now : null,
+        saved_at: newStatus === 'saved' ? now : null,
+        dismissed_at: newStatus === 'dismissed' ? now : null,
+        updated_at: now,
+      })
       if (recordType === 'brief') {
-        const { error: bErr } = await dualWriteBriefUserState(supabase, recordId, user.id, newStatus, now)
-        if (bErr) throw bErr
+        await dualWriteBriefUserState(supabase, recordId, user.id, newStatus, now)
       }
     }
     await broadcastRecordState(user.id, { recordType, recordIds, status: newStatus, bulk: true })
